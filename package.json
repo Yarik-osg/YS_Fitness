@@ -15,6 +15,9 @@
     "typecheck:staged": "node scripts/run-staged-typecheck.mjs",
     "lint:staged": "lint-staged",
     "prepare": "husky",
+    "docker:up": "docker compose up -d --wait postgres",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && docker compose up -d --wait postgres",
     "db:generate": "pnpm --filter api prisma:generate",
     "db:migrate": "pnpm --filter api prisma:migrate",
     "db:seed": "pnpm --filter api prisma:seed"
