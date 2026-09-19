@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CLIENT
+  TRAINER
+  ADMIN
+}
+
+enum BiologicalSexForCalculation {
+  MALE
+  FEMALE
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHTLY_ACTIVE
+  MODERATELY_ACTIVE
+  VERY_ACTIVE
+  EXTRA_ACTIVE
+}
+
+enum FitnessGoal {
+  LOSE_WEIGHT
+  MAINTAIN_WEIGHT
+  GAIN_WEIGHT
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(320)
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(CLIENT)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  profile          UserProfile?
+  bodyMeasurements BodyMeasurement[]
+  authSessions     AuthSession[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id                          String                      @id @default(uuid()) @db.Uuid
+  userId                      String                      @unique @map("user_id") @db.Uuid
+  dateOfBirth                 DateTime                    @map("date_of_birth") @db.Date
+  biologicalSexForCalculation BiologicalSexForCalculation @map("biological_sex_for_calculation")
+  heightCm                    Decimal                     @map("height_cm") @db.Decimal(5, 2)
+  activityLevel               ActivityLevel               @map("activity_level")
+  /// Current goal only. Goal history is intentionally deferred to a future tracked-history model.
+  goal                        FitnessGoal
+  healthRestrictions          Json?                       @map("health_restrictions")
+  timezone                    String                      @default("UTC") @db.VarChar(100)
+  onboardingCompletedAt       DateTime?                   @map("onboarding_completed_at")
+  createdAt                   DateTime                    @default(now()) @map("created_at")
+  updatedAt                   DateTime                    @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model BodyMeasurement {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  weightKg       Decimal  @map("weight_kg") @db.Decimal(6, 2)
+  bodyFatPercent Decimal? @map("body_fat_percent") @db.Decimal(5, 2)
+  measuredAt     DateTime @default(now()) @map("measured_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, measuredAt(sort: Desc)])
+  @@map("body_measurements")
+}
+
+model AuthSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  userAgent  String?   @map("user_agent") @db.VarChar(500)
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  deviceName String?   @map("device_name") @db.VarChar(100)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens AuthRefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@map("auth_sessions")
+}
+
+model AuthRefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  session AuthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@map("auth_refresh_tokens")
+}
