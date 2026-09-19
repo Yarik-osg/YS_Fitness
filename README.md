@@ -15,13 +15,14 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for domain boundaries and [CONTRIBUTING.
 
 ## Local setup
 
-Requirements: Node.js 20+, pnpm 10, and Docker.
+Requirements: Node.js 20+, pnpm 10, and a Docker-compatible runtime. On macOS, [OrbStack](https://orbstack.dev/) is the recommended lightweight runtime; Docker Desktop is also supported. This repository uses the modern `docker compose` plugin syntax.
 
 ```bash
+cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
-docker compose up -d postgres
 pnpm install
+pnpm docker:up
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
@@ -30,6 +31,23 @@ pnpm dev
 The web app runs at `http://localhost:3000`; the API runs at `http://localhost:3001/api/v1`. Swagger is available at `/api/v1/docs`, and health checks use `GET /api/v1/health`.
 
 Set real random values for all secret variables and change the trainer seed password before running the seed. `pnpm db:seed` is explicit and idempotent; application startup never seeds data.
+
+### Local containers
+
+The root `.env` owns local container settings. `apps/api/.env` owns the API connection string and must use matching PostgreSQL credentials.
+
+```bash
+# Start PostgreSQL and wait for its healthcheck
+pnpm docker:up
+
+# Stop containers while preserving database data
+pnpm docker:down
+
+# Delete local database data and start a fresh PostgreSQL instance
+pnpm docker:reset
+```
+
+PostgreSQL data persists in the named `postgres_data` volume. The Compose file is structured so Redis can be added under `services` when queues and caching are implemented.
 
 ## Authentication endpoints
 
