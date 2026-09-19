@@ -21,6 +21,10 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }));
 
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe('LandingPage', () => {
   afterEach(() => {
     cleanup();

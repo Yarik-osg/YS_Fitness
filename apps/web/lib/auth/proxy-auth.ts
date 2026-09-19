@@ -27,6 +27,13 @@ export function splitLocalePath(pathname: string): {
   };
 }
 
+export function withLocalePrefix(pathname: string, locale: AppLocale): string {
+  const { pathnameWithoutLocale } = splitLocalePath(pathname);
+  return pathnameWithoutLocale === '/'
+    ? `/${locale}`
+    : `/${locale}${pathnameWithoutLocale}`;
+}
+
 export function applyAuthRedirect({
   pathnameWithoutLocale,
   locale,

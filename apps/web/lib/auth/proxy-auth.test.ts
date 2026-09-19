@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyAuthRedirect, splitLocalePath } from './proxy-auth';
+import {
+  applyAuthRedirect,
+  splitLocalePath,
+  withLocalePrefix,
+} from './proxy-auth';
 
 describe('splitLocalePath', () => {
   it('strips a supported locale prefix', () => {
@@ -14,6 +18,12 @@ describe('splitLocalePath', () => {
       locale: 'uk',
       pathnameWithoutLocale: '/login',
     });
+  });
+});
+
+describe('withLocalePrefix', () => {
+  it('replaces an existing locale prefix', () => {
+    expect(withLocalePrefix('/uk/dashboard', 'en')).toBe('/en/dashboard');
   });
 });
 
