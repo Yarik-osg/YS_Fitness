@@ -29,4 +29,16 @@ describe('LocaleSwitcher', () => {
 
     expect(replace).toHaveBeenCalledWith('/register', { locale: 'en' });
   });
+
+  it('labels the chip as EN when the locale is English', () => {
+    render(
+      <I18nTestProvider locale="en">
+        <LocaleSwitcher />
+      </I18nTestProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Change language/i }),
+    ).toHaveTextContent('EN');
+  });
 });

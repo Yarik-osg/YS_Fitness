@@ -1,5 +1,7 @@
 'use client';
 
+import UA from 'country-flag-icons/react/3x2/UA';
+import US from 'country-flag-icons/react/3x2/US';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
 
@@ -9,6 +11,7 @@ export function LocaleSwitcher() {
   const router = useRouter();
   const t = useTranslations('marketing');
   const nextLocale = locale === 'uk' ? 'en' : 'uk';
+  const Flag = locale === 'en' ? US : UA;
 
   return (
     <button
@@ -17,10 +20,7 @@ export function LocaleSwitcher() {
       onClick={() => router.replace(pathname, { locale: nextLocale })}
       className="flex items-center gap-1 font-label text-[6px] tracking-[0.1em] text-white"
     >
-      <span className="flex flex-col gap-px">
-        <span className="h-1 w-2.5 rounded-[1px] bg-[#2346f2]" />
-        <span className="h-1 w-2.5 rounded-[1px] bg-[#eaf134]" />
-      </span>
+      <Flag aria-hidden className="h-2.5 w-[15px] rounded-[1px]" />
       {locale === 'uk' ? t('nav.localeUk') : t('nav.localeEn')}
     </button>
   );
