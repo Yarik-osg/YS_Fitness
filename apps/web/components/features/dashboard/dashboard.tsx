@@ -1,9 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { Activity, Dumbbell, Salad } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
+import { useRouter } from '@/i18n/navigation';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
@@ -11,6 +12,7 @@ export function Dashboard() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
+  const t = useTranslations('dashboard');
 
   async function signOut() {
     await logout.mutateAsync().catch(() => undefined);
@@ -27,16 +29,16 @@ export function Dashboard() {
           onClick={() => void signOut()}
           disabled={logout.isPending}
         >
-          Вийти
+          {t('logout')}
         </Button>
       </nav>
 
       <header className="pb-10 pt-14">
         <p className="font-label text-[10px] uppercase tracking-[0.2em] text-accent">
-          Особистий кабінет
+          {t('eyebrow')}
         </p>
         <h1 className="mt-3 max-w-lg font-heading text-5xl uppercase leading-none">
-          Твоя система <span className="text-accent">прогресу</span>
+          {t('title')} <span className="text-accent">{t('titleAccent')}</span>
         </h1>
         <p className="mt-5 text-sm text-muted">{user?.email}</p>
       </header>
@@ -44,18 +46,18 @@ export function Dashboard() {
       <section className="grid gap-4 md:grid-cols-3">
         <DashboardCard
           icon={<Dumbbell />}
-          title="Тренування"
-          text="Персональна програма з’явиться тут у наступному модулі."
+          title={t('workouts.title')}
+          text={t('workouts.text')}
         />
         <DashboardCard
           icon={<Salad />}
-          title="Харчування"
-          text="Калорії та макроси будуть розраховані окремо."
+          title={t('nutrition.title')}
+          text={t('nutrition.text')}
         />
         <DashboardCard
           icon={<Activity />}
-          title="Прогрес"
-          text="Виміри, фото й історія результатів — скоро."
+          title={t('progress.title')}
+          text={t('progress.text')}
         />
       </section>
     </main>

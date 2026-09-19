@@ -1,22 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { FAQ_ITEMS } from './landing-content';
+import { useTranslations } from 'next-intl';
 
 export function FaqSection() {
+  const t = useTranslations('marketing');
+  const items = t.raw('faq.items') as { q: string; a: string }[];
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
     <section className="border-t border-white/6 px-5 py-14">
       <p className="mb-2 font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-        Питання
+        {t('faq.eyebrow')}
       </p>
       <h2 className="font-heading text-[1.9rem] font-normal uppercase leading-tight tracking-tight">
-        FAQ
+        {t('faq.heading')}
       </h2>
 
       <div className="mt-7">
-        {FAQ_ITEMS.map((item, index) => {
+        {items.map((item, index) => {
           const isOpen = openFaq === index;
           return (
             <div key={item.q} className="border-b border-white/6">

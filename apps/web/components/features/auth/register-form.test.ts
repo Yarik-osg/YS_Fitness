@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { registerFormSchema } from './register-form';
+import { registerFormSchema } from './register-form-schema';
 
 describe('registerFormSchema', () => {
   it('uses the shared minimum password rule', () => {

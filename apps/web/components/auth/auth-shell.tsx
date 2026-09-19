@@ -1,5 +1,8 @@
-import Link from 'next/link';
+'use client';
+
 import type { ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 
 export function BrandMark() {
   return (
@@ -24,6 +27,8 @@ export function AuthShell({
   children: ReactNode;
   footer: ReactNode;
 }) {
+  const t = useTranslations('auth');
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-[#0b0d0f]/90">
       <nav className="flex h-16 items-center justify-between border-b border-white/8 px-6">
@@ -31,7 +36,7 @@ export function AuthShell({
           href="/"
           className="font-label text-[10px] font-semibold uppercase tracking-[0.14em] text-accent"
         >
-          ← Назад
+          {t('back')}
         </Link>
         <BrandMark />
         <span className="w-12" />
