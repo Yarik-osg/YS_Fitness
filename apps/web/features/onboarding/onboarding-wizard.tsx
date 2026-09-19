@@ -15,29 +15,60 @@ import { useOnboardingStore, type OnboardingState } from './onboarding-store';
 import { buildOnboardingPayload } from './payload';
 import { StepShell } from './step-shell';
 
-const FEMALE_IMAGES = [
-  'https://images.unsplash.com/photo-1531520563951-4c0e3d3fcacc?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1606902965551-dce093cda6e7?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1538240175502-ec4eb4455f34?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1574680088814-c9e8a10d8a4d?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&w=600&q=80',
+const FEMALE_CURRENT_BODY: Choice[] = (
+  [
+    ['slim', 'photo-1531520563951-4c0e3d3fcacc'],
+    ['toned', 'photo-1606902965551-dce093cda6e7'],
+    ['athletic', 'photo-1538240175502-ec4eb4455f34'],
+    ['defined', 'photo-1574680088814-c9e8a10d8a4d'],
+    ['full', 'photo-1541534741688-6078c6bfb5c5'],
+  ] as const
+).map(([value, photo], index) => ({
+  value,
+  label: `Варіант ${index + 1}`,
+  image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
+}));
+
+const FEMALE_DESIRED_IMAGES = [
+  'photo-1531520563951-4c0e3d3fcacc',
+  'photo-1606902965551-dce093cda6e7',
+  'photo-1538240175502-ec4eb4455f34',
+  'photo-1574680088814-c9e8a10d8a4d',
+  'photo-1534367610401-9f5ed68180aa',
 ];
 
-const MALE_IMAGES = [
-  'https://images.unsplash.com/photo-1613702973353-a854c7dc7a3b?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1614396648745-d5de9c9e037e?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1532384816664-01b8b7238c8d?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1578924608828-79a71150f711?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1610312856669-2cee66b2949c?auto=format&fit=crop&w=600&q=80',
+const MALE_CURRENT_IMAGES = [
+  'photo-1613702973353-a854c7dc7a3b',
+  'photo-1614396648745-d5de9c9e037e',
+  'photo-1532384816664-01b8b7238c8d',
+  'photo-1578924608828-79a71150f711',
+  'photo-1610312856669-2cee66b2949c',
 ];
 
-const mainGoalChoices: Choice[] = [
+const MALE_DESIRED_IMAGES = [
+  'photo-1614396648745-d5de9c9e037e',
+  'photo-1532384816664-01b8b7238c8d',
+  'photo-1578924608828-79a71150f711',
+  'photo-1672866332205-9246ee75ca14',
+  'photo-1621750627159-cf77b0b91aac',
+];
+
+const sharedMainGoalChoices: Choice[] = [
   { value: 'lose_weight', label: 'Схуднути' },
   { value: 'build_muscle', label: "Набрати м'язову масу" },
   { value: 'improve_body', label: 'Покращити якість тіла' },
   { value: 'maintain', label: 'Зберегти форму' },
-  { value: 'get_stronger', label: 'Стати сильніше' },
 ];
+
+function mainGoalChoices(male: boolean): Choice[] {
+  return [
+    ...sharedMainGoalChoices,
+    {
+      value: 'get_stronger',
+      label: male ? 'Стати сильнішим' : 'Стати сильнішою',
+    },
+  ];
+}
 
 const weightGoalChoices: Choice[] = [
   {
@@ -57,7 +88,7 @@ const weightGoalChoices: Choice[] = [
   },
 ];
 
-const experienceChoices: Choice[] = [
+const sharedExperienceChoices: Choice[] = [
   {
     value: 'beginner',
     label: 'Початківець',
@@ -68,12 +99,18 @@ const experienceChoices: Choice[] = [
     label: 'Середній рівень',
     description: 'Регулярно тренуюсь 6–24 місяці',
   },
-  {
-    value: 'advanced',
-    label: 'Досвідчений рівень',
-    description: 'Системно тренуюсь понад 2 роки',
-  },
 ];
+
+function experienceChoices(male: boolean): Choice[] {
+  return [
+    ...sharedExperienceChoices,
+    {
+      value: 'advanced',
+      label: male ? 'Досвідчений' : 'Досвідчена',
+      description: 'Системно тренуюсь понад 2 роки',
+    },
+  ];
+}
 
 const frequencyChoices: Choice[] = [
   { value: '2', label: '2 рази', description: 'Оптимально для початку' },
@@ -126,7 +163,10 @@ const maleFocus: Choice[] = [
 
 const nutritionChoices: Choice[] = [
   { value: 'structured', label: 'Харчуюсь за планом / рахую калорії' },
-  { value: 'balanced', label: 'Збалансовано, але без підрахунків' },
+  {
+    value: 'balanced',
+    label: 'Намагаюсь харчуватись збалансовано, але без підрахунків',
+  },
   { value: 'intuitive', label: 'Харчуюсь інтуїтивно' },
   { value: 'irregular', label: 'Харчування нерегулярне' },
   { value: 'uncontrolled', label: 'Не контролюю харчування' },
@@ -140,7 +180,23 @@ const mealChoices: Choice[] = [
   { value: 'no_schedule', label: '~', description: 'Немає режиму' },
 ];
 
-const habitChoices: Choice[] = [
+const maleMealChoices: Choice[] = [
+  { value: '1-2', label: '1–2 рази', description: 'Мало їм протягом дня' },
+  { value: '3', label: '3 рази', description: 'Сніданок, обід, вечеря' },
+  {
+    value: '4-5',
+    label: '4–5 разів',
+    description: 'Із перекусами між прийомами',
+  },
+  { value: '6+', label: '6+ разів', description: 'Їм дуже часто' },
+  {
+    value: 'varies',
+    label: 'По-різному',
+    description: 'Нестабільний режим харчування',
+  },
+];
+
+const femaleHabitChoices: Choice[] = [
   { value: 'evening_overeating', label: 'Переїдання ввечері' },
   { value: 'snacking', label: 'Часті перекуси' },
   { value: 'sweet_cravings', label: 'Тяга до солодкого' },
@@ -148,6 +204,17 @@ const habitChoices: Choice[] = [
   { value: 'skipping_meals', label: 'Пропускаю прийоми їжі' },
   { value: 'portions', label: 'Важко контролювати порції' },
   { value: 'emotional', label: 'Харчування залежить від настрою' },
+  { value: 'none', label: 'Нічого з переліченого' },
+];
+
+const maleHabitChoices: Choice[] = [
+  { value: 'late_eating', label: 'Їм пізно ввечері або вночі' },
+  { value: 'skipping', label: 'Пропускаю прийоми їжі' },
+  { value: 'emotional', label: 'Іноді їм через стрес або нудьгу' },
+  { value: 'fast_food', label: 'Часто їм фастфуд або напівфабрикати' },
+  { value: 'sweets', label: 'Важко відмовитись від солодкого' },
+  { value: 'overeating', label: 'Схильний до переїдання' },
+  { value: 'irregular', label: 'Їм нерегулярно' },
   { value: 'none', label: 'Нічого з переліченого' },
 ];
 
@@ -177,13 +244,23 @@ export function OnboardingWizard() {
 
   const male = draft.programTrack === 'male';
   const age = calculateAge(draft.dateOfBirth);
-  const bodyChoices = useMemo(
+  const currentBodyChoices = useMemo(() => {
+    if (!male) return FEMALE_CURRENT_BODY;
+    return MALE_CURRENT_IMAGES.map((photo, index) => ({
+      value: String(index),
+      label: `Варіант ${index + 1}`,
+      image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
+    }));
+  }, [male]);
+  const desiredBodyChoices = useMemo(
     () =>
-      (male ? MALE_IMAGES : FEMALE_IMAGES).map((image, index) => ({
-        value: String(index),
-        label: `Варіант ${index + 1}`,
-        image,
-      })),
+      (male ? MALE_DESIRED_IMAGES : FEMALE_DESIRED_IMAGES).map(
+        (photo, index) => ({
+          value: String(index),
+          label: `Варіант ${index + 1}`,
+          image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
+        }),
+      ),
     [male],
   );
 
@@ -358,7 +435,7 @@ export function OnboardingWizard() {
           <ChoiceList
             grid
             imageGrid
-            choices={bodyChoices}
+            choices={current ? currentBodyChoices : desiredBodyChoices}
             value={current ? draft.currentBody : draft.desiredBody}
             onChange={(value) =>
               draft.setAnswer(
@@ -381,7 +458,7 @@ export function OnboardingWizard() {
           }
         >
           <ChoiceList
-            choices={mainGoalChoices}
+            choices={mainGoalChoices(male)}
             value={draft.mainGoal}
             onChange={(mainGoal) => draft.setAnswer({ mainGoal })}
           />
@@ -422,7 +499,7 @@ export function OnboardingWizard() {
           }
         >
           <ChoiceList
-            choices={experienceChoices}
+            choices={experienceChoices(male)}
             value={draft.experience}
             onChange={(experience) => draft.setAnswer({ experience })}
           />
@@ -436,7 +513,9 @@ export function OnboardingWizard() {
           title={
             <>
               Скільки разів на тиждень ти{' '}
-              <span className="text-accent">готові тренуватися?</span>
+              <span className="text-accent">
+                {male ? 'готовий тренуватися?' : 'готова тренуватися?'}
+              </span>
             </>
           }
           description="Обери реалістичну кількість тренувань, яку зможеш підтримувати."
@@ -529,10 +608,13 @@ export function OnboardingWizard() {
               <span className="text-accent">зазвичай їси?</span>
             </>
           }
+          description={
+            male ? 'Обери варіант, що найбільше підходить.' : undefined
+          }
         >
           <ChoiceList
             grid
-            choices={mealChoices}
+            choices={male ? maleMealChoices : mealChoices}
             value={draft.mealsPerDay}
             onChange={(mealsPerDay) => draft.setAnswer({ mealsPerDay })}
           />
@@ -544,15 +626,25 @@ export function OnboardingWizard() {
           {...common}
           eyebrow="Харчові звички"
           title={
-            <>
-              Що найбільше{' '}
-              <span className="text-accent">заважає харчуванню?</span>
-            </>
+            male ? (
+              <>
+                Які звички <span className="text-accent">ти маєш?</span>
+              </>
+            ) : (
+              <>
+                Що найбільше{' '}
+                <span className="text-accent">заважає харчуванню?</span>
+              </>
+            )
           }
-          description="Можна обрати декілька варіантів."
+          description={
+            male
+              ? 'Обери всі варіанти, що підходять.'
+              : 'Можна обрати декілька варіантів.'
+          }
         >
           <MultiChoiceList
-            choices={habitChoices}
+            choices={male ? maleHabitChoices : femaleHabitChoices}
             value={draft.eatingHabits}
             onChange={(eatingHabits) => draft.setAnswer({ eatingHabits })}
           />

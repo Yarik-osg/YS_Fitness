@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
 
 describe('OnboardingWizard', () => {
   beforeEach(() => {
+    cleanup();
     window.sessionStorage.clear();
     useOnboardingStore.getState().reset();
     push.mockReset();
@@ -36,6 +37,26 @@ describe('OnboardingWizard', () => {
       'aria-pressed',
       'true',
     );
-    expect(useOnboardingStore.getState().currentBody).toBe('1');
+    expect(useOnboardingStore.getState().currentBody).toBe('toned');
+  });
+
+  it('uses the reference option sets for the male track', () => {
+    useOnboardingStore.setState({ programTrack: 'male', step: 10 });
+    render(
+      <Providers>
+        <OnboardingWizard />
+      </Providers>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /4–5 разів/i }),
+    ).toBeInTheDocument();
+
+    act(() => useOnboardingStore.getState().setStep(11));
+
+    expect(
+      screen.getByRole('button', { name: /Їм пізно ввечері або вночі/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Які звички/i)).toBeInTheDocument();
   });
 });
