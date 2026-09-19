@@ -1,14 +1,14 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@repo/validation';
+import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Link, useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { useLogin } from '@/lib/hooks/use-auth';
 
@@ -18,6 +18,7 @@ type LoginFormInput = Pick<LoginInput, 'email' | 'password'>;
 export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
+  const t = useTranslations('auth');
   const {
     register,
     handleSubmit,
@@ -38,18 +39,18 @@ export function LoginForm() {
 
   return (
     <AuthShell
-      eyebrow="Особистий кабінет"
-      title="Раді бачити"
-      highlighted="знову"
-      description="Увійди, щоб продовжити тренування та відстежувати свій прогрес."
+      eyebrow={t('login.eyebrow')}
+      title={t('login.title')}
+      highlighted={t('login.highlighted')}
+      description={t('login.description')}
       footer={
         <>
-          Ще немає акаунта?{' '}
+          {t('login.footerPrompt')}{' '}
           <Link
             className="font-semibold text-accent underline underline-offset-4"
             href="/register"
           >
-            Зареєструватись
+            {t('login.footerLink')}
           </Link>
         </>
       }
@@ -66,23 +67,23 @@ export function LoginForm() {
             {...register('email')}
           />
           {errors.email && (
-            <p className="text-xs text-red-400">{errors.email.message}</p>
+            <p className="text-xs text-red-400">{t('validation.email')}</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Пароль</Label>
+          <Label htmlFor="password">{t('login.passwordLabel')}</Label>
           <Input
             id="password"
             type="password"
             autoComplete="current-password"
-            placeholder="Введи пароль"
+            placeholder={t('login.passwordPlaceholder')}
             aria-invalid={Boolean(errors.password)}
             {...register('password')}
           />
           {errors.password && (
             <p className="text-xs text-red-400">
-              Пароль має містити щонайменше 8 символів.
+              {t('validation.passwordMin')}
             </p>
           )}
         </div>
@@ -92,7 +93,7 @@ export function LoginForm() {
             role="alert"
             className="border-l-2 border-red-400 bg-red-400/8 px-4 py-3 text-xs text-red-300"
           >
-            {getUserFacingError(login.error)}
+            {getUserFacingError(login.error, t)}
           </p>
         )}
 
@@ -101,7 +102,7 @@ export function LoginForm() {
           type="submit"
           disabled={login.isPending}
         >
-          {login.isPending ? 'Входимо…' : 'Увійти →'}
+          {login.isPending ? t('login.pending') : t('login.submit')}
         </Button>
       </form>
     </AuthShell>

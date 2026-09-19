@@ -1,41 +1,37 @@
+import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
+import { routing } from './i18n/routing';
+import { applyAuthRedirect, splitLocalePath } from './lib/auth/proxy-auth';
 
-const AUTH_ROUTES = ['/login', '/register'];
-const PROTECTED_ROUTES = ['/onboarding', '/dashboard'];
+const handleI18nRouting = createMiddleware(routing);
 
 export function proxy(request: NextRequest) {
+  const intlResponse = handleI18nRouting(request);
+
+  if (intlResponse.status >= 300 && intlResponse.status < 400) {
+    return intlResponse;
+  }
+
   const { pathname } = request.nextUrl;
+  const { locale, pathnameWithoutLocale } = splitLocalePath(pathname);
   const rawHint = request.cookies.get('ys_web_session')?.value;
   const hint =
     rawHint === 'onboarding' || rawHint === 'complete' ? rawHint : null;
-  const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
-    pathname.startsWith(route),
-  );
 
-  if (isAuthRoute && hint) {
-    return NextResponse.redirect(
-      new URL(hint === 'complete' ? '/dashboard' : '/onboarding', request.url),
-    );
+  const authTarget = applyAuthRedirect({
+    pathnameWithoutLocale,
+    locale,
+    fullPathname: pathname,
+    hint,
+  });
+
+  if (authTarget) {
+    return NextResponse.redirect(new URL(authTarget, request.url));
   }
 
-  if (isProtectedRoute && !hint) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  if (pathname.startsWith('/onboarding') && hint === 'complete') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
-  if (pathname.startsWith('/dashboard') && hint === 'onboarding') {
-    return NextResponse.redirect(new URL('/onboarding', request.url));
-  }
-
-  return NextResponse.next();
+  return intlResponse;
 }
 
 export const config = {
-  matcher: ['/login', '/register', '/onboarding/:path*', '/dashboard/:path*'],
+  matcher: '/((?!api|_next|_vercel|.*\\..*).*)',
 };

@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { onboardingSchema } from '@repo/validation';
 import { CheckCircle2, Dumbbell, Sparkles } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { useSaveOnboarding } from '@/lib/hooks/use-users';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
@@ -15,19 +16,13 @@ import { useOnboardingStore, type OnboardingState } from './onboarding-store';
 import { buildOnboardingPayload } from './payload';
 import { StepShell } from './step-shell';
 
-const FEMALE_CURRENT_BODY: Choice[] = (
-  [
-    ['slim', 'photo-1531520563951-4c0e3d3fcacc'],
-    ['toned', 'photo-1606902965551-dce093cda6e7'],
-    ['athletic', 'photo-1538240175502-ec4eb4455f34'],
-    ['defined', 'photo-1574680088814-c9e8a10d8a4d'],
-    ['full', 'photo-1541534741688-6078c6bfb5c5'],
-  ] as const
-).map(([value, photo], index) => ({
-  value,
-  label: `Варіант ${index + 1}`,
-  image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
-}));
+const FEMALE_CURRENT_PHOTOS = [
+  ['slim', 'photo-1531520563951-4c0e3d3fcacc'],
+  ['toned', 'photo-1606902965551-dce093cda6e7'],
+  ['athletic', 'photo-1538240175502-ec4eb4455f34'],
+  ['defined', 'photo-1574680088814-c9e8a10d8a4d'],
+  ['full', 'photo-1541534741688-6078c6bfb5c5'],
+] as const;
 
 const FEMALE_DESIRED_IMAGES = [
   'photo-1531520563951-4c0e3d3fcacc',
@@ -53,171 +48,6 @@ const MALE_DESIRED_IMAGES = [
   'photo-1621750627159-cf77b0b91aac',
 ];
 
-const sharedMainGoalChoices: Choice[] = [
-  { value: 'lose_weight', label: 'Схуднути' },
-  { value: 'build_muscle', label: "Набрати м'язову масу" },
-  { value: 'improve_body', label: 'Покращити якість тіла' },
-  { value: 'maintain', label: 'Зберегти форму' },
-];
-
-function mainGoalChoices(male: boolean): Choice[] {
-  return [
-    ...sharedMainGoalChoices,
-    {
-      value: 'get_stronger',
-      label: male ? 'Стати сильнішим' : 'Стати сильнішою',
-    },
-  ];
-}
-
-const weightGoalChoices: Choice[] = [
-  {
-    value: 'LOSE_WEIGHT',
-    label: 'Знизити вагу',
-    description: 'Дефіцит калорій',
-  },
-  {
-    value: 'MAINTAIN_WEIGHT',
-    label: 'Утримувати вагу',
-    description: 'Баланс калорій',
-  },
-  {
-    value: 'GAIN_WEIGHT',
-    label: 'Збільшити вагу',
-    description: 'Профіцит калорій',
-  },
-];
-
-const sharedExperienceChoices: Choice[] = [
-  {
-    value: 'beginner',
-    label: 'Початківець',
-    description: 'Менше 6 місяців або тільки починаю',
-  },
-  {
-    value: 'intermediate',
-    label: 'Середній рівень',
-    description: 'Регулярно тренуюсь 6–24 місяці',
-  },
-];
-
-function experienceChoices(male: boolean): Choice[] {
-  return [
-    ...sharedExperienceChoices,
-    {
-      value: 'advanced',
-      label: male ? 'Досвідчений' : 'Досвідчена',
-      description: 'Системно тренуюсь понад 2 роки',
-    },
-  ];
-}
-
-const frequencyChoices: Choice[] = [
-  { value: '2', label: '2 рази', description: 'Оптимально для початку' },
-  { value: '3', label: '3 рази', description: 'Збалансований темп' },
-  { value: '4', label: '4 рази', description: 'Інтенсивний прогрес' },
-];
-
-const activityChoices: Choice[] = [
-  {
-    value: 'SEDENTARY',
-    label: 'Мінімальна',
-    description: 'Переважно сидячий день',
-  },
-  {
-    value: 'LIGHTLY_ACTIVE',
-    label: 'Легка',
-    description: 'Легка активність 1–3 дні на тиждень',
-  },
-  {
-    value: 'MODERATELY_ACTIVE',
-    label: 'Помірна',
-    description: 'Активність 3–5 днів на тиждень',
-  },
-  {
-    value: 'VERY_ACTIVE',
-    label: 'Висока',
-    description: 'Інтенсивна активність 6–7 днів',
-  },
-  {
-    value: 'EXTRA_ACTIVE',
-    label: 'Дуже висока',
-    description: 'Фізична робота або подвійні тренування',
-  },
-];
-
-const femaleFocus: Choice[] = [
-  { value: 'glutes', label: 'Сідниці' },
-  { value: 'legs', label: 'Ноги' },
-  { value: 'shoulders', label: 'Плечі' },
-  { value: 'back', label: 'Спина' },
-  { value: 'arms', label: 'Руки' },
-  { value: 'abs', label: 'Прес' },
-  { value: 'full_body', label: 'Рівномірний розвиток усього тіла' },
-];
-
-const maleFocus: Choice[] = [
-  { value: 'chest', label: 'Груди' },
-  ...femaleFocus,
-];
-
-const nutritionChoices: Choice[] = [
-  { value: 'structured', label: 'Харчуюсь за планом / рахую калорії' },
-  {
-    value: 'balanced',
-    label: 'Намагаюсь харчуватись збалансовано, але без підрахунків',
-  },
-  { value: 'intuitive', label: 'Харчуюсь інтуїтивно' },
-  { value: 'irregular', label: 'Харчування нерегулярне' },
-  { value: 'uncontrolled', label: 'Не контролюю харчування' },
-];
-
-const mealChoices: Choice[] = [
-  { value: '1-2', label: '1–2', description: 'Рідкісні прийоми їжі' },
-  { value: '3', label: '3', description: 'Класичний режим' },
-  { value: '4', label: '4', description: 'Часте харчування' },
-  { value: '5+', label: '5+', description: 'Дрібні порції, часто' },
-  { value: 'no_schedule', label: '~', description: 'Немає режиму' },
-];
-
-const maleMealChoices: Choice[] = [
-  { value: '1-2', label: '1–2 рази', description: 'Мало їм протягом дня' },
-  { value: '3', label: '3 рази', description: 'Сніданок, обід, вечеря' },
-  {
-    value: '4-5',
-    label: '4–5 разів',
-    description: 'Із перекусами між прийомами',
-  },
-  { value: '6+', label: '6+ разів', description: 'Їм дуже часто' },
-  {
-    value: 'varies',
-    label: 'По-різному',
-    description: 'Нестабільний режим харчування',
-  },
-];
-
-const femaleHabitChoices: Choice[] = [
-  { value: 'evening_overeating', label: 'Переїдання ввечері' },
-  { value: 'snacking', label: 'Часті перекуси' },
-  { value: 'sweet_cravings', label: 'Тяга до солодкого' },
-  { value: 'fastfood', label: 'Фастфуд / доставка' },
-  { value: 'skipping_meals', label: 'Пропускаю прийоми їжі' },
-  { value: 'portions', label: 'Важко контролювати порції' },
-  { value: 'emotional', label: 'Харчування залежить від настрою' },
-  { value: 'none', label: 'Нічого з переліченого' },
-];
-
-const maleHabitChoices: Choice[] = [
-  { value: 'late_eating', label: 'Їм пізно ввечері або вночі' },
-  { value: 'skipping', label: 'Пропускаю прийоми їжі' },
-  { value: 'emotional', label: 'Іноді їм через стрес або нудьгу' },
-  { value: 'fast_food', label: 'Часто їм фастфуд або напівфабрикати' },
-  { value: 'sweets', label: 'Важко відмовитись від солодкого' },
-  { value: 'overeating', label: 'Схильний до переїдання' },
-  { value: 'irregular', label: 'Їм нерегулярно' },
-  { value: 'none', label: 'Нічого з переліченого' },
-];
-
 const TOTAL_STEPS = 14;
 
 function calculateAge(dateOfBirth?: string) {
@@ -234,10 +64,16 @@ function calculateAge(dateOfBirth?: string) {
   return age;
 }
 
+function accent(chunks: ReactNode) {
+  return <span className="text-accent">{chunks}</span>;
+}
+
 export function OnboardingWizard() {
   const router = useRouter();
   const draft = useOnboardingStore();
   const saveOnboarding = useSaveOnboarding();
+  const t = useTranslations('onboarding');
+  const tAuth = useTranslations('auth');
   const [phase, setPhase] = useState<'wizard' | 'analysis' | 'result' | 'plan'>(
     'wizard',
   );
@@ -245,24 +81,237 @@ export function OnboardingWizard() {
   const male = draft.programTrack === 'male';
   const age = calculateAge(draft.dateOfBirth);
   const currentBodyChoices = useMemo(() => {
-    if (!male) return FEMALE_CURRENT_BODY;
+    if (!male) {
+      return FEMALE_CURRENT_PHOTOS.map(([value, photo], index) => ({
+        value,
+        label: t('variant', { index: index + 1 }),
+        image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
+      }));
+    }
     return MALE_CURRENT_IMAGES.map((photo, index) => ({
       value: String(index),
-      label: `Варіант ${index + 1}`,
+      label: t('variant', { index: index + 1 }),
       image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
     }));
-  }, [male]);
+  }, [male, t]);
   const desiredBodyChoices = useMemo(
     () =>
       (male ? MALE_DESIRED_IMAGES : FEMALE_DESIRED_IMAGES).map(
         (photo, index) => ({
           value: String(index),
-          label: `Варіант ${index + 1}`,
+          label: t('variant', { index: index + 1 }),
           image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
         }),
       ),
-    [male],
+    [male, t],
   );
+
+  const mainGoalChoices: Choice[] = [
+    { value: 'lose_weight', label: t('choices.mainGoal.lose_weight') },
+    { value: 'build_muscle', label: t('choices.mainGoal.build_muscle') },
+    { value: 'improve_body', label: t('choices.mainGoal.improve_body') },
+    { value: 'maintain', label: t('choices.mainGoal.maintain') },
+    {
+      value: 'get_stronger',
+      label: male
+        ? t('choices.mainGoal.get_stronger_male')
+        : t('choices.mainGoal.get_stronger_female'),
+    },
+  ];
+
+  const weightGoalChoices: Choice[] = [
+    {
+      value: 'LOSE_WEIGHT',
+      label: t('choices.weightGoal.LOSE_WEIGHT.label'),
+      description: t('choices.weightGoal.LOSE_WEIGHT.description'),
+    },
+    {
+      value: 'MAINTAIN_WEIGHT',
+      label: t('choices.weightGoal.MAINTAIN_WEIGHT.label'),
+      description: t('choices.weightGoal.MAINTAIN_WEIGHT.description'),
+    },
+    {
+      value: 'GAIN_WEIGHT',
+      label: t('choices.weightGoal.GAIN_WEIGHT.label'),
+      description: t('choices.weightGoal.GAIN_WEIGHT.description'),
+    },
+  ];
+
+  const experienceChoices: Choice[] = [
+    {
+      value: 'beginner',
+      label: t('choices.experience.beginner.label'),
+      description: t('choices.experience.beginner.description'),
+    },
+    {
+      value: 'intermediate',
+      label: t('choices.experience.intermediate.label'),
+      description: t('choices.experience.intermediate.description'),
+    },
+    {
+      value: 'advanced',
+      label: male
+        ? t('choices.experience.advanced_male')
+        : t('choices.experience.advanced_female'),
+      description: t('choices.experience.advancedDescription'),
+    },
+  ];
+
+  const frequencyChoices: Choice[] = [
+    {
+      value: '2',
+      label: t('choices.frequency.2.label'),
+      description: t('choices.frequency.2.description'),
+    },
+    {
+      value: '3',
+      label: t('choices.frequency.3.label'),
+      description: t('choices.frequency.3.description'),
+    },
+    {
+      value: '4',
+      label: t('choices.frequency.4.label'),
+      description: t('choices.frequency.4.description'),
+    },
+  ];
+
+  const activityChoices: Choice[] = [
+    {
+      value: 'SEDENTARY',
+      label: t('choices.activity.SEDENTARY.label'),
+      description: t('choices.activity.SEDENTARY.description'),
+    },
+    {
+      value: 'LIGHTLY_ACTIVE',
+      label: t('choices.activity.LIGHTLY_ACTIVE.label'),
+      description: t('choices.activity.LIGHTLY_ACTIVE.description'),
+    },
+    {
+      value: 'MODERATELY_ACTIVE',
+      label: t('choices.activity.MODERATELY_ACTIVE.label'),
+      description: t('choices.activity.MODERATELY_ACTIVE.description'),
+    },
+    {
+      value: 'VERY_ACTIVE',
+      label: t('choices.activity.VERY_ACTIVE.label'),
+      description: t('choices.activity.VERY_ACTIVE.description'),
+    },
+    {
+      value: 'EXTRA_ACTIVE',
+      label: t('choices.activity.EXTRA_ACTIVE.label'),
+      description: t('choices.activity.EXTRA_ACTIVE.description'),
+    },
+  ];
+
+  const femaleFocus: Choice[] = [
+    { value: 'glutes', label: t('choices.focus.glutes') },
+    { value: 'legs', label: t('choices.focus.legs') },
+    { value: 'shoulders', label: t('choices.focus.shoulders') },
+    { value: 'back', label: t('choices.focus.back') },
+    { value: 'arms', label: t('choices.focus.arms') },
+    { value: 'abs', label: t('choices.focus.abs') },
+    { value: 'full_body', label: t('choices.focus.full_body') },
+  ];
+
+  const maleFocus: Choice[] = [
+    { value: 'chest', label: t('choices.focus.chest') },
+    ...femaleFocus,
+  ];
+
+  const nutritionChoices: Choice[] = [
+    { value: 'structured', label: t('choices.nutrition.structured') },
+    { value: 'balanced', label: t('choices.nutrition.balanced') },
+    { value: 'intuitive', label: t('choices.nutrition.intuitive') },
+    { value: 'irregular', label: t('choices.nutrition.irregular') },
+    { value: 'uncontrolled', label: t('choices.nutrition.uncontrolled') },
+  ];
+
+  const mealChoices: Choice[] = [
+    {
+      value: '1-2',
+      label: t('choices.meals.1-2.label'),
+      description: t('choices.meals.1-2.description'),
+    },
+    {
+      value: '3',
+      label: t('choices.meals.3.label'),
+      description: t('choices.meals.3.description'),
+    },
+    {
+      value: '4',
+      label: t('choices.meals.4.label'),
+      description: t('choices.meals.4.description'),
+    },
+    {
+      value: '5+',
+      label: t('choices.meals.5+.label'),
+      description: t('choices.meals.5+.description'),
+    },
+    {
+      value: 'no_schedule',
+      label: t('choices.meals.no_schedule.label'),
+      description: t('choices.meals.no_schedule.description'),
+    },
+  ];
+
+  const maleMealChoices: Choice[] = [
+    {
+      value: '1-2',
+      label: t('choices.mealsMale.1-2.label'),
+      description: t('choices.mealsMale.1-2.description'),
+    },
+    {
+      value: '3',
+      label: t('choices.mealsMale.3.label'),
+      description: t('choices.mealsMale.3.description'),
+    },
+    {
+      value: '4-5',
+      label: t('choices.mealsMale.4-5.label'),
+      description: t('choices.mealsMale.4-5.description'),
+    },
+    {
+      value: '6+',
+      label: t('choices.mealsMale.6+.label'),
+      description: t('choices.mealsMale.6+.description'),
+    },
+    {
+      value: 'varies',
+      label: t('choices.mealsMale.varies.label'),
+      description: t('choices.mealsMale.varies.description'),
+    },
+  ];
+
+  const femaleHabitChoices: Choice[] = [
+    {
+      value: 'evening_overeating',
+      label: t('choices.habitsFemale.evening_overeating'),
+    },
+    { value: 'snacking', label: t('choices.habitsFemale.snacking') },
+    {
+      value: 'sweet_cravings',
+      label: t('choices.habitsFemale.sweet_cravings'),
+    },
+    { value: 'fastfood', label: t('choices.habitsFemale.fastfood') },
+    {
+      value: 'skipping_meals',
+      label: t('choices.habitsFemale.skipping_meals'),
+    },
+    { value: 'portions', label: t('choices.habitsFemale.portions') },
+    { value: 'emotional', label: t('choices.habitsFemale.emotional') },
+    { value: 'none', label: t('choices.habitsFemale.none') },
+  ];
+
+  const maleHabitChoices: Choice[] = [
+    { value: 'late_eating', label: t('choices.habitsMale.late_eating') },
+    { value: 'skipping', label: t('choices.habitsMale.skipping') },
+    { value: 'emotional', label: t('choices.habitsMale.emotional') },
+    { value: 'fast_food', label: t('choices.habitsMale.fast_food') },
+    { value: 'sweets', label: t('choices.habitsMale.sweets') },
+    { value: 'overeating', label: t('choices.habitsMale.overeating') },
+    { value: 'irregular', label: t('choices.habitsMale.irregular') },
+    { value: 'none', label: t('choices.habitsMale.none') },
+  ];
 
   useEffect(() => {
     if (phase !== 'analysis') return;
@@ -368,7 +417,7 @@ export function OnboardingWizard() {
     canContinue: isCurrentStepValid(),
     pending: saveOnboarding.isPending,
     error: saveOnboarding.error
-      ? getUserFacingError(saveOnboarding.error)
+      ? getUserFacingError(saveOnboarding.error, tAuth)
       : null,
   };
 
@@ -377,13 +426,9 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Вибір програми"
-          title={
-            <>
-              Обери свій <span className="text-accent">напрямок</span>
-            </>
-          }
-          description="Цей вибір змінює візуальну мову та акценти програми. Для розрахунку BMR буде окреме питання."
+          eyebrow={t('steps.program.eyebrow')}
+          title={t.rich('steps.program.title', { accent })}
+          description={t('steps.program.description')}
         >
           <ChoiceList
             value={draft.programTrack}
@@ -395,15 +440,15 @@ export function OnboardingWizard() {
             choices={[
               {
                 value: 'female',
-                label: 'Для жінок',
-                description: 'Жіноча програма',
+                label: t('choices.program.female.label'),
+                description: t('choices.program.female.description'),
                 image:
                   'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&w=800&q=80',
               },
               {
                 value: 'male',
-                label: 'Для чоловіків',
-                description: 'Чоловіча програма',
+                label: t('choices.program.male.label'),
+                description: t('choices.program.male.description'),
                 image:
                   'https://images.unsplash.com/photo-1578924608828-79a71150f711?auto=format&fit=crop&w=800&q=80',
               },
@@ -417,20 +462,20 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={current ? 'Поточна форма' : 'Бажана форма'}
-          title={
-            current ? (
-              <>
-                Яка твоя <span className="text-accent">форма зараз?</span>
-              </>
-            ) : (
-              <>
-                Якої форми ти{' '}
-                <span className="text-accent">хочеш досягти?</span>
-              </>
-            )
+          eyebrow={
+            current
+              ? t('steps.currentBody.eyebrow')
+              : t('steps.desiredBody.eyebrow')
           }
-          description="Обери фото, яке найбільше відповідає твоїй відповіді."
+          title={t.rich(
+            current ? 'steps.currentBody.title' : 'steps.desiredBody.title',
+            { accent },
+          )}
+          description={
+            current
+              ? t('steps.currentBody.description')
+              : t('steps.desiredBody.description')
+          }
         >
           <ChoiceList
             grid
@@ -450,15 +495,11 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Головна мета"
-          title={
-            <>
-              Яка твоя <span className="text-accent">головна мета?</span>
-            </>
-          }
+          eyebrow={t('steps.mainGoal.eyebrow')}
+          title={t.rich('steps.mainGoal.title', { accent })}
         >
           <ChoiceList
-            choices={mainGoalChoices(male)}
+            choices={mainGoalChoices}
             value={draft.mainGoal}
             onChange={(mainGoal) => draft.setAnswer({ mainGoal })}
           />
@@ -468,13 +509,9 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Ціль ваги"
-          title={
-            <>
-              Як має змінитися <span className="text-accent">твоя вага?</span>
-            </>
-          }
-          description="Це окремий параметр для майбутнього розрахунку калорій."
+          eyebrow={t('steps.weightGoal.eyebrow')}
+          title={t.rich('steps.weightGoal.title', { accent })}
+          description={t('steps.weightGoal.description')}
         >
           <ChoiceList
             choices={weightGoalChoices}
@@ -491,15 +528,11 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Рівень підготовки"
-          title={
-            <>
-              Який у тебе <span className="text-accent">досвід тренувань?</span>
-            </>
-          }
+          eyebrow={t('steps.experience.eyebrow')}
+          title={t.rich('steps.experience.title', { accent })}
         >
           <ChoiceList
-            choices={experienceChoices(male)}
+            choices={experienceChoices}
             value={draft.experience}
             onChange={(experience) => draft.setAnswer({ experience })}
           />
@@ -509,16 +542,12 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Частота тренувань"
-          title={
-            <>
-              Скільки разів на тиждень ти{' '}
-              <span className="text-accent">
-                {male ? 'готовий тренуватися?' : 'готова тренуватися?'}
-              </span>
-            </>
-          }
-          description="Обери реалістичну кількість тренувань, яку зможеш підтримувати."
+          eyebrow={t('steps.frequency.eyebrow')}
+          title={t.rich(
+            male ? 'steps.frequency.titleMale' : 'steps.frequency.titleFemale',
+            { accent },
+          )}
+          description={t('steps.frequency.description')}
         >
           <ChoiceList
             choices={frequencyChoices}
@@ -533,13 +562,9 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Щоденна активність"
-          title={
-            <>
-              Наскільки ти <span className="text-accent">активні щодня?</span>
-            </>
-          }
-          description="Не враховуй заплановані тренування — оцінюй звичайний день."
+          eyebrow={t('steps.activity.eyebrow')}
+          title={t.rich('steps.activity.title', { accent })}
+          description={t('steps.activity.description')}
         >
           <ChoiceList
             choices={activityChoices}
@@ -561,14 +586,9 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Акцент тренувань"
-          title={
-            <>
-              На чому ти хочеш{' '}
-              <span className="text-accent">зробити акцент?</span>
-            </>
-          }
-          description="Можна обрати декілька варіантів."
+          eyebrow={t('steps.focus.eyebrow')}
+          title={t.rich('steps.focus.title', { accent })}
+          description={t('steps.focus.description')}
         >
           <MultiChoiceList
             choices={male ? maleFocus : femaleFocus}
@@ -581,12 +601,8 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Харчування зараз"
-          title={
-            <>
-              Як ти <span className="text-accent">харчуєшся зараз?</span>
-            </>
-          }
+          eyebrow={t('steps.nutrition.eyebrow')}
+          title={t.rich('steps.nutrition.title', { accent })}
         >
           <ChoiceList
             choices={nutritionChoices}
@@ -601,16 +617,9 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Режим харчування"
-          title={
-            <>
-              Скільки разів на день ти{' '}
-              <span className="text-accent">зазвичай їси?</span>
-            </>
-          }
-          description={
-            male ? 'Обери варіант, що найбільше підходить.' : undefined
-          }
+          eyebrow={t('steps.meals.eyebrow')}
+          title={t.rich('steps.meals.title', { accent })}
+          description={male ? t('steps.meals.descriptionMale') : undefined}
         >
           <ChoiceList
             grid
@@ -624,23 +633,15 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Харчові звички"
-          title={
-            male ? (
-              <>
-                Які звички <span className="text-accent">ти маєш?</span>
-              </>
-            ) : (
-              <>
-                Що найбільше{' '}
-                <span className="text-accent">заважає харчуванню?</span>
-              </>
-            )
-          }
+          eyebrow={t('steps.habits.eyebrow')}
+          title={t.rich(
+            male ? 'steps.habits.titleMale' : 'steps.habits.titleFemale',
+            { accent },
+          )}
           description={
             male
-              ? 'Обери всі варіанти, що підходять.'
-              : 'Можна обрати декілька варіантів.'
+              ? t('steps.habits.descriptionMale')
+              : t('steps.habits.descriptionFemale')
           }
         >
           <MultiChoiceList
@@ -654,21 +655,19 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Особисті дані"
-          title={
-            <>
-              Розкажи про <span className="text-accent">своє тіло</span>
-            </>
-          }
+          eyebrow={t('steps.metrics.eyebrow')}
+          title={t.rich('steps.metrics.title', { accent })}
           description={
             age === null
-              ? 'Використовуємо лише метричні одиниці.'
-              : `Розрахований вік: ${age}`
+              ? t('steps.metrics.unitsNote')
+              : t('steps.metrics.ageNote', { age })
           }
         >
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Дата народження</Label>
+              <Label htmlFor="dateOfBirth">
+                {t('steps.metrics.dateOfBirth')}
+              </Label>
               <Input
                 id="dateOfBirth"
                 type="date"
@@ -681,7 +680,7 @@ export function OnboardingWizard() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="heightCm">Зріст, см</Label>
+                <Label htmlFor="heightCm">{t('steps.metrics.height')}</Label>
                 <Input
                   id="heightCm"
                   type="number"
@@ -699,7 +698,7 @@ export function OnboardingWizard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="weightKg">Вага, кг</Label>
+                <Label htmlFor="weightKg">{t('steps.metrics.weight')}</Label>
                 <Input
                   id="weightKg"
                   type="number"
@@ -725,19 +724,14 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow="Розрахунок енергії"
-          title={
-            <>
-              Обери параметр для{' '}
-              <span className="text-accent">формули BMR</span>
-            </>
-          }
-          description="Це окреме біологічне значення використовується лише у формулі Mifflin–St Jeor і не змінює обраний напрямок програми."
+          eyebrow={t('steps.bmr.eyebrow')}
+          title={t.rich('steps.bmr.title', { accent })}
+          description={t('steps.bmr.description')}
         >
           <ChoiceList
             choices={[
-              { value: 'FEMALE', label: 'Жіноча формула' },
-              { value: 'MALE', label: 'Чоловіча формула' },
+              { value: 'FEMALE', label: t('choices.bmr.FEMALE') },
+              { value: 'MALE', label: t('choices.bmr.MALE') },
             ]}
             value={draft.biologicalSexForCalculation}
             onChange={(biologicalSexForCalculation) =>
@@ -753,6 +747,8 @@ export function OnboardingWizard() {
 }
 
 function Analysis() {
+  const t = useTranslations('onboarding');
+
   return (
     <main className="mx-auto grid min-h-screen w-full max-w-md place-items-center border-x border-white/5 px-8 text-center">
       <div>
@@ -761,10 +757,10 @@ function Analysis() {
           size={42}
         />
         <p className="font-label text-[10px] uppercase tracking-[0.2em] text-accent">
-          Аналіз відповідей
+          {t('analysis.eyebrow')}
         </p>
         <h1 className="mt-4 font-heading text-4xl uppercase leading-tight">
-          Формуємо твою <span className="text-accent">персональну основу</span>
+          {t.rich('analysis.title', { accent })}
         </h1>
         <div className="mx-auto mt-8 h-1 w-48 overflow-hidden bg-line">
           <div className="h-full w-2/3 animate-pulse bg-accent" />
@@ -783,23 +779,27 @@ function Result({
   draft: OnboardingState;
   onContinue: () => void;
 }) {
+  const t = useTranslations('onboarding');
+
   return (
     <SummaryScreen
-      eyebrow="Персональний результат"
-      title={
-        <>
-          Твоя база <span className="text-accent">готова</span>
-        </>
-      }
+      eyebrow={t('result.eyebrow')}
+      title={t.rich('result.title', { accent })}
       icon={<CheckCircle2 size={38} />}
       onContinue={onContinue}
-      button="Переглянути план →"
+      button={t('result.button')}
     >
       <div className="grid grid-cols-3 gap-2">
         {[
-          ['Вік', age ?? '—'],
-          ['Зріст', `${draft.heightCm} см`],
-          ['Вага', `${draft.weightKg} кг`],
+          [t('result.age'), age ?? '—'],
+          [
+            t('result.height'),
+            t('result.heightValue', { value: draft.heightCm ?? '—' }),
+          ],
+          [
+            t('result.weight'),
+            t('result.weightValue', { value: draft.weightKg ?? '—' }),
+          ],
         ].map(([label, value]) => (
           <div
             key={label}
@@ -814,10 +814,7 @@ function Result({
           </div>
         ))}
       </div>
-      <p className="mt-5 text-xs leading-6 text-muted">
-        Профіль збережено. Розрахунок калорій і макросів з’явиться в окремому
-        модулі харчування — ми не підміняємо його статичними значеннями.
-      </p>
+      <p className="mt-5 text-xs leading-6 text-muted">{t('result.note')}</p>
     </SummaryScreen>
   );
 }
@@ -829,36 +826,38 @@ function Plan({
   draft: OnboardingState;
   onContinue: () => void;
 }) {
+  const t = useTranslations('onboarding');
+
   return (
     <SummaryScreen
-      eyebrow="Рекомендований план"
-      title={
-        <>
-          Твій ритм. <span className="text-accent">Твій прогрес.</span>
-        </>
-      }
+      eyebrow={t('plan.eyebrow')}
+      title={t.rich('plan.title', { accent })}
       icon={<Dumbbell size={38} />}
       onContinue={onContinue}
-      button="Перейти в кабінет →"
+      button={t('plan.button')}
     >
       <div className="space-y-3">
         <PlanRow
-          label="Тренування"
-          value={`${draft.trainingFrequency ?? '3'} рази на тиждень`}
+          label={t('plan.training')}
+          value={t('plan.trainingValue', {
+            count: draft.trainingFrequency ?? '3',
+          })}
         />
-        <PlanRow label="Рівень" value={draft.experience ?? 'Персональний'} />
         <PlanRow
-          label="Акцент"
+          label={t('plan.level')}
+          value={draft.experience ?? t('plan.levelFallback')}
+        />
+        <PlanRow
+          label={t('plan.focus')}
           value={
             draft.focusAreas.includes('full_body')
-              ? 'Усе тіло'
-              : `${draft.focusAreas.length} пріоритетні зони`
+              ? t('plan.focusFullBody')
+              : t('plan.focusZones', { count: draft.focusAreas.length })
           }
         />
       </div>
       <p className="mt-5 border-l-2 border-accent/50 pl-3 text-[10px] leading-5 text-muted">
-        Це локальний попередній перегляд. Відповіді про форму, досвід,
-        тренування та харчові звички ще не зберігаються на сервері.
+        {t('plan.disclaimer')}
       </p>
     </SummaryScreen>
   );

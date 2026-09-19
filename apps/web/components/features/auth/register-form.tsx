@@ -1,37 +1,38 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { registerSchema } from '@repo/validation';
+import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Link, useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { useRegister } from '@/lib/hooks/use-auth';
-
-export const registerFormSchema = registerSchema
-  .pick({ email: true, password: true })
-  .extend({ confirmPassword: z.string() })
-  .refine((input) => input.password === input.confirmPassword, {
-    path: ['confirmPassword'],
-    message: 'Паролі не збігаються.',
-  });
+import {
+  createRegisterFormSchema,
+  registerFormSchema,
+} from './register-form-schema';
 
 type RegisterFormInput = z.infer<typeof registerFormSchema>;
 
 export function RegisterForm() {
   const router = useRouter();
   const registerMutation = useRegister();
+  const t = useTranslations('auth');
+  const schema = useMemo(
+    () => createRegisterFormSchema(t('validation.passwordMismatch')),
+    [t],
+  );
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterFormInput>({
-    resolver: zodResolver(registerFormSchema),
+    resolver: zodResolver(schema),
     defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
@@ -49,18 +50,18 @@ export function RegisterForm() {
 
   return (
     <AuthShell
-      eyebrow="Реєстрація"
-      title="Створи свій"
-      highlighted="акаунт"
-      description="Зареєструйся — і ми підготуємо програму навколо твоєї цілі."
+      eyebrow={t('register.eyebrow')}
+      title={t('register.title')}
+      highlighted={t('register.highlighted')}
+      description={t('register.description')}
       footer={
         <>
-          Вже маєш акаунт?{' '}
+          {t('register.footerPrompt')}{' '}
           <Link
             className="font-semibold text-accent underline underline-offset-4"
             href="/login"
           >
-            Увійти
+            {t('register.footerLink')}
           </Link>
         </>
       }
@@ -77,40 +78,40 @@ export function RegisterForm() {
             {...register('email')}
           />
           {errors.email && (
-            <p className="text-xs text-red-400">Введи коректний email.</p>
+            <p className="text-xs text-red-400">{t('validation.email')}</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Пароль</Label>
+          <Label htmlFor="password">{t('register.passwordLabel')}</Label>
           <Input
             id="password"
             type="password"
             autoComplete="new-password"
-            placeholder="Мінімум 8 символів"
+            placeholder={t('register.passwordPlaceholder')}
             aria-invalid={Boolean(errors.password)}
             {...register('password')}
           />
           {errors.password && (
             <p className="text-xs text-red-400">
-              Пароль має містити щонайменше 8 символів.
+              {t('validation.passwordMin')}
             </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Підтвердження паролю</Label>
+          <Label htmlFor="confirmPassword">{t('register.confirmLabel')}</Label>
           <Input
             id="confirmPassword"
             type="password"
             autoComplete="new-password"
-            placeholder="Повтори пароль"
+            placeholder={t('register.confirmPlaceholder')}
             aria-invalid={Boolean(errors.confirmPassword)}
             {...register('confirmPassword')}
           />
           {errors.confirmPassword && (
             <p className="text-xs text-red-400">
-              {errors.confirmPassword.message}
+              {t('validation.passwordMismatch')}
             </p>
           )}
         </div>
@@ -120,7 +121,7 @@ export function RegisterForm() {
             role="alert"
             className="border-l-2 border-red-400 bg-red-400/8 px-4 py-3 text-xs text-red-300"
           >
-            {getUserFacingError(registerMutation.error)}
+            {getUserFacingError(registerMutation.error, t)}
           </p>
         )}
 
@@ -129,7 +130,9 @@ export function RegisterForm() {
           type="submit"
           disabled={registerMutation.isPending}
         >
-          {registerMutation.isPending ? 'Створюємо…' : 'Створити акаунт →'}
+          {registerMutation.isPending
+            ? t('register.pending')
+            : t('register.submit')}
         </Button>
       </form>
     </AuthShell>

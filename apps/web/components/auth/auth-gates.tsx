@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
 import { getPostAuthPath } from '@/lib/auth/routing';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import { refresh } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/users';
+import { usePathname, useRouter } from '@/i18n/navigation';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 
 async function restoreSession() {

@@ -2,13 +2,18 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
+import { I18nTestProvider } from '@/test/i18n';
 import { OnboardingWizard } from './onboarding-wizard';
 import { useOnboardingStore } from './onboarding-store';
 
 const push = vi.fn();
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
+  usePathname: () => '/onboarding',
+  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 describe('OnboardingWizard', () => {
@@ -22,9 +27,11 @@ describe('OnboardingWizard', () => {
   it('preserves a selected answer after forward and back navigation', async () => {
     const user = userEvent.setup();
     render(
-      <Providers>
-        <OnboardingWizard />
-      </Providers>,
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
     );
 
     await user.click(screen.getByRole('button', { name: /Для жінок/i }));
@@ -43,9 +50,11 @@ describe('OnboardingWizard', () => {
   it('uses the reference option sets for the male track', () => {
     useOnboardingStore.setState({ programTrack: 'male', step: 10 });
     render(
-      <Providers>
-        <OnboardingWizard />
-      </Providers>,
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
     );
 
     expect(

@@ -1,0 +1,435 @@
+{
+  "marketing": {
+    "nav": {
+      "login": "Log in",
+      "localeUk": "УКР",
+      "localeEn": "EN",
+      "switchLocale": "Change language"
+    },
+    "hero": {
+      "titleLine1": "A system",
+      "titleLine2": "that works",
+      "titleLine3": "for",
+      "titleAccent1": "your",
+      "titleAccent2": "result",
+      "subtitle": "Personal online coaching, training, and nutrition for real changes",
+      "cta": "Start changing"
+    },
+    "why": {
+      "eyebrow": "YS Fitness",
+      "heading": "Why people choose me",
+      "cards": [
+        {
+          "label": "IFBB athlete",
+          "desc": "Experience competing on the international stage"
+        },
+        {
+          "label": "Professional approach",
+          "desc": "Training that accounts for your goal and level"
+        },
+        {
+          "label": "Nutrition",
+          "desc": "A personal calorie and macro calculation for your goal"
+        },
+        {
+          "label": "Progress control",
+          "desc": "Track changes and results in your personal cabinet"
+        }
+      ]
+    },
+    "painPoints": [
+      "You do not want to think each time about which exercises to do.",
+      "You want to see your progress in numbers.",
+      "You need a clear system that is easy to fit into life."
+    ],
+    "coach": {
+      "eyebrow": "Your coach",
+      "nameLine1": "Yana",
+      "nameLine2": "Starosotnikova",
+      "imageAlt": "Yana Starosotnikova",
+      "credentials": [
+        "Personal trainer",
+        "IFBB Bikini Athlete",
+        "Online Fitness Coach"
+      ],
+      "bio1": "A personal trainer and IFBB Bikini athlete.",
+      "bio2": "I created YS FITNESS to give you not just a set of exercises, but a clear system you can train with independently and see your progress.",
+      "bio3": "My approach is training with logic, discipline without extremes, and work toward a real result."
+    },
+    "pricing": {
+      "eyebrow": "Choose your plan",
+      "heading": "Start now",
+      "featuredBadge": "Better value",
+      "threeMonthsLabel": "3 months",
+      "perMonth": "830 ₴ / month",
+      "savings": "Save 480 ₴",
+      "chooseThreeMonths": "Choose 3 months",
+      "oneMonthLabel": "1 month",
+      "oneMonthAccess": "30 days of access",
+      "chooseOneMonth": "Choose 1 month"
+    },
+    "included": {
+      "eyebrow": "Included",
+      "heading": "What is included",
+      "items": [
+        "A personally selected training program",
+        "Detailed workouts and exercises",
+        "Saving results",
+        "Progress tracking",
+        "Personal calorie and macro calculation",
+        "Access to the personal cabinet"
+      ]
+    },
+    "faq": {
+      "eyebrow": "Questions",
+      "heading": "FAQ",
+      "items": [
+        {
+          "q": "Will the program suit a beginner?",
+          "a": "Yes. The program adapts to your training level during the questionnaire. Exercises come with detailed explanations."
+        },
+        {
+          "q": "Can I train in a gym?",
+          "a": "Yes, the program is designed for gym training with free weights and machines."
+        },
+        {
+          "q": "Can I change the program?",
+          "a": "In Version 1 the program is formed from the questionnaire results. Editing will be added in later versions."
+        },
+        {
+          "q": "How are calories and macros calculated?",
+          "a": "Based on your age, height, weight, and goal. The calculation is done automatically during registration."
+        },
+        {
+          "q": "What happens after the subscription ends?",
+          "a": "Access to the personal cabinet and progress data will stop. You can renew the subscription at any time."
+        },
+        {
+          "q": "What is the difference between the 1- and 3-month plans?",
+          "a": "The features are the same. The difference is duration and price. The 3-month plan is 480 ₴ more advantageous."
+        }
+      ]
+    },
+    "finalCta": {
+      "eyebrow": "YS Fitness",
+      "titleLine1": "Your result",
+      "titleLine2": "starts",
+      "titleLine3": "with a system",
+      "body": "Complete a short questionnaire and get a program according to your goal.",
+      "cta": "Start changing",
+      "note": "Takes 3 minutes"
+    },
+    "footer": {
+      "links": ["Instagram", "Privacy Policy", "Terms of Use", "Contact"],
+      "copyright": "© 2026 YS FITNESS. All rights reserved."
+    }
+  },
+  "auth": {
+    "back": "← Back",
+    "login": {
+      "eyebrow": "Personal cabinet",
+      "title": "Glad to see",
+      "highlighted": "you again",
+      "description": "Log in to continue training and track your progress.",
+      "footerPrompt": "Do not have an account yet?",
+      "footerLink": "Register",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter password",
+      "submit": "Log in →",
+      "pending": "Signing in…"
+    },
+    "register": {
+      "eyebrow": "Registration",
+      "title": "Create your",
+      "highlighted": "account",
+      "description": "Register — and we will prepare a program around your goal.",
+      "footerPrompt": "Already have an account?",
+      "footerLink": "Log in",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Minimum 8 characters",
+      "confirmLabel": "Confirm password",
+      "confirmPlaceholder": "Repeat password",
+      "submit": "Create account →",
+      "pending": "Creating…"
+    },
+    "validation": {
+      "email": "Enter a valid email.",
+      "passwordMin": "Password must contain at least 8 characters.",
+      "passwordMismatch": "Passwords do not match."
+    },
+    "errors": {
+      "EMAIL_ALREADY_REGISTERED": "An account already exists for this email.",
+      "INVALID_CREDENTIALS": "The email or password is incorrect.",
+      "INVALID_DATE_OF_BIRTH": "Enter a valid date of birth.",
+      "INVALID_TIMEZONE": "Your browser timezone could not be recognized.",
+      "REFRESH_TOKEN_REQUIRED": "Your session has expired. Please sign in again.",
+      "REFRESH_TOKEN_INVALID": "Your session has expired. Please sign in again.",
+      "REFRESH_TOKEN_REUSED": "For your security, please sign in again.",
+      "SESSION_REVOKED": "Your session has ended. Please sign in again.",
+      "TOO_MANY_REQUESTS": "Too many attempts. Wait a moment and try again.",
+      "NETWORK_ERROR": "The service is unavailable. Check your connection and retry.",
+      "SERVER_ERROR": "Something went wrong on our side. Please try again.",
+      "UNKNOWN": "Something went wrong. Please try again."
+    }
+  },
+  "onboarding": {
+    "back": "Back",
+    "continue": "Continue →",
+    "saving": "Saving…",
+    "variant": "Option {index}",
+    "choices": {
+      "program": {
+        "female": { "label": "For women", "description": "Women's program" },
+        "male": { "label": "For men", "description": "Men's program" }
+      },
+      "mainGoal": {
+        "lose_weight": "Lose weight",
+        "build_muscle": "Gain muscle mass",
+        "improve_body": "Improve body quality",
+        "maintain": "Maintain shape",
+        "get_stronger_male": "Get stronger",
+        "get_stronger_female": "Get stronger"
+      },
+      "weightGoal": {
+        "LOSE_WEIGHT": {
+          "label": "Reduce weight",
+          "description": "Calorie deficit"
+        },
+        "MAINTAIN_WEIGHT": {
+          "label": "Maintain weight",
+          "description": "Calorie balance"
+        },
+        "GAIN_WEIGHT": {
+          "label": "Increase weight",
+          "description": "Calorie surplus"
+        }
+      },
+      "experience": {
+        "beginner": {
+          "label": "Beginner",
+          "description": "Less than 6 months or just starting"
+        },
+        "intermediate": {
+          "label": "Intermediate",
+          "description": "I train regularly for 6–24 months"
+        },
+        "advanced_male": "Experienced",
+        "advanced_female": "Experienced",
+        "advancedDescription": "I train systematically for more than 2 years"
+      },
+      "frequency": {
+        "2": { "label": "2 times", "description": "Optimal for starting" },
+        "3": { "label": "3 times", "description": "A balanced pace" },
+        "4": { "label": "4 times", "description": "Intensive progress" }
+      },
+      "activity": {
+        "SEDENTARY": {
+          "label": "Minimal",
+          "description": "Mostly a sedentary day"
+        },
+        "LIGHTLY_ACTIVE": {
+          "label": "Light",
+          "description": "Light activity 1–3 days a week"
+        },
+        "MODERATELY_ACTIVE": {
+          "label": "Moderate",
+          "description": "Activity 3–5 days a week"
+        },
+        "VERY_ACTIVE": {
+          "label": "High",
+          "description": "Intense activity 6–7 days"
+        },
+        "EXTRA_ACTIVE": {
+          "label": "Very high",
+          "description": "Physical work or double training"
+        }
+      },
+      "focus": {
+        "glutes": "Glutes",
+        "legs": "Legs",
+        "shoulders": "Shoulders",
+        "back": "Back",
+        "arms": "Arms",
+        "abs": "Abs",
+        "full_body": "Even development of the whole body",
+        "chest": "Chest"
+      },
+      "nutrition": {
+        "structured": "I eat by a plan / count calories",
+        "balanced": "I try to eat in a balanced way, but without counting",
+        "intuitive": "I eat intuitively",
+        "irregular": "Nutrition is irregular",
+        "uncontrolled": "I do not control nutrition"
+      },
+      "meals": {
+        "1-2": { "label": "1–2", "description": "Rare meals" },
+        "3": { "label": "3", "description": "A classic schedule" },
+        "4": { "label": "4", "description": "Frequent eating" },
+        "5+": { "label": "5+", "description": "Small portions, often" },
+        "no_schedule": { "label": "~", "description": "No schedule" }
+      },
+      "mealsMale": {
+        "1-2": {
+          "label": "1–2 times",
+          "description": "I eat little during the day"
+        },
+        "3": { "label": "3 times", "description": "Breakfast, lunch, dinner" },
+        "4-5": {
+          "label": "4–5 times",
+          "description": "With snacks between meals"
+        },
+        "6+": { "label": "6+ times", "description": "I eat very often" },
+        "varies": {
+          "label": "It varies",
+          "description": "An unstable eating schedule"
+        }
+      },
+      "habitsFemale": {
+        "evening_overeating": "Overeating in the evening",
+        "snacking": "Frequent snacks",
+        "sweet_cravings": "Craving sweets",
+        "fastfood": "Fast food / delivery",
+        "skipping_meals": "I skip meals",
+        "portions": "It is hard to control portions",
+        "emotional": "Eating depends on mood",
+        "none": "None of the listed"
+      },
+      "habitsMale": {
+        "late_eating": "I eat late in the evening or at night",
+        "skipping": "I skip meals",
+        "emotional": "Sometimes I eat because of stress or boredom",
+        "fast_food": "I often eat fast food or semi-finished products",
+        "sweets": "It is hard to refuse sweets",
+        "overeating": "I am prone to overeating",
+        "irregular": "I eat irregularly",
+        "none": "None of the listed"
+      },
+      "bmr": {
+        "FEMALE": "Female formula",
+        "MALE": "Male formula"
+      }
+    },
+    "steps": {
+      "program": {
+        "eyebrow": "Program choice",
+        "title": "Choose your <accent>direction</accent>",
+        "description": "This choice changes the visual language and program accents. There will be a separate question for the BMR calculation."
+      },
+      "currentBody": {
+        "eyebrow": "Current shape",
+        "title": "What is your <accent>shape now?</accent>",
+        "description": "Choose the photo that best matches your answer."
+      },
+      "desiredBody": {
+        "eyebrow": "Desired shape",
+        "title": "What shape do you <accent>want to reach?</accent>",
+        "description": "Choose the photo that best matches your answer."
+      },
+      "mainGoal": {
+        "eyebrow": "Main goal",
+        "title": "What is your <accent>main goal?</accent>"
+      },
+      "weightGoal": {
+        "eyebrow": "Weight goal",
+        "title": "How should <accent>your weight</accent> change?",
+        "description": "This is a separate parameter for a future calorie calculation."
+      },
+      "experience": {
+        "eyebrow": "Training level",
+        "title": "What is your <accent>training experience?</accent>"
+      },
+      "frequency": {
+        "eyebrow": "Training frequency",
+        "titleMale": "How many times a week are you <accent>ready to train?</accent>",
+        "titleFemale": "How many times a week are you <accent>ready to train?</accent>",
+        "description": "Choose a realistic number of workouts you can maintain."
+      },
+      "activity": {
+        "eyebrow": "Daily activity",
+        "title": "How <accent>active are you daily?</accent>",
+        "description": "Do not include planned workouts — evaluate a usual day."
+      },
+      "focus": {
+        "eyebrow": "Training focus",
+        "title": "What do you want to <accent>focus on?</accent>",
+        "description": "You can choose several options."
+      },
+      "nutrition": {
+        "eyebrow": "Nutrition now",
+        "title": "How do you <accent>eat now?</accent>"
+      },
+      "meals": {
+        "eyebrow": "Eating schedule",
+        "title": "How many times a day do you <accent>usually eat?</accent>",
+        "descriptionMale": "Choose the option that fits best."
+      },
+      "habits": {
+        "eyebrow": "Eating habits",
+        "titleMale": "Which habits <accent>do you have?</accent>",
+        "titleFemale": "What most <accent>gets in the way of nutrition?</accent>",
+        "descriptionMale": "Choose all options that apply.",
+        "descriptionFemale": "You can choose several options."
+      },
+      "metrics": {
+        "eyebrow": "Personal data",
+        "title": "Tell us about <accent>your body</accent>",
+        "unitsNote": "We use metric units only.",
+        "ageNote": "Calculated age: {age}",
+        "dateOfBirth": "Date of birth",
+        "height": "Height, cm",
+        "weight": "Weight, kg"
+      },
+      "bmr": {
+        "eyebrow": "Energy calculation",
+        "title": "Choose a parameter for the <accent>BMR formula</accent>",
+        "description": "This separate biological value is used only in the Mifflin–St Jeor formula and does not change the chosen program direction."
+      }
+    },
+    "analysis": {
+      "eyebrow": "Answer analysis",
+      "title": "We are forming your <accent>personal foundation</accent>"
+    },
+    "result": {
+      "eyebrow": "Personal result",
+      "title": "Your base is <accent>ready</accent>",
+      "button": "View plan →",
+      "age": "Age",
+      "height": "Height",
+      "weight": "Weight",
+      "heightValue": "{value} cm",
+      "weightValue": "{value} kg",
+      "note": "The profile is saved. The calorie and macro calculation will appear in a separate nutrition module — we do not replace it with static values."
+    },
+    "plan": {
+      "eyebrow": "Recommended plan",
+      "title": "Your rhythm. <accent>Your progress.</accent>",
+      "button": "Go to cabinet →",
+      "training": "Training",
+      "trainingValue": "{count} times a week",
+      "level": "Level",
+      "levelFallback": "Personal",
+      "focus": "Focus",
+      "focusFullBody": "Whole body",
+      "focusZones": "{count} priority zones",
+      "disclaimer": "This is a local preview. Answers about shape, experience, training, and eating habits are not yet saved on the server."
+    }
+  },
+  "dashboard": {
+    "logout": "Log out",
+    "eyebrow": "Personal cabinet",
+    "title": "Your system",
+    "titleAccent": "of progress",
+    "workouts": {
+      "title": "Training",
+      "text": "A personal program will appear here in the next module."
+    },
+    "nutrition": {
+      "title": "Nutrition",
+      "text": "Calories and macros will be calculated separately."
+    },
+    "progress": {
+      "title": "Progress",
+      "text": "Measurements, photos, and result history — soon."
+    }
+  }
+}

@@ -1,27 +1,48 @@
 import { ApiClientError } from './client';
 
-const ERROR_MESSAGES: Record<string, string> = {
-  EMAIL_ALREADY_REGISTERED: 'An account already exists for this email.',
-  INVALID_CREDENTIALS: 'The email or password is incorrect.',
-  INVALID_DATE_OF_BIRTH: 'Enter a valid date of birth.',
-  INVALID_TIMEZONE: 'Your browser timezone could not be recognized.',
-  REFRESH_TOKEN_REQUIRED: 'Your session has expired. Please sign in again.',
-  REFRESH_TOKEN_INVALID: 'Your session has expired. Please sign in again.',
-  REFRESH_TOKEN_REUSED: 'For your security, please sign in again.',
-  SESSION_REVOKED: 'Your session has ended. Please sign in again.',
-  TOO_MANY_REQUESTS: 'Too many attempts. Wait a moment and try again.',
-  NETWORK_ERROR: 'The service is unavailable. Check your connection and retry.',
-};
+const ERROR_CODES = [
+  'EMAIL_ALREADY_REGISTERED',
+  'INVALID_CREDENTIALS',
+  'INVALID_DATE_OF_BIRTH',
+  'INVALID_TIMEZONE',
+  'REFRESH_TOKEN_REQUIRED',
+  'REFRESH_TOKEN_INVALID',
+  'REFRESH_TOKEN_REUSED',
+  'SESSION_REVOKED',
+  'TOO_MANY_REQUESTS',
+  'NETWORK_ERROR',
+] as const;
 
-export function getUserFacingError(error: unknown) {
+type KnownErrorCode = (typeof ERROR_CODES)[number];
+
+export type AuthErrorMessageKey =
+  `errors.${KnownErrorCode}` | 'errors.SERVER_ERROR' | 'errors.UNKNOWN';
+
+function isKnownErrorCode(code: string): code is KnownErrorCode {
+  return ERROR_CODES.includes(code as KnownErrorCode);
+}
+
+export function getUserFacingErrorKey(error: unknown): AuthErrorMessageKey {
   if (error instanceof ApiClientError) {
-    return (
-      ERROR_MESSAGES[error.code] ??
-      (error.status >= 500
-        ? 'Something went wrong on our side. Please try again.'
-        : error.message)
-    );
+    if (isKnownErrorCode(error.code)) {
+      return `errors.${error.code}`;
+    }
+
+    return error.status >= 500 ? 'errors.SERVER_ERROR' : 'errors.UNKNOWN';
   }
 
-  return 'Something went wrong. Please try again.';
+  return 'errors.UNKNOWN';
+}
+
+export function getUserFacingError(
+  error: unknown,
+  t: (key: AuthErrorMessageKey) => string,
+) {
+  if (error instanceof ApiClientError && !isKnownErrorCode(error.code)) {
+    if (error.status < 500) {
+      return error.message;
+    }
+  }
+
+  return t(getUserFacingErrorKey(error));
 }

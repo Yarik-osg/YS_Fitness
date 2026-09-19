@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest';
+import {
+  applyAuthRedirect,
+  splitLocalePath,
+  withLocalePrefix,
+} from './proxy-auth';
+
+describe('splitLocalePath', () => {
+  it('strips a supported locale prefix', () => {
+    expect(splitLocalePath('/en/dashboard')).toEqual({
+      locale: 'en',
+      pathnameWithoutLocale: '/dashboard',
+    });
+  });
+
+  it('falls back to the default locale without a prefix', () => {
+    expect(splitLocalePath('/login')).toEqual({
+      locale: 'uk',
+      pathnameWithoutLocale: '/login',
+    });
+  });
+});
+
+describe('withLocalePrefix', () => {
+  it('replaces an existing locale prefix', () => {
+    expect(withLocalePrefix('/uk/dashboard', 'en')).toBe('/en/dashboard');
+  });
+});
+
+describe('applyAuthRedirect', () => {
+  it('sends an unauthenticated dashboard visit to a locale-prefixed login', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/dashboard',
+        locale: 'en',
+        fullPathname: '/en/dashboard',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Fdashboard');
+  });
+
+  it('sends a completed session away from a locale-prefixed login', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/login',
+        locale: 'uk',
+        fullPathname: '/uk/login',
+        hint: 'complete',
+      }),
+    ).toBe('/uk/dashboard');
+  });
+});

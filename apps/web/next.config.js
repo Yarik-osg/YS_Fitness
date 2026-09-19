@@ -1,6 +1,15 @@
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@repo/shared-types', '@repo/ui', '@repo/validation'],
+  transpilePackages: [
+    '@repo/i18n',
+    '@repo/shared-types',
+    '@repo/ui',
+    '@repo/validation',
+  ],
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);
