@@ -37,3 +37,6 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Local design export used only as a porting reference
+design-reference/
