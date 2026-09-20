@@ -5,6 +5,7 @@ import type { SubscriptionResponse } from '@repo/shared-types';
 import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
@@ -153,7 +154,10 @@ function CheckoutFrame({ children }: { children: React.ReactNode }) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 px-6 pb-10 pt-8">
-      <BrandMark />
+      <header className="flex items-center justify-between">
+        <BrandMark />
+        <LocaleSwitcher />
+      </header>
       <p className="mt-16 font-label text-[9px] font-semibold uppercase tracking-[0.2em] text-accent">
         {t('title')}
       </p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { getPostAuthPath } from '@/lib/auth/routing';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import { refresh } from '@/lib/api/auth';
@@ -22,7 +23,10 @@ async function restoreSession() {
 
 function LoadingScreen() {
   return (
-    <main className="grid min-h-screen place-items-center px-6">
+    <main className="relative grid min-h-screen place-items-center px-6">
+      <div className="absolute top-8 right-6">
+        <LocaleSwitcher />
+      </div>
       <div className="text-center">
         <p className="font-heading text-3xl uppercase tracking-wider">
           YS Fitness

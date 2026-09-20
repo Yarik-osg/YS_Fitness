@@ -3,6 +3,7 @@
 import { Activity, Dumbbell, Salad } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { useLogout } from '@/lib/hooks/use-auth';
@@ -26,14 +27,17 @@ export function Dashboard() {
     <main className="mx-auto min-h-screen w-full max-w-3xl px-6 pb-12 pt-7">
       <nav className="flex items-center justify-between border-b border-line pb-5">
         <BrandMark />
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => void signOut()}
-          disabled={logout.isPending}
-        >
-          {t('logout')}
-        </Button>
+        <div className="flex items-center gap-4">
+          <LocaleSwitcher />
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void signOut()}
+            disabled={logout.isPending}
+          >
+            {t('logout')}
+          </Button>
+        </div>
       </nav>
 
       <header className="pb-10 pt-14">
