@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Link } from '@/i18n/navigation';
 
 export function BrandMark() {
@@ -39,7 +40,7 @@ export function AuthShell({
           {t('back')}
         </Link>
         <BrandMark />
-        <span className="w-12" />
+        <LocaleSwitcher />
       </nav>
 
       <section className="flex flex-1 flex-col px-6 pb-10 pt-12">

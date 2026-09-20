@@ -4,10 +4,10 @@ import Image from 'next/image';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { FaqSection } from './faq-section';
-import { LocaleSwitcher } from './locale-switcher';
 import { PricingSection } from './pricing-section';
 
 const WHY_CARD_ACCENTS = ['teal', 'teal', 'lime', 'lime'] as const;

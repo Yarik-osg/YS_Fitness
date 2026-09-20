@@ -5,6 +5,7 @@ import { onboardingSchema } from '@repo/validation';
 import { CheckCircle2, Dumbbell, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -752,7 +753,10 @@ function Analysis() {
   const t = useTranslations('onboarding');
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-md place-items-center border-x border-white/5 px-8 text-center">
+    <main className="relative mx-auto grid min-h-screen w-full max-w-md place-items-center border-x border-white/5 px-8 text-center">
+      <div className="absolute top-8 right-6">
+        <LocaleSwitcher />
+      </div>
       <div>
         <Sparkles
           className="mx-auto mb-7 animate-pulse text-accent"
@@ -893,7 +897,10 @@ function SummaryScreen({
 }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 px-6 pb-10 pt-8">
-      <BrandMark />
+      <header className="flex items-center justify-between">
+        <BrandMark />
+        <LocaleSwitcher />
+      </header>
       <div className="mt-16 text-accent">{icon}</div>
       <p className="mt-5 font-label text-[9px] font-semibold uppercase tracking-[0.2em] text-accent">
         {eyebrow}

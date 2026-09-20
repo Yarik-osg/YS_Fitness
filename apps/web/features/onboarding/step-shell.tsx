@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
+import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
@@ -37,7 +38,7 @@ export function StepShell({
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-[#0b0d0f]/95">
       <nav className="border-b border-white/8 px-5 pb-4 pt-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={onBack}
@@ -46,9 +47,12 @@ export function StepShell({
             <ArrowLeft size={16} /> {t('back')}
           </button>
           <BrandMark />
-          <span className="w-15 text-right font-label text-[10px] text-muted">
-            {step + 1}/{total}
-          </span>
+          <div className="flex min-w-15 flex-col items-end gap-1">
+            <span className="font-label text-[10px] text-muted">
+              {step + 1}/{total}
+            </span>
+            <LocaleSwitcher />
+          </div>
         </div>
         <Progress value={((step + 1) / total) * 100} />
       </nav>

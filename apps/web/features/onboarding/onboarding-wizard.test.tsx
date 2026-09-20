@@ -16,6 +16,10 @@ vi.mock('@/i18n/navigation', () => ({
   ),
 }));
 
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe('OnboardingWizard', () => {
   beforeEach(() => {
     cleanup();
@@ -35,6 +39,9 @@ describe('OnboardingWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Для жінок/i }));
+    expect(
+      screen.getByRole('button', { name: /Змінити мову/i }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Продовжити/i }));
     await user.click(screen.getByRole('button', { name: /Варіант 2/i }));
     await user.click(screen.getByRole('button', { name: /Продовжити/i }));

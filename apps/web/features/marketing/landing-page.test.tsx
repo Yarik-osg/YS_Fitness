@@ -90,6 +90,9 @@ describe('LandingPage', () => {
       'href',
       '/login',
     );
+    expect(
+      screen.getByRole('button', { name: /Змінити мову/i }),
+    ).toBeInTheDocument();
     await waitFor(() => {
       expect(
         screen.getByRole('button', { name: /Обрати 3 місяці/i }),
