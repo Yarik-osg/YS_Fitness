@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -26,7 +26,9 @@ export function Dashboard() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-6 pb-12 pt-7">
       <nav className="flex items-center justify-between border-b border-line pb-5">
-        <BrandMark />
+        <Link href="/" className="inline-flex">
+          <BrandMark />
+        </Link>
         <div className="flex items-center gap-4">
           <LocaleSwitcher />
           <Button

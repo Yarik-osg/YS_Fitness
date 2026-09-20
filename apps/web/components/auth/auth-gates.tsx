@@ -2,11 +2,15 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { LocaleSwitcher } from '@/components/locale-switcher';
-import { getPostAuthPath } from '@/lib/auth/routing';
-import { writeSessionHint } from '@/lib/auth/session-cookie';
+import {
+  bindOnboardingDraftToUser,
+  resetOnboardingDraft,
+} from '@/features/onboarding/onboarding-store';
+import { usePathname, useRouter } from '@/i18n/navigation';
 import { refresh } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/users';
-import { usePathname, useRouter } from '@/i18n/navigation';
+import { getPostAuthPath } from '@/lib/auth/routing';
+import { writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 
 async function restoreSession() {
@@ -18,6 +22,11 @@ async function restoreSession() {
   writeSessionHint(
     user.profile?.onboardingCompletedAt ? 'complete' : 'onboarding',
   );
+  if (user.profile?.onboardingCompletedAt) {
+    resetOnboardingDraft();
+  } else {
+    bindOnboardingDraftToUser(user.id);
+  }
   return user;
 }
 
@@ -67,6 +76,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       } catch {
         if (!active) return;
         useAuthStore.getState().clearSession();
+        resetOnboardingDraft();
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       }
     }

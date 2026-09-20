@@ -7,8 +7,13 @@ import type {
 } from '@repo/shared-types';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import {
+  biologicalSexFromProgramTrack,
+  ONBOARDING_WIZARD_STEPS,
+  type ProgramTrack,
+} from './program-track';
 
-export type ProgramTrack = 'female' | 'male';
+export type { ProgramTrack };
 
 export interface OnboardingDraft {
   programTrack?: ProgramTrack;
@@ -34,15 +39,31 @@ export interface OnboardingDraft {
 
 export interface OnboardingState extends OnboardingDraft {
   step: number;
+  ownerUserId?: string;
   setAnswer: (patch: Partial<OnboardingDraft>) => void;
   setStep: (step: number) => void;
   reset: () => void;
 }
 
-const initialState: OnboardingDraft & { step: number } = {
+const initialState: OnboardingDraft & { step: number; ownerUserId?: string } = {
   step: 0,
+  ownerUserId: undefined,
+  programTrack: undefined,
+  currentBody: undefined,
+  desiredBody: undefined,
+  mainGoal: undefined,
+  experience: undefined,
+  trainingFrequency: undefined,
   focusAreas: [],
+  nutritionCurrent: undefined,
+  mealsPerDay: undefined,
   eatingHabits: [],
+  goal: undefined,
+  activityLevel: undefined,
+  dateOfBirth: undefined,
+  heightCm: undefined,
+  weightKg: undefined,
+  biologicalSexForCalculation: undefined,
 };
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -51,13 +72,14 @@ export const useOnboardingStore = create<OnboardingState>()(
       ...initialState,
       setAnswer: (patch) => set(patch),
       setStep: (step) => set({ step }),
-      reset: () => set(initialState),
+      reset: () => set((state) => ({ ...state, ...initialState })),
     }),
     {
       name: 'ys-onboarding-draft',
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         step: state.step,
+        ownerUserId: state.ownerUserId,
         programTrack: state.programTrack,
         currentBody: state.currentBody,
         desiredBody: state.desiredBody,
@@ -75,6 +97,56 @@ export const useOnboardingStore = create<OnboardingState>()(
         weightKg: state.weightKg,
         biologicalSexForCalculation: state.biologicalSexForCalculation,
       }),
+      merge: (persisted, current) =>
+        migrateOnboardingDraft(
+          persisted as Partial<OnboardingState> | undefined,
+          current,
+        ),
     },
   ),
 );
+
+function migrateOnboardingDraft(
+  persisted: Partial<OnboardingState> | undefined,
+  current: OnboardingState,
+): OnboardingState {
+  const next = { ...current, ...persisted };
+  const lastStep = ONBOARDING_WIZARD_STEPS - 1;
+
+  if (typeof next.step === 'number' && next.step > lastStep) {
+    next.step = lastStep;
+  }
+
+  if (next.programTrack && !next.biologicalSexForCalculation) {
+    next.biologicalSexForCalculation = biologicalSexFromProgramTrack(
+      next.programTrack,
+    );
+  }
+
+  return next;
+}
+
+export function resetOnboardingDraft() {
+  useOnboardingStore.getState().reset();
+  void useOnboardingStore.persist.clearStorage();
+}
+
+export function bindOnboardingDraftToUser(
+  userId: string,
+  options: { replace?: boolean } = {},
+) {
+  const apply = () => {
+    const state = useOnboardingStore.getState();
+    if (options.replace || state.ownerUserId !== userId) {
+      resetOnboardingDraft();
+    }
+    useOnboardingStore.setState({ ownerUserId: userId });
+  };
+
+  if (useOnboardingStore.persist.hasHydrated()) {
+    apply();
+    return;
+  }
+
+  useOnboardingStore.persist.onFinishHydration(apply);
+}

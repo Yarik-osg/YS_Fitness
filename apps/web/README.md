@@ -19,9 +19,21 @@ Landing plan buttons load prices from `GET /subscriptions/plans` and persist the
 ## Onboarding persistence
 
 The current API persists only date of birth, BMR calculation sex, metric height
-and weight, activity level, weight goal, and timezone. Program direction,
-current/desired body, design goal, experience, training frequency, focus areas,
-current nutrition, meals per day, and eating habits remain in the browser draft
-and result preview only. Health restrictions are not collected yet. These
-answers must not be mapped to unrelated profile fields; they need dedicated
-backend contracts in a future programs/nutrition milestone.
+and weight, activity level, weight goal, and timezone. Selecting program
+direction (female/male) also writes `biologicalSexForCalculation` for that
+payload; the direction itself, current/desired body, design goal, experience,
+training frequency, focus areas, current nutrition, meals per day, and eating
+habits remain in the browser draft and result preview only. Health restrictions
+are not collected yet. These answers must not be mapped to unrelated profile
+fields; they need dedicated backend contracts in a future programs/nutrition
+milestone.
+
+The browser draft lives in `sessionStorage` (`ys-onboarding-draft`) and is
+scoped to the signed-in user. Register and logout clear it so a new account
+does not inherit the previous quiz.
+
+## Session chrome
+
+The landing nav reads the `ys_web_session` hint. Guests see Log in; users
+still in onboarding see Continue (`/onboarding`); completed users see
+Dashboard (`/dashboard`). The dashboard YS mark links to the landing page.

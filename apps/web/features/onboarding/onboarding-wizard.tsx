@@ -14,8 +14,16 @@ import { getUserFacingError } from '@/lib/api/errors';
 import { useSaveOnboarding } from '@/lib/hooks/use-users';
 import { readSelectedPlanId } from '@/lib/subscriptions/selected-plan';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
-import { useOnboardingStore, type OnboardingState } from './onboarding-store';
+import {
+  resetOnboardingDraft,
+  useOnboardingStore,
+  type OnboardingState,
+} from './onboarding-store';
 import { buildOnboardingPayload } from './payload';
+import {
+  biologicalSexFromProgramTrack,
+  ONBOARDING_WIZARD_STEPS,
+} from './program-track';
 import { StepShell } from './step-shell';
 
 const FEMALE_CURRENT_PHOTOS = [
@@ -50,7 +58,7 @@ const MALE_DESIRED_IMAGES = [
   'photo-1621750627159-cf77b0b91aac',
 ];
 
-const TOTAL_STEPS = 14;
+const TOTAL_STEPS = ONBOARDING_WIZARD_STEPS;
 
 function calculateAge(dateOfBirth?: string) {
   if (!dateOfBirth) return null;
@@ -80,6 +88,7 @@ export function OnboardingWizard() {
     'wizard',
   );
 
+  const step = Math.min(Math.max(draft.step, 0), TOTAL_STEPS - 1);
   const male = draft.programTrack === 'male';
   const age = calculateAge(draft.dateOfBirth);
   const currentBodyChoices = useMemo(() => {
@@ -322,17 +331,17 @@ export function OnboardingWizard() {
   }, [phase]);
 
   function previous() {
-    if (draft.step === 0) {
+    if (step === 0) {
       router.push('/');
       return;
     }
-    draft.setStep(draft.step - 1);
+    draft.setStep(step - 1);
   }
 
   async function next() {
     if (!isCurrentStepValid()) return;
-    if (draft.step < TOTAL_STEPS - 1) {
-      draft.setStep(draft.step + 1);
+    if (step < TOTAL_STEPS - 1) {
+      draft.setStep(step + 1);
       return;
     }
 
@@ -345,7 +354,7 @@ export function OnboardingWizard() {
   }
 
   function isCurrentStepValid() {
-    switch (draft.step) {
+    switch (step) {
       case 0:
         return Boolean(draft.programTrack);
       case 1:
@@ -382,12 +391,6 @@ export function OnboardingWizard() {
             heightCm: draft.heightCm,
             weightKg: draft.weightKg,
           }).success;
-      case 13:
-        return onboardingSchema
-          .pick({ biologicalSexForCalculation: true })
-          .safeParse({
-            biologicalSexForCalculation: draft.biologicalSexForCalculation,
-          }).success;
       default:
         return false;
     }
@@ -404,7 +407,7 @@ export function OnboardingWizard() {
       <Plan
         draft={draft}
         onContinue={() => {
-          draft.reset();
+          resetOnboardingDraft();
           const planId = readSelectedPlanId();
           router.replace(planId ? `/checkout?planId=${planId}` : '/dashboard');
         }}
@@ -413,7 +416,7 @@ export function OnboardingWizard() {
   }
 
   const common = {
-    step: draft.step,
+    step,
     total: TOTAL_STEPS,
     onBack: previous,
     onContinue: () => void next(),
@@ -424,7 +427,7 @@ export function OnboardingWizard() {
       : null,
   };
 
-  switch (draft.step) {
+  switch (step) {
     case 0:
       return (
         <StepShell
@@ -438,6 +441,9 @@ export function OnboardingWizard() {
             onChange={(value) =>
               draft.setAnswer({
                 programTrack: value as 'female' | 'male',
+                biologicalSexForCalculation: biologicalSexFromProgramTrack(
+                  value as 'female' | 'male',
+                ),
               })
             }
             choices={[
@@ -461,7 +467,7 @@ export function OnboardingWizard() {
       );
     case 1:
     case 2: {
-      const current = draft.step === 1;
+      const current = step === 1;
       return (
         <StepShell
           {...common}
@@ -724,28 +730,7 @@ export function OnboardingWizard() {
         </StepShell>
       );
     default:
-      return (
-        <StepShell
-          {...common}
-          eyebrow={t('steps.bmr.eyebrow')}
-          title={t.rich('steps.bmr.title', { accent })}
-          description={t('steps.bmr.description')}
-        >
-          <ChoiceList
-            choices={[
-              { value: 'FEMALE', label: t('choices.bmr.FEMALE') },
-              { value: 'MALE', label: t('choices.bmr.MALE') },
-            ]}
-            value={draft.biologicalSexForCalculation}
-            onChange={(biologicalSexForCalculation) =>
-              draft.setAnswer({
-                biologicalSexForCalculation: biologicalSexForCalculation as
-                  'FEMALE' | 'MALE',
-              })
-            }
-          />
-        </StepShell>
-      );
+      return null;
   }
 }
 

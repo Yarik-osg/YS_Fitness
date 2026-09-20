@@ -129,6 +129,39 @@ describe('LandingPage', () => {
     });
     expect(window.sessionStorage.getItem('ys_selected_plan_id')).toBe('plan-3');
   });
+
+  it('sends a completed session to the dashboard instead of login', () => {
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <LandingPage sessionHint="complete" />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: /Кабінет/i })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
+    expect(
+      screen.queryByRole('link', { name: /Увійти/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends an in-progress session back to onboarding', () => {
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <LandingPage sessionHint="onboarding" />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: /Продовжити/i })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    );
+  });
 });
 
 describe('persistSelectedPlanId', () => {
