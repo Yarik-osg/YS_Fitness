@@ -1,5 +1,5 @@
 import type { MeResponse } from '@repo/shared-types';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { getPostAuthPath } from './routing';
 
 function user(onboardingCompletedAt: string | null): MeResponse {
@@ -26,13 +26,22 @@ function user(onboardingCompletedAt: string | null): MeResponse {
 }
 
 describe('getPostAuthPath', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
   it('sends a new login to onboarding', () => {
     expect(getPostAuthPath(user(null))).toBe('/onboarding');
   });
 
   it('sends an onboarded login to the dashboard', () => {
-    expect(getPostAuthPath(user('2026-09-19T10:00:00.000Z'))).toBe(
+    expect(getPostAuthPath(user('2026-09-19T10:00:00.000Z'), null)).toBe(
       '/dashboard',
+    );
+  });
+
+  it('sends an onboarded login with a selected plan to checkout', () => {
+    expect(getPostAuthPath(user('2026-09-19T10:00:00.000Z'), 'plan-3')).toBe(
+      '/checkout?planId=plan-3',
     );
   });
 });

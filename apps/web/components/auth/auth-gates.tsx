@@ -47,11 +47,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
         const restoredUser = await restoreSession();
         if (!active) return;
         const destination = getPostAuthPath(restoredUser);
+        const onOnboarding = pathname.startsWith('/onboarding');
+        const onDashboard = pathname.startsWith('/dashboard');
+        const onCheckout = pathname.startsWith('/checkout');
+
         if (
-          (pathname.startsWith('/dashboard') &&
-            destination === '/onboarding') ||
-          (pathname.startsWith('/checkout') && destination === '/onboarding') ||
-          (pathname.startsWith('/onboarding') && destination === '/dashboard')
+          (onOnboarding && !destination.startsWith('/onboarding')) ||
+          (onDashboard && destination.startsWith('/onboarding')) ||
+          (onCheckout && destination.startsWith('/onboarding'))
         ) {
           router.replace(destination);
           return;

@@ -106,6 +106,12 @@ describeWithDatabase('subscriptions (e2e)', () => {
     );
     expect(monthly).toBeDefined();
 
+    const mineBefore = await request(app.getHttpServer())
+      .get('/api/v1/subscriptions/me')
+      .set('Authorization', authorization)
+      .expect(200);
+    expect(mineBefore.body).toEqual({ subscription: null });
+
     const checkout = await request(app.getHttpServer())
       .post('/api/v1/subscriptions/checkout')
       .set('Authorization', authorization)
@@ -121,8 +127,8 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .set('Authorization', authorization)
       .expect(200);
 
-    expect(mine.body.status).toBe('ACTIVE');
-    expect(mine.body.plan.code).toBe('1_MONTH');
+    expect(mine.body.subscription.status).toBe('ACTIVE');
+    expect(mine.body.subscription.plan.code).toBe('1_MONTH');
   });
 
   it('lets only one of two concurrent checkouts succeed', async () => {

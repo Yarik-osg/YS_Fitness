@@ -39,11 +39,13 @@ export function applyAuthRedirect({
   locale,
   fullPathname,
   hint,
+  planId,
 }: {
   pathnameWithoutLocale: string;
   locale: AppLocale;
   fullPathname: string;
   hint: SessionHint | null;
+  planId?: string | null;
 }): string | null {
   const prefixed = (path: string) => `/${locale}${path}`;
   const isAuthRoute = AUTH_ROUTES.some((route) =>
@@ -52,9 +54,15 @@ export function applyAuthRedirect({
   const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
     pathnameWithoutLocale.startsWith(route),
   );
+  const checkoutPath = planId
+    ? `/checkout?planId=${encodeURIComponent(planId)}`
+    : '/checkout';
 
   if (isAuthRoute && hint) {
-    return prefixed(hint === 'complete' ? '/dashboard' : '/onboarding');
+    if (hint === 'onboarding') {
+      return prefixed('/onboarding');
+    }
+    return prefixed(planId ? checkoutPath : '/dashboard');
   }
 
   if (isProtectedRoute && !hint) {

@@ -8,6 +8,7 @@ import { BrandMark } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
+import { getUserFacingError } from '@/lib/api/errors';
 import { getMySubscription } from '@/lib/api/subscriptions';
 import { useCheckout } from '@/lib/hooks/use-subscriptions';
 import {
@@ -27,11 +28,13 @@ function CheckoutFlow() {
   const searchParams = useSearchParams();
   const checkout = useCheckout();
   const t = useTranslations('checkout');
+  const tAuth = useTranslations('auth');
   const planId = searchParams.get('planId') ?? readSelectedPlanId();
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const started = useRef(false);
   const checkoutPlan = checkout.mutateAsync;
 
@@ -41,13 +44,17 @@ function CheckoutFlow() {
 
     void (async () => {
       try {
-        const existing = await getMySubscription();
-        if (
-          existing &&
-          (existing.status === 'ACTIVE' || existing.status === 'PENDING')
-        ) {
-          setSubscription(existing);
-          return;
+        try {
+          const existing = await getMySubscription();
+          if (
+            existing &&
+            (existing.status === 'ACTIVE' || existing.status === 'PENDING')
+          ) {
+            setSubscription(existing);
+            return;
+          }
+        } catch {
+          // A missing current subscription should not block checkout.
         }
 
         const result = await checkoutPlan(planId);
@@ -58,16 +65,16 @@ function CheckoutFlow() {
           cause instanceof ApiClientError &&
           cause.code === 'SUBSCRIPTION_ALREADY_ACTIVE'
         ) {
-          const mine = await getMySubscription();
+          const mine = await getMySubscription().catch(() => null);
           if (mine) {
             setSubscription(mine);
             return;
           }
         }
-        setError(t('error'));
+        setError(getUserFacingError(cause, tAuth) || t('error'));
       }
     })();
-  }, [checkoutPlan, planId, t]);
+  }, [attempt, checkoutPlan, planId, t, tAuth]);
 
   if (!planId) {
     return (
@@ -84,6 +91,16 @@ function CheckoutFlow() {
     return (
       <CheckoutFrame>
         <p className="text-sm text-muted">{error}</p>
+        <Button
+          className="mt-8 w-full"
+          onClick={() => {
+            started.current = false;
+            setError(null);
+            setAttempt((current) => current + 1);
+          }}
+        >
+          {t('retry')}
+        </Button>
       </CheckoutFrame>
     );
   }

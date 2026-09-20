@@ -446,6 +446,7 @@
     "dashboardCta": "Go to cabinet →",
     "missingPlan": "Choose a plan on the home page first.",
     "choosePlanCta": "Choose a plan",
-    "error": "We could not confirm the subscription. Try again."
+    "error": "We could not confirm the subscription. Try again.",
+    "retry": "Try again"
   }
 }

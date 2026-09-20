@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type {
   CheckoutResponse,
+  CurrentSubscriptionResponse,
   PlanResponse,
   SubscriptionResponse,
 } from '@repo/shared-types';
@@ -41,10 +42,10 @@ export class SubscriptionsController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMine(
+  async getMine(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<SubscriptionResponse | null> {
-    return this.subscriptions.getMine(user.sub);
+  ): Promise<CurrentSubscriptionResponse> {
+    return { subscription: await this.subscriptions.getMine(user.sub) };
   }
 
   @Post('grant')

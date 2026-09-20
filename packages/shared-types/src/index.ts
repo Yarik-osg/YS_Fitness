@@ -104,3 +104,7 @@ export interface CheckoutResponse {
   subscription: SubscriptionResponse;
   checkoutUrl: string | null;
 }
+
+export interface CurrentSubscriptionResponse {
+  subscription: SubscriptionResponse | null;
+}
