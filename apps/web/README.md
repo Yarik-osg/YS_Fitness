@@ -18,19 +18,17 @@ Landing plan buttons load prices from `GET /subscriptions/plans` and persist the
 
 ## Onboarding persistence
 
-The current API persists only date of birth, BMR calculation sex, metric height
-and weight, activity level, weight goal, and timezone. Selecting program
-direction (female/male) also writes `biologicalSexForCalculation` for that
-payload; the direction itself, current/desired body, design goal, experience,
-training frequency, focus areas, current nutrition, meals per day, and eating
-habits remain in the browser draft and result preview only. Health restrictions
-are not collected yet. These answers must not be mapped to unrelated profile
-fields; they need dedicated backend contracts in a future programs/nutrition
-milestone.
+`PUT /users/me/onboarding` persists the calculation subset on `UserProfile` /
+`BodyMeasurement` and the rest of the quiz on `OnboardingResponses` in one
+request. Selecting program direction (female/male) writes `programTrack` and
+also `biologicalSexForCalculation`. Design goal (`mainGoal`) stays distinct
+from the profile weight goal. Health restrictions are not collected yet.
 
-The browser draft lives in `sessionStorage` (`ys-onboarding-draft`) and is
-scoped to the signed-in user. Register and logout clear it so a new account
-does not inherit the previous quiz.
+The browser draft in `sessionStorage` (`ys-onboarding-draft`) is only a
+working copy until submit. It is scoped to the signed-in user; register and
+logout clear it so a new account does not inherit the previous quiz.
+`GET /users/me/onboarding-responses` can read the saved quiz later; cross-device
+resume is not built yet.
 
 ## Session chrome
 

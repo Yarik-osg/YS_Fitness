@@ -17,4 +17,14 @@ export class OnboardingDto implements OnboardingInput {
   goal!: 'LOSE_WEIGHT' | 'MAINTAIN_WEIGHT' | 'GAIN_WEIGHT';
   healthRestrictions?: { type: string }[];
   timezone!: string;
+  programTrack!: 'female' | 'male';
+  currentBody!: OnboardingInput['currentBody'];
+  desiredBody!: OnboardingInput['desiredBody'];
+  mainGoal!: OnboardingInput['mainGoal'];
+  experience!: OnboardingInput['experience'];
+  trainingFrequency!: OnboardingInput['trainingFrequency'];
+  focusAreas!: OnboardingInput['focusAreas'];
+  nutritionCurrent!: OnboardingInput['nutritionCurrent'];
+  mealsPerDay!: OnboardingInput['mealsPerDay'];
+  eatingHabits!: OnboardingInput['eatingHabits'];
 }

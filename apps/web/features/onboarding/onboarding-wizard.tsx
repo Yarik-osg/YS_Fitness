@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { onboardingSchema } from '@repo/validation';
+import { onboardingProfileSchema } from '@repo/validation';
 import { CheckCircle2, Dumbbell, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
@@ -364,7 +364,7 @@ export function OnboardingWizard() {
       case 3:
         return Boolean(draft.mainGoal);
       case 4:
-        return onboardingSchema
+        return onboardingProfileSchema
           .pick({ goal: true })
           .safeParse({ goal: draft.goal }).success;
       case 5:
@@ -372,7 +372,7 @@ export function OnboardingWizard() {
       case 6:
         return Boolean(draft.trainingFrequency);
       case 7:
-        return onboardingSchema
+        return onboardingProfileSchema
           .pick({ activityLevel: true })
           .safeParse({ activityLevel: draft.activityLevel }).success;
       case 8:
@@ -384,7 +384,7 @@ export function OnboardingWizard() {
       case 11:
         return draft.eatingHabits.length > 0;
       case 12:
-        return onboardingSchema
+        return onboardingProfileSchema
           .pick({ dateOfBirth: true, heightCm: true, weightKg: true })
           .safeParse({
             dateOfBirth: draft.dateOfBirth,

@@ -17,7 +17,7 @@ They were kept separate for semantic accuracy: a visual/program preference is no
 
 Merge them into a single “Обери свій напрямок” step. Selecting female or male writes both `draft.programTrack` and `draft.biologicalSexForCalculation` (`female` → `FEMALE`, `male` → `MALE`).
 
-The PUT `/users/me/onboarding` contract is unchanged: the payload still sends `biologicalSexForCalculation` and still omits `programTrack`.
+`PUT /users/me/onboarding` sends both `programTrack` (stored on `OnboardingResponses`) and `biologicalSexForCalculation` (stored on `UserProfile`). Program track is not a profile field.
 
 This reverses the earlier product/architecture choice to keep the two questions separate.
 
@@ -37,7 +37,7 @@ This reverses the earlier product/architecture choice to keep the two questions 
 ## Alternatives considered
 
 - Keep two steps for semantic accuracy: rejected because the overlap cost more friction than it saved for the expected user.
-- Persist `programTrack` on the profile: rejected; it remains a client-draft/UX field until a programs contract exists.
+- Persist `programTrack` on the profile: rejected; it belongs on `OnboardingResponses` with the rest of the raw questionnaire.
 
 ## References
 

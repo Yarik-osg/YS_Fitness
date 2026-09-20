@@ -18,5 +18,15 @@ export function buildOnboardingPayload(
     activityLevel: draft.activityLevel,
     goal: draft.goal,
     timezone,
+    programTrack: draft.programTrack,
+    currentBody: draft.currentBody,
+    desiredBody: draft.desiredBody,
+    mainGoal: draft.mainGoal,
+    experience: draft.experience,
+    trainingFrequency: draft.trainingFrequency,
+    focusAreas: draft.focusAreas,
+    nutritionCurrent: draft.nutritionCurrent,
+    mealsPerDay: draft.mealsPerDay,
+    eatingHabits: draft.eatingHabits,
   });
 }
