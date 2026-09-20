@@ -65,6 +65,33 @@ export interface OnboardingResponse {
   measurement: BodyMeasurementResponse;
 }
 
+export type ProgramTrack = 'female' | 'male';
+export type OnboardingMainGoal =
+  'lose_weight' | 'build_muscle' | 'improve_body' | 'maintain' | 'get_stronger';
+export type TrainingExperience = 'beginner' | 'intermediate' | 'advanced';
+export type TrainingFrequency = '2' | '3' | '4';
+export type NutritionCurrent =
+  'structured' | 'balanced' | 'intuitive' | 'irregular' | 'uncontrolled';
+
+export interface OnboardingResponsesRecord {
+  programTrack: ProgramTrack;
+  currentBody: string;
+  desiredBody: string;
+  mainGoal: OnboardingMainGoal;
+  experience: TrainingExperience;
+  trainingFrequency: TrainingFrequency;
+  focusAreas: string[];
+  nutritionCurrent: NutritionCurrent;
+  mealsPerDay: string;
+  eatingHabits: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OnboardingResponsesResponse {
+  responses: OnboardingResponsesRecord | null;
+}
+
 export interface ApiError {
   statusCode: number;
   code: string;

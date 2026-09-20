@@ -32,6 +32,33 @@ enum FitnessGoal {
   GAIN_WEIGHT
 }
 
+enum ProgramTrack {
+  FEMALE
+  MALE
+}
+
+enum OnboardingMainGoal {
+  LOSE_WEIGHT
+  BUILD_MUSCLE
+  IMPROVE_BODY
+  MAINTAIN
+  GET_STRONGER
+}
+
+enum TrainingExperience {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum NutritionCurrent {
+  STRUCTURED
+  BALANCED
+  INTUITIVE
+  IRREGULAR
+  UNCONTROLLED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique @db.VarChar(320)
@@ -42,10 +69,11 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   profile              UserProfile?
+  onboardingResponses  OnboardingResponses?
   bodyMeasurements     BodyMeasurement[]
   authSessions         AuthSession[]
   subscriptions        Subscription[]
-  grantedSubscriptions Subscription[]    @relation("GrantedSubscriptions")
+  grantedSubscriptions Subscription[]       @relation("GrantedSubscriptions")
 
   @@map("users")
 }
@@ -68,6 +96,27 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
+}
+
+model OnboardingResponses {
+  id                String             @id @default(uuid()) @db.Uuid
+  userId            String             @unique @map("user_id") @db.Uuid
+  programTrack      ProgramTrack       @map("program_track")
+  currentBody       String             @map("current_body") @db.VarChar(32)
+  desiredBody       String             @map("desired_body") @db.VarChar(8)
+  mainGoal          OnboardingMainGoal @map("main_goal")
+  experience        TrainingExperience
+  trainingFrequency String             @map("training_frequency") @db.VarChar(8)
+  focusAreas        String[]           @map("focus_areas")
+  nutritionCurrent  NutritionCurrent   @map("nutrition_current")
+  mealsPerDay       String             @map("meals_per_day") @db.VarChar(16)
+  eatingHabits      String[]           @map("eating_habits")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_responses")
 }
 
 model BodyMeasurement {

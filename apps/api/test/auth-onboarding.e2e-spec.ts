@@ -6,6 +6,10 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
+import {
+  FEMALE_ONBOARDING,
+  FEMALE_ONBOARDING_ANSWERS,
+} from './onboarding.fixture.js';
 
 const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
@@ -39,6 +43,7 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
     await prisma.authRefreshToken.deleteMany();
     await prisma.authSession.deleteMany();
     await prisma.bodyMeasurement.deleteMany();
+    await prisma.onboardingResponses.deleteMany();
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
   });
@@ -152,31 +157,33 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
       .expect(201);
 
     const authorization = `Bearer ${registration.body.tokens.accessToken}`;
-    const input = {
-      dateOfBirth: '1990-05-10',
-      biologicalSexForCalculation: 'FEMALE',
-      heightCm: 168,
-      weightKg: 67.5,
-      bodyFatPercent: 24,
-      activityLevel: 'MODERATELY_ACTIVE',
-      goal: 'LOSE_WEIGHT',
-      healthRestrictions: [{ type: 'knee_injury' }],
-      timezone: 'Europe/Kyiv',
-    };
+
+    await request(app.getHttpServer())
+      .get('/api/v1/users/me/onboarding-responses')
+      .set('Authorization', authorization)
+      .expect(200, { responses: null });
 
     await request(app.getHttpServer())
       .put('/api/v1/users/me/onboarding')
       .set('Authorization', authorization)
-      .send(input)
+      .send(FEMALE_ONBOARDING)
       .expect(200);
 
+    const saved = await request(app.getHttpServer())
+      .get('/api/v1/users/me/onboarding-responses')
+      .set('Authorization', authorization)
+      .expect(200);
+
+    expect(saved.body.responses).toMatchObject(FEMALE_ONBOARDING_ANSWERS);
+
     await request(app.getHttpServer())
       .put('/api/v1/users/me/onboarding')
       .set('Authorization', authorization)
-      .send(input)
+      .send(FEMALE_ONBOARDING)
       .expect(200);
 
     expect(await prisma.userProfile.count()).toBe(1);
     expect(await prisma.bodyMeasurement.count()).toBe(1);
+    expect(await prisma.onboardingResponses.count()).toBe(1);
   });
 });

@@ -7,19 +7,10 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
+import { FEMALE_ONBOARDING } from './onboarding.fixture.js';
 
 const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
-
-const ONBOARDING = {
-  dateOfBirth: '1990-05-10',
-  biologicalSexForCalculation: 'FEMALE',
-  heightCm: 168,
-  weightKg: 67.5,
-  activityLevel: 'MODERATELY_ACTIVE',
-  goal: 'LOSE_WEIGHT',
-  timezone: 'Europe/Kyiv',
-};
 
 describeWithDatabase('subscriptions (e2e)', () => {
   let app: INestApplication;
@@ -51,6 +42,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
     await prisma.authRefreshToken.deleteMany();
     await prisma.authSession.deleteMany();
     await prisma.bodyMeasurement.deleteMany();
+    await prisma.onboardingResponses.deleteMany();
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
 
@@ -95,7 +87,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
     await request(app.getHttpServer())
       .put('/api/v1/users/me/onboarding')
       .set('Authorization', authorization)
-      .send(ONBOARDING)
+      .send(FEMALE_ONBOARDING)
       .expect(200);
 
     const plans = await request(app.getHttpServer())

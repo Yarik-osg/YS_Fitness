@@ -1,3 +1,4 @@
+import type { OnboardingInput } from '@repo/validation';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { saveOnboarding } from './users';
@@ -23,13 +24,23 @@ describe('saveOnboarding', () => {
 
     const payload = {
       dateOfBirth: '1994-05-10',
-      biologicalSexForCalculation: 'FEMALE' as const,
+      biologicalSexForCalculation: 'FEMALE',
       heightCm: 168,
       weightKg: 64.5,
-      activityLevel: 'MODERATELY_ACTIVE' as const,
-      goal: 'MAINTAIN_WEIGHT' as const,
+      activityLevel: 'MODERATELY_ACTIVE',
+      goal: 'MAINTAIN_WEIGHT',
       timezone: 'Europe/Kyiv',
-    };
+      programTrack: 'female',
+      currentBody: 'slim',
+      desiredBody: '1',
+      mainGoal: 'get_stronger',
+      experience: 'intermediate',
+      trainingFrequency: '3',
+      focusAreas: ['glutes', 'legs'],
+      nutritionCurrent: 'balanced',
+      mealsPerDay: '3',
+      eatingHabits: ['snacking', 'emotional'],
+    } satisfies OnboardingInput;
 
     await saveOnboarding(payload);
 

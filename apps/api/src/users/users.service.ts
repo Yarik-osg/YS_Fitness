@@ -1,7 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { OnboardingResponsesResponse } from '@repo/shared-types';
 import type { OnboardingInput } from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  sameOnboardingResponses,
+  toOnboardingResponsesRecord,
+  toPrismaOnboardingResponses,
+} from './onboarding-responses.mapper.js';
 
 @Injectable()
 export class UsersService {
@@ -48,13 +54,15 @@ export class UsersService {
 
     return this.prisma.$transaction(
       async (transaction) => {
-        const [existingProfile, latestMeasurement] = await Promise.all([
-          transaction.userProfile.findUnique({ where: { userId } }),
-          transaction.bodyMeasurement.findFirst({
-            where: { userId },
-            orderBy: { measuredAt: 'desc' },
-          }),
-        ]);
+        const [existingProfile, latestMeasurement, existingResponses] =
+          await Promise.all([
+            transaction.userProfile.findUnique({ where: { userId } }),
+            transaction.bodyMeasurement.findFirst({
+              where: { userId },
+              orderBy: { measuredAt: 'desc' },
+            }),
+            transaction.onboardingResponses.findUnique({ where: { userId } }),
+          ]);
 
         const completedAt =
           existingProfile?.onboardingCompletedAt ?? new Date();
@@ -101,10 +109,33 @@ export class UsersService {
             })
           : latestMeasurement;
 
+        const responsesData = toPrismaOnboardingResponses(input);
+        if (
+          !existingResponses ||
+          !sameOnboardingResponses(existingResponses, input)
+        ) {
+          await transaction.onboardingResponses.upsert({
+            where: { userId },
+            create: { userId, ...responsesData },
+            update: responsesData,
+          });
+        }
+
         return { profile, measurement };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+  }
+
+  async getOnboardingResponses(
+    userId: string,
+  ): Promise<OnboardingResponsesResponse> {
+    const row = await this.prisma.onboardingResponses.findUnique({
+      where: { userId },
+    });
+    return {
+      responses: row ? toOnboardingResponsesRecord(row) : null,
+    };
   }
 
   private validateDateOfBirth(value: string): Date {

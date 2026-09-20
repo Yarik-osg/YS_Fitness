@@ -22,4 +22,9 @@ export class UsersController {
   ) {
     return this.users.saveOnboarding(user.sub, input);
   }
+
+  @Get('me/onboarding-responses')
+  getOnboardingResponses(@CurrentUser() user: AuthenticatedUser) {
+    return this.users.getOnboardingResponses(user.sub);
+  }
 }

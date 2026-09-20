@@ -7,11 +7,14 @@ YS Fitness is a pnpm/Turborepo monorepo with a NestJS REST API, a Next.js web ap
 Questionnaire input, derived targets, and generated plans are separate domain concerns:
 
 - **Profile data** records facts supplied by the user: date of birth, calculation sex, height, activity level, goal, restrictions, and measurement history.
+- **Questionnaire input** is stored on `OnboardingResponses`, one row per user, separate from `UserProfile`. It holds the raw quiz (`programTrack`, body photos, design goal, experience, frequency, focus areas, nutrition habits). Nutrition and programs may read it later; they must not write it.
 - **Nutrition** calculates and stores versioned calorie and macro targets from profile data. It must not add calculated values to `UserProfile`.
 - **Programs** generates and assigns workout programs. Program state must not be embedded in profile or nutrition records.
 - **Workouts** records performed sessions, sets, reps, and loads independently from program templates.
 
-Web onboarding asks program track (female/male visual branch) once. That choice also fills `biologicalSexForCalculation` on the persisted profile. Program track itself stays in the browser draft until a programs contract exists. See [ADR 003](docs/adr/003-onboarding-program-track-and-bmr-sex.md).
+Web onboarding asks program track (female/male visual branch) once. That choice writes `programTrack` on `OnboardingResponses` and also fills `biologicalSexForCalculation` on the persisted profile. See [ADR 003](docs/adr/003-onboarding-program-track-and-bmr-sex.md).
+
+Users who completed onboarding before `OnboardingResponses` existed have no row. `GET /users/me/onboarding-responses` returning `{ responses: null }` is expected for them. Do not backfill invented answers.
 
 A domain may read another domain through an explicit service or public contract. It must not mutate another domain's tables directly. New calculated outputs should retain enough input/version metadata to explain when and how they were produced.
 
