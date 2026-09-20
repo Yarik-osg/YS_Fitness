@@ -50,6 +50,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         if (
           (pathname.startsWith('/dashboard') &&
             destination === '/onboarding') ||
+          (pathname.startsWith('/checkout') && destination === '/onboarding') ||
           (pathname.startsWith('/onboarding') && destination === '/dashboard')
         ) {
           router.replace(destination);

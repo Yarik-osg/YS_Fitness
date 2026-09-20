@@ -73,3 +73,34 @@ export interface ApiError {
   timestamp: string;
   details?: unknown;
 }
+
+export type SubscriptionStatus = 'PENDING' | 'ACTIVE' | 'CANCELED' | 'EXPIRED';
+export type PaymentProvider = 'MOCK' | 'MANUAL' | 'WAYFORPAY';
+
+export interface PlanResponse {
+  id: string;
+  code: string;
+  name: string;
+  priceAmount: number;
+  currency: string;
+  intervalMonths: number;
+  isActive: boolean;
+}
+
+export interface SubscriptionResponse {
+  id: string;
+  userId: string;
+  planId: string;
+  status: SubscriptionStatus;
+  provider: PaymentProvider;
+  providerReference: string | null;
+  currentPeriodEnd: string | null;
+  grantedByUserId: string | null;
+  createdAt: string;
+  plan: PlanResponse;
+}
+
+export interface CheckoutResponse {
+  subscription: SubscriptionResponse;
+  checkoutUrl: string | null;
+}

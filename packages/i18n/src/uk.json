@@ -61,12 +61,13 @@
       "heading": "Почни зараз",
       "featuredBadge": "Вигідніше",
       "threeMonthsLabel": "3 місяці",
-      "perMonth": "830 ₴ / місяць",
-      "savings": "Економія 480 ₴",
+      "perMonth": "{amount} ₴ / місяць",
+      "savings": "Економія {amount} ₴",
       "chooseThreeMonths": "Обрати 3 місяці",
       "oneMonthLabel": "1 місяць",
       "oneMonthAccess": "30 днів доступу",
-      "chooseOneMonth": "Обрати 1 місяць"
+      "chooseOneMonth": "Обрати 1 місяць",
+      "choosing": "Зачекай…"
     },
     "included": {
       "eyebrow": "У складі",
@@ -427,6 +428,21 @@
     "progress": {
       "title": "Прогрес",
       "text": "Виміри, фото й історія результатів — скоро."
+    },
+    "subscription": {
+      "active": "{plan} · до {periodEnd}",
+      "none": "Підписка ще не активована."
     }
+  },
+  "checkout": {
+    "title": "Оплата",
+    "eyebrow": "Підписка",
+    "loading": "Підтверджуємо доступ…",
+    "successTitle": "Доступ відкрито",
+    "successBody": "План {plan} активний до {periodEnd}.",
+    "dashboardCta": "Перейти в кабінет →",
+    "missingPlan": "Спочатку обери план на головній сторінці.",
+    "choosePlanCta": "Обрати план",
+    "error": "Не вдалося підтвердити підписку. Спробуй ще раз."
   }
 }

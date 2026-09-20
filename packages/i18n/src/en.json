@@ -61,12 +61,13 @@
       "heading": "Start now",
       "featuredBadge": "Better value",
       "threeMonthsLabel": "3 months",
-      "perMonth": "830 ₴ / month",
-      "savings": "Save 480 ₴",
+      "perMonth": "{amount} ₴ / month",
+      "savings": "Save {amount} ₴",
       "chooseThreeMonths": "Choose 3 months",
       "oneMonthLabel": "1 month",
       "oneMonthAccess": "30 days of access",
-      "chooseOneMonth": "Choose 1 month"
+      "chooseOneMonth": "Choose 1 month",
+      "choosing": "Please wait…"
     },
     "included": {
       "eyebrow": "Included",
@@ -430,6 +431,21 @@
     "progress": {
       "title": "Progress",
       "text": "Measurements, photos, and result history — soon."
+    },
+    "subscription": {
+      "active": "{plan} · until {periodEnd}",
+      "none": "No subscription is active yet."
     }
+  },
+  "checkout": {
+    "title": "Checkout",
+    "eyebrow": "Subscription",
+    "loading": "Confirming access…",
+    "successTitle": "Access is open",
+    "successBody": "The {plan} plan is active until {periodEnd}.",
+    "dashboardCta": "Go to cabinet →",
+    "missingPlan": "Choose a plan on the home page first.",
+    "choosePlanCta": "Choose a plan",
+    "error": "We could not confirm the subscription. Try again."
   }
 }
