@@ -12,6 +12,10 @@ Route groups and feature-folder conventions are documented in the root [CONTRIBU
 
 Copy [.env.example](.env.example) to `.env.local` for local development.
 
+## Checkout
+
+Landing plan buttons load prices from `GET /subscriptions/plans` and persist the selected `planId` in the URL and `sessionStorage` (`ys_selected_plan_id`). Guests go to `/register?planId=`; users who have not finished onboarding go to `/onboarding`; onboarded users with no current subscription go to `/checkout`. `/checkout` is a protected client route: it posts `POST /subscriptions/checkout` (mock confirmation, no card form) and then links to the dashboard.
+
 ## Onboarding persistence
 
 The current API persists only date of birth, BMR calculation sex, metric height
