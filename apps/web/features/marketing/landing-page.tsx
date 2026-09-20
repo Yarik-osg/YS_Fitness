@@ -7,13 +7,24 @@ import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
+import type { SessionHint } from '@/lib/auth/session-cookie';
 import { FaqSection } from './faq-section';
 import { PricingSection } from './pricing-section';
 
 const WHY_CARD_ACCENTS = ['teal', 'teal', 'lime', 'lime'] as const;
 
-export function LandingPage() {
+export function LandingPage({
+  sessionHint = null,
+}: {
+  sessionHint?: SessionHint | null;
+}) {
   const t = useTranslations('marketing');
+  const account =
+    sessionHint === 'complete'
+      ? { href: '/dashboard' as const, label: t('nav.account') }
+      : sessionHint === 'onboarding'
+        ? { href: '/onboarding' as const, label: t('nav.continue') }
+        : { href: '/login' as const, label: t('nav.login') };
   const whyCards = t.raw('why.cards') as { label: string; desc: string }[];
   const painPoints = t.raw('painPoints') as string[];
   const credentials = t.raw('coach.credentials') as string[];
@@ -38,10 +49,10 @@ export function LandingPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/login"
+            href={account.href}
             className="font-label text-[10px] font-semibold uppercase tracking-widest text-muted hover:text-accent"
           >
-            {t('nav.login')}
+            {account.label}
           </Link>
           <LocaleSwitcher />
           <span aria-hidden className="flex flex-col gap-1">

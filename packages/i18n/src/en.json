@@ -2,6 +2,8 @@
   "marketing": {
     "nav": {
       "login": "Log in",
+      "account": "Dashboard",
+      "continue": "Continue",
       "localeUk": "УКР",
       "localeEn": "EN",
       "switchLocale": "Change language"
@@ -304,17 +306,13 @@
         "overeating": "I am prone to overeating",
         "irregular": "I eat irregularly",
         "none": "None of the listed"
-      },
-      "bmr": {
-        "FEMALE": "Female formula",
-        "MALE": "Male formula"
       }
     },
     "steps": {
       "program": {
         "eyebrow": "Program choice",
         "title": "Choose your <accent>direction</accent>",
-        "description": "This choice changes the visual language and program accents. There will be a separate question for the BMR calculation."
+        "description": "This choice sets how the program looks and is also used for your calorie calculation."
       },
       "currentBody": {
         "eyebrow": "Current shape",
@@ -379,11 +377,6 @@
         "dateOfBirth": "Date of birth",
         "height": "Height, cm",
         "weight": "Weight, kg"
-      },
-      "bmr": {
-        "eyebrow": "Energy calculation",
-        "title": "Choose a parameter for the <accent>BMR formula</accent>",
-        "description": "This separate biological value is used only in the Mifflin–St Jeor formula and does not change the chosen program direction."
       }
     },
     "analysis": {

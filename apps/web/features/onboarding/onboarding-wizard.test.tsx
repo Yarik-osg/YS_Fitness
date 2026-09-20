@@ -54,6 +54,65 @@ describe('OnboardingWizard', () => {
     expect(useOnboardingStore.getState().currentBody).toBe('toned');
   });
 
+  it('sets program track and BMR calculation sex from a female direction choice', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Для жінок/i }));
+
+    expect(useOnboardingStore.getState()).toMatchObject({
+      programTrack: 'female',
+      biologicalSexForCalculation: 'FEMALE',
+    });
+  });
+
+  it('sets program track and BMR calculation sex from a male direction choice', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Для чоловіків/i }));
+
+    expect(useOnboardingStore.getState()).toMatchObject({
+      programTrack: 'male',
+      biologicalSexForCalculation: 'MALE',
+    });
+  });
+
+  it('continues from program track to current-body instead of the removed BMR step', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Для жінок/i }));
+    await user.click(screen.getByRole('button', { name: /Продовжити/i }));
+
+    expect(
+      screen.queryByText(/Обери параметр для формули BMR/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Choose a parameter for the BMR formula/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Яка твоя/i)).toBeInTheDocument();
+    expect(screen.getByText(/форма зараз/i)).toBeInTheDocument();
+  });
+
   it('uses the reference option sets for the male track', () => {
     useOnboardingStore.setState({ programTrack: 'male', step: 10 });
     render(

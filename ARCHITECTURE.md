@@ -11,6 +11,8 @@ Questionnaire input, derived targets, and generated plans are separate domain co
 - **Programs** generates and assigns workout programs. Program state must not be embedded in profile or nutrition records.
 - **Workouts** records performed sessions, sets, reps, and loads independently from program templates.
 
+Web onboarding asks program track (female/male visual branch) once. That choice also fills `biologicalSexForCalculation` on the persisted profile. Program track itself stays in the browser draft until a programs contract exists. See [ADR 003](docs/adr/003-onboarding-program-track-and-bmr-sex.md).
+
 A domain may read another domain through an explicit service or public contract. It must not mutate another domain's tables directly. New calculated outputs should retain enough input/version metadata to explain when and how they were produced.
 
 ## Backend modules
