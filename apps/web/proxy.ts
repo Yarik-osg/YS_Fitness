@@ -23,6 +23,7 @@ export function proxy(request: NextRequest) {
     locale,
     fullPathname: pathname,
     hint,
+    planId: request.nextUrl.searchParams.get('planId'),
   });
 
   if (authTarget) {

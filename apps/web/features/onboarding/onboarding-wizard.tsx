@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { useSaveOnboarding } from '@/lib/hooks/use-users';
+import { readSelectedPlanId } from '@/lib/subscriptions/selected-plan';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
 import { useOnboardingStore, type OnboardingState } from './onboarding-store';
 import { buildOnboardingPayload } from './payload';
@@ -403,7 +404,8 @@ export function OnboardingWizard() {
         draft={draft}
         onContinue={() => {
           draft.reset();
-          router.replace('/dashboard');
+          const planId = readSelectedPlanId();
+          router.replace(planId ? `/checkout?planId=${planId}` : '/dashboard');
         }}
       />
     );

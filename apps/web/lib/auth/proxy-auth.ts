@@ -3,7 +3,7 @@ import type { AppLocale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 
 const AUTH_ROUTES = ['/login', '/register'];
-const PROTECTED_ROUTES = ['/onboarding', '/dashboard'];
+const PROTECTED_ROUTES = ['/onboarding', '/dashboard', '/checkout'];
 
 export function splitLocalePath(pathname: string): {
   locale: AppLocale;
@@ -39,11 +39,13 @@ export function applyAuthRedirect({
   locale,
   fullPathname,
   hint,
+  planId,
 }: {
   pathnameWithoutLocale: string;
   locale: AppLocale;
   fullPathname: string;
   hint: SessionHint | null;
+  planId?: string | null;
 }): string | null {
   const prefixed = (path: string) => `/${locale}${path}`;
   const isAuthRoute = AUTH_ROUTES.some((route) =>
@@ -52,9 +54,15 @@ export function applyAuthRedirect({
   const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
     pathnameWithoutLocale.startsWith(route),
   );
+  const checkoutPath = planId
+    ? `/checkout?planId=${encodeURIComponent(planId)}`
+    : '/checkout';
 
   if (isAuthRoute && hint) {
-    return prefixed(hint === 'complete' ? '/dashboard' : '/onboarding');
+    if (hint === 'onboarding') {
+      return prefixed('/onboarding');
+    }
+    return prefixed(planId ? checkoutPath : '/dashboard');
   }
 
   if (isProtectedRoute && !hint) {
@@ -65,7 +73,11 @@ export function applyAuthRedirect({
     return prefixed('/dashboard');
   }
 
-  if (pathnameWithoutLocale.startsWith('/dashboard') && hint === 'onboarding') {
+  if (
+    (pathnameWithoutLocale.startsWith('/dashboard') ||
+      pathnameWithoutLocale.startsWith('/checkout')) &&
+    hint === 'onboarding'
+  ) {
     return prefixed('/onboarding');
   }
 

@@ -49,4 +49,38 @@ describe('applyAuthRedirect', () => {
       }),
     ).toBe('/uk/dashboard');
   });
+
+  it('sends a completed session with a selected plan to checkout', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/login',
+        locale: 'uk',
+        fullPathname: '/uk/login',
+        hint: 'complete',
+        planId: 'plan-3',
+      }),
+    ).toBe('/uk/checkout?planId=plan-3');
+  });
+
+  it('protects checkout like other client routes', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/checkout',
+        locale: 'en',
+        fullPathname: '/en/checkout',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Fcheckout');
+  });
+
+  it('keeps incomplete onboarding away from checkout', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/checkout',
+        locale: 'uk',
+        fullPathname: '/uk/checkout',
+        hint: 'onboarding',
+      }),
+    ).toBe('/uk/onboarding');
+  });
 });

@@ -102,7 +102,10 @@ async function performRequest<T>(
   if (!response.ok) throw await parseError(response);
   if (response.status === 204) return undefined as T;
 
-  return (await response.json()) as T;
+  const text = await response.text();
+  if (!text) return null as T;
+
+  return JSON.parse(text) as T;
 }
 
 export function apiRequest<T>(path: string, options: RequestOptions = {}) {

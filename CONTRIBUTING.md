@@ -2,13 +2,14 @@
 
 ## Before starting
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) and the accepted decisions in [docs/adr](docs/adr). Keep changes focused: nutrition, programs, workouts, media, and admin should each be developed in separate feature branches and pull requests.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) and the accepted decisions in [docs/adr](docs/adr). Keep changes focused: subscriptions, nutrition, programs, workouts, media, and admin should each be developed in separate feature branches and pull requests.
 
 ## Branches and commits
 
 Branch names use lowercase kebab-case:
 
 - `feature/nutrition-targets`
+- `feature/subscriptions-mock-provider`
 - `fix/refresh-token-race`
 - `chore/update-tooling`
 - `docs/program-boundaries`

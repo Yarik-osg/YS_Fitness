@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
 import { CsrfService } from './csrf.service.js';
 import { CookieCsrfGuard } from './cookie-csrf.guard.js';
 
@@ -15,9 +16,10 @@ import { CookieCsrfGuard } from './cookie-csrf.guard.js';
     AuthService,
     JwtStrategy,
     JwtAuthGuard,
+    RolesGuard,
     CsrfService,
     CookieCsrfGuard,
   ],
-  exports: [JwtAuthGuard],
+  exports: [JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

@@ -1,6 +1,6 @@
 # YS Fitness
 
-Personal-training SaaS monorepo. This milestone provides a Next.js web shell and a NestJS API with PostgreSQL, Prisma, email/password authentication, rotating refresh sessions, and onboarding.
+Personal-training SaaS monorepo. This milestone provides a Next.js web shell and a NestJS API with PostgreSQL, Prisma, email/password authentication, rotating refresh sessions, onboarding, and mock subscription checkout.
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) for domain boundaries and [CONTRIBUTING.md](CONTRIBUTING.md) before adding a module. Decisions with long-term impact are recorded in [docs/adr](docs/adr).
 
@@ -30,7 +30,7 @@ pnpm dev
 
 The web app runs at `http://localhost:3000`; the API runs at `http://localhost:3001/api/v1`. Swagger is available at `/api/v1/docs`, and health checks use `GET /api/v1/health`.
 
-Set real random values for all secret variables and change the trainer seed password before running the seed. `pnpm db:seed` is explicit and idempotent; application startup never seeds data.
+Set real random values for all secret variables and change the trainer seed password before running the seed. `pnpm db:seed` is explicit and idempotent; it also upserts the two catalog plans (`3_MONTHS` at 2490 ₴ and `1_MONTH` at 990 ₴, stored in kopiykas). Application startup never seeds data.
 
 ### Local containers
 
@@ -68,6 +68,19 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 `PUT /api/v1/users/me/onboarding` is bearer-authenticated and stores raw questionnaire data only. It upserts `UserProfile` and appends a `BodyMeasurement` when weight/body-fat data changed. An identical retry does not duplicate the measurement. Calorie targets and generated programs are deliberately separate future modules.
 
+## Subscriptions
+
+- `GET /api/v1/subscriptions/plans` — public catalog
+- `POST /api/v1/subscriptions/checkout` — JWT; `{ planId }` creates a `PENDING` row, then the mock provider confirms it to `ACTIVE`
+- `GET /api/v1/subscriptions/me` — JWT; `{ subscription }` is the current `PENDING`/`ACTIVE` row plus plan, or `null`
+- `POST /api/v1/subscriptions/grant` — JWT + `TRAINER`/`ADMIN`; `{ userId, planId, expiresAt? }` writes a `MANUAL` `ACTIVE` subscription
+
+Prices are integers in kopiykas. A user may have at most one `PENDING` or `ACTIVE` subscription; that rule is enforced by a PostgreSQL partial unique index. A concurrent second checkout returns `409` with `SUBSCRIPTION_ALREADY_ACTIVE`.
+
+On the web app, landing plan CTAs store `planId` (query + `sessionStorage`). Guests go to register, new users finish onboarding, then `/checkout` posts and shows confirmation. Already-onboarded logins with a selected plan skip straight to checkout. Dashboard shows plan name and period end.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md#subscriptions) for the payment-provider token and index details.
+
 ## Checks
 
 ```bash
@@ -89,7 +102,7 @@ Husky runs staged formatting/linting and affected type checks before commits, co
 
 ## Branches and pull requests
 
-Use `feature/`, `fix/`, `chore/`, `docs/`, or `refactor/` prefixes followed by kebab-case. Each major domain—nutrition, programs, workouts, media, and admin—gets its own focused branch and pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for examples and the review checklist.
+Use `feature/`, `fix/`, `chore/`, `docs/`, or `refactor/` prefixes followed by kebab-case. Each major domain—subscriptions, nutrition, programs, workouts, media, and admin—gets its own focused branch and pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for examples and the review checklist.
 
 ## Intentional deferrals
 
@@ -99,3 +112,5 @@ Use `feature/`, `fix/`, `chore/`, `docs/`, or `refactor/` prefixes followed by k
 - Goal-history tracking (the profile stores the current goal)
 - Nutrition target calculation
 - Workout-program generation
+- WayForPay HTTP, webhooks, signatures, and hosted checkout
+- Dunning, invoices, refunds, and proration

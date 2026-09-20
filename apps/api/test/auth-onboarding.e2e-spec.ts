@@ -35,6 +35,7 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
   });
 
   beforeEach(async () => {
+    await prisma.subscription.deleteMany();
     await prisma.authRefreshToken.deleteMany();
     await prisma.authSession.deleteMany();
     await prisma.bodyMeasurement.deleteMany();
