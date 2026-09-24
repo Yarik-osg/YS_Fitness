@@ -21,6 +21,7 @@ export function buildOnboardingPayload(
     programTrack: draft.programTrack,
     currentBody: draft.currentBody,
     desiredBody: draft.desiredBody,
+    physiqueLevel: draft.physiqueLevel,
     mainGoal: draft.mainGoal,
     experience: draft.experience,
     trainingFrequency: draft.trainingFrequency,

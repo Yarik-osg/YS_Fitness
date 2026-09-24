@@ -13,6 +13,7 @@ import { useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { useSaveOnboarding } from '@/lib/hooks/use-users';
 import { readSelectedPlanId } from '@/lib/subscriptions/selected-plan';
+import { BodyPhysiqueSlider } from './physique-slider';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
 import {
   resetOnboardingDraft,
@@ -362,28 +363,30 @@ export function OnboardingWizard() {
       case 2:
         return Boolean(draft.desiredBody);
       case 3:
-        return Boolean(draft.mainGoal);
+        return Boolean(draft.physiqueLevel);
       case 4:
+        return Boolean(draft.mainGoal);
+      case 5:
         return onboardingProfileSchema
           .pick({ goal: true })
           .safeParse({ goal: draft.goal }).success;
-      case 5:
-        return Boolean(draft.experience);
       case 6:
-        return Boolean(draft.trainingFrequency);
+        return Boolean(draft.experience);
       case 7:
+        return Boolean(draft.trainingFrequency);
+      case 8:
         return onboardingProfileSchema
           .pick({ activityLevel: true })
           .safeParse({ activityLevel: draft.activityLevel }).success;
-      case 8:
-        return draft.focusAreas.length > 0;
       case 9:
-        return Boolean(draft.nutritionCurrent);
+        return draft.focusAreas.length > 0;
       case 10:
-        return Boolean(draft.mealsPerDay);
+        return Boolean(draft.nutritionCurrent);
       case 11:
-        return draft.eatingHabits.length > 0;
+        return Boolean(draft.mealsPerDay);
       case 12:
+        return draft.eatingHabits.length > 0;
+      case 13:
         return onboardingProfileSchema
           .pick({ dateOfBirth: true, heightCm: true, weightKg: true })
           .safeParse({
@@ -504,6 +507,23 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
+          eyebrow={t('steps.physique.eyebrow')}
+          title={t.rich('steps.physique.title', { accent })}
+          description={t('steps.physique.description')}
+        >
+          <BodyPhysiqueSlider
+            track={draft.programTrack ?? 'female'}
+            value={draft.physiqueLevel}
+            onChange={(physiqueLevel) => draft.setAnswer({ physiqueLevel })}
+            label={t('physiqueSlider.label')}
+            valueLabel={(index) => t('variant', { index: index + 1 })}
+          />
+        </StepShell>
+      );
+    case 4:
+      return (
+        <StepShell
+          {...common}
           eyebrow={t('steps.mainGoal.eyebrow')}
           title={t.rich('steps.mainGoal.title', { accent })}
         >
@@ -514,7 +534,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 4:
+    case 5:
       return (
         <StepShell
           {...common}
@@ -533,7 +553,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 5:
+    case 6:
       return (
         <StepShell
           {...common}
@@ -547,7 +567,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 6:
+    case 7:
       return (
         <StepShell
           {...common}
@@ -567,7 +587,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 7:
+    case 8:
       return (
         <StepShell
           {...common}
@@ -591,7 +611,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 8:
+    case 9:
       return (
         <StepShell
           {...common}
@@ -606,7 +626,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 9:
+    case 10:
       return (
         <StepShell
           {...common}
@@ -622,7 +642,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 10:
+    case 11:
       return (
         <StepShell
           {...common}
@@ -638,7 +658,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 11:
+    case 12:
       return (
         <StepShell
           {...common}
@@ -660,7 +680,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 12:
+    case 13:
       return (
         <StepShell
           {...common}

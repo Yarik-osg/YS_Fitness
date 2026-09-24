@@ -104,6 +104,18 @@ export const MALE_EATING_HABITS = [
   'irregular',
   'none',
 ] as const;
+export const PHYSIQUE_LEVELS = [
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+] as const;
 
 const CURRENT_BODIES = [
   ...FEMALE_CURRENT_BODIES,
@@ -152,6 +164,7 @@ const onboardingQuestionnaireSchema = z.object({
   nutritionCurrent: z.enum(NUTRITION_CURRENT),
   mealsPerDay: z.enum(MEALS_PER_DAY),
   eatingHabits: z.array(z.enum(EATING_HABITS)).min(1),
+  physiqueLevel: z.enum(PHYSIQUE_LEVELS),
 });
 
 function trackVocabulary(programTrack: (typeof PROGRAM_TRACKS)[number]) {

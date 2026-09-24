@@ -18,6 +18,7 @@ const existingResponses = {
   nutritionCurrent: 'BALANCED',
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
+  physiqueLevel: '4',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -135,6 +136,7 @@ describe('UsersService.getOnboardingResponses', () => {
         nutritionCurrent: 'balanced',
         mealsPerDay: '3',
         eatingHabits: ['snacking', 'emotional'],
+        physiqueLevel: '4',
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
       },

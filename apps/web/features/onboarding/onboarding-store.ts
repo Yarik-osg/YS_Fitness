@@ -21,6 +21,7 @@ export interface OnboardingDraft {
   // They intentionally are not mapped to unrelated UserProfile columns.
   currentBody?: string;
   desiredBody?: string;
+  physiqueLevel?: string;
   mainGoal?: string;
   experience?: string;
   trainingFrequency?: string;
@@ -51,6 +52,7 @@ const initialState: OnboardingDraft & { step: number; ownerUserId?: string } = {
   programTrack: undefined,
   currentBody: undefined,
   desiredBody: undefined,
+  physiqueLevel: undefined,
   mainGoal: undefined,
   experience: undefined,
   trainingFrequency: undefined,
@@ -83,6 +85,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         programTrack: state.programTrack,
         currentBody: state.currentBody,
         desiredBody: state.desiredBody,
+        physiqueLevel: state.physiqueLevel,
         mainGoal: state.mainGoal,
         experience: state.experience,
         trainingFrequency: state.trainingFrequency,
