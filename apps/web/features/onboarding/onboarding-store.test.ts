@@ -27,6 +27,7 @@ describe('onboarding draft ownership', () => {
     });
     expect(useOnboardingStore.getState().programTrack).toBeUndefined();
     expect(useOnboardingStore.getState().currentBody).toBeUndefined();
+    expect(useOnboardingStore.getState().physiqueLevel).toBeUndefined();
   });
 
   it('keeps in-progress answers when the same user is bound again', () => {

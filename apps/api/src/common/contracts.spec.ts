@@ -23,6 +23,7 @@ const femaleOnboarding = {
   nutritionCurrent: 'balanced',
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
+  physiqueLevel: '4',
 } as const;
 
 const maleOnboarding = {
@@ -43,6 +44,7 @@ const maleOnboarding = {
   nutritionCurrent: 'structured',
   mealsPerDay: '4-5',
   eatingHabits: ['late_eating', 'none'],
+  physiqueLevel: '6',
 } as const;
 
 function issuePaths(result: ReturnType<typeof onboardingSchema.safeParse>) {
@@ -86,6 +88,7 @@ describe('shared API contracts', () => {
       nutritionCurrent: 'balanced',
       mealsPerDay: '3',
       eatingHabits: ['snacking', 'emotional'],
+      physiqueLevel: '4',
     });
 
     expect(result.success).toBe(true);
@@ -110,6 +113,7 @@ describe('shared API contracts', () => {
       nutritionCurrent: 'structured',
       mealsPerDay: '4-5',
       eatingHabits: ['late_eating', 'none'],
+      physiqueLevel: '6',
     });
 
     expect(result.success).toBe(true);
@@ -146,6 +150,33 @@ describe('shared API contracts', () => {
     expect(issuePaths(chestOnFemale)).toContainEqual(['focusAreas', 0]);
     expect(issuePaths(snackingOnMale)).toContainEqual(['eatingHabits', 0]);
     expect(issuePaths(mixedFocus)).toEqual([['focusAreas', 1]]);
+  });
+
+  it('accepts physiqueLevel 0-9 and rejects values outside that scale', () => {
+    expect(
+      onboardingSchema.safeParse({ ...femaleOnboarding, physiqueLevel: '0' })
+        .success,
+    ).toBe(true);
+    expect(
+      onboardingSchema.safeParse({ ...femaleOnboarding, physiqueLevel: '9' })
+        .success,
+    ).toBe(true);
+    expect(
+      issuePaths(
+        onboardingSchema.safeParse({
+          ...femaleOnboarding,
+          physiqueLevel: '10',
+        }),
+      ),
+    ).toContainEqual(['physiqueLevel']);
+    expect(
+      issuePaths(
+        onboardingSchema.safeParse({
+          ...femaleOnboarding,
+          physiqueLevel: '-1',
+        }),
+      ),
+    ).toContainEqual(['physiqueLevel']);
   });
 
   it('requires uuid plan and user identifiers for subscription writes', () => {

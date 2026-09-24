@@ -27,4 +27,5 @@ export class OnboardingDto implements OnboardingInput {
   nutritionCurrent!: OnboardingInput['nutritionCurrent'];
   mealsPerDay!: OnboardingInput['mealsPerDay'];
   eatingHabits!: OnboardingInput['eatingHabits'];
+  physiqueLevel!: OnboardingInput['physiqueLevel'];
 }

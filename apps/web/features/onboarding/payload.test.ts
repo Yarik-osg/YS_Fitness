@@ -5,6 +5,7 @@ const femaleDraft = {
   programTrack: 'female' as const,
   currentBody: 'slim',
   desiredBody: '1',
+  physiqueLevel: '4',
   mainGoal: 'get_stronger',
   experience: 'intermediate',
   trainingFrequency: '3',
@@ -35,6 +36,7 @@ describe('buildOnboardingPayload', () => {
       programTrack: 'female',
       currentBody: 'slim',
       desiredBody: '1',
+      physiqueLevel: '4',
       mainGoal: 'get_stronger',
       experience: 'intermediate',
       trainingFrequency: '3',
@@ -51,6 +53,7 @@ describe('buildOnboardingPayload', () => {
         programTrack: 'male',
         currentBody: '2',
         desiredBody: '3',
+        physiqueLevel: '6',
         mainGoal: 'build_muscle',
         experience: 'advanced',
         trainingFrequency: '4',
@@ -70,6 +73,7 @@ describe('buildOnboardingPayload', () => {
 
     expect(payload.biologicalSexForCalculation).toBe('MALE');
     expect(payload.programTrack).toBe('male');
+    expect(payload.physiqueLevel).toBe('6');
     expect(payload.focusAreas).toEqual(['chest', 'abs']);
   });
 

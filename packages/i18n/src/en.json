@@ -180,6 +180,9 @@
     "continue": "Continue →",
     "saving": "Saving…",
     "variant": "Option {index}",
+    "physiqueSlider": {
+      "label": "Overall physique"
+    },
     "choices": {
       "program": {
         "female": { "label": "For women", "description": "Women's program" },
@@ -323,6 +326,11 @@
         "eyebrow": "Desired shape",
         "title": "What shape do you <accent>want to reach?</accent>",
         "description": "Choose the photo that best matches your answer."
+      },
+      "physique": {
+        "eyebrow": "Physique",
+        "title": "What is your <accent>overall physique?</accent>",
+        "description": "Move the slider to choose the illustration that best matches your answer."
       },
       "mainGoal": {
         "eyebrow": "Main goal",

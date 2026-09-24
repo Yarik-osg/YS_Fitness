@@ -84,6 +84,7 @@ export function toPrismaOnboardingResponses(input: OnboardingInput) {
     nutritionCurrent: NUTRITION_TO_PRISMA[input.nutritionCurrent],
     mealsPerDay: input.mealsPerDay,
     eatingHabits: input.eatingHabits,
+    physiqueLevel: input.physiqueLevel,
   };
 }
 
@@ -102,7 +103,8 @@ export function sameOnboardingResponses(
     existing.nutritionCurrent === next.nutritionCurrent &&
     existing.mealsPerDay === next.mealsPerDay &&
     sameStringArray(existing.focusAreas, next.focusAreas) &&
-    sameStringArray(existing.eatingHabits, next.eatingHabits)
+    sameStringArray(existing.eatingHabits, next.eatingHabits) &&
+    existing.physiqueLevel === next.physiqueLevel
   );
 }
 
@@ -120,6 +122,7 @@ export function toOnboardingResponsesRecord(
     nutritionCurrent: NUTRITION_FROM_PRISMA[row.nutritionCurrent],
     mealsPerDay: row.mealsPerDay,
     eatingHabits: row.eatingHabits,
+    physiqueLevel: row.physiqueLevel,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

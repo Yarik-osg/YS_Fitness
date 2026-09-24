@@ -114,7 +114,7 @@ describe('OnboardingWizard', () => {
   });
 
   it('uses the reference option sets for the male track', () => {
-    useOnboardingStore.setState({ programTrack: 'male', step: 10 });
+    useOnboardingStore.setState({ programTrack: 'male', step: 11 });
     render(
       <I18nTestProvider>
         <Providers>
@@ -127,11 +127,40 @@ describe('OnboardingWizard', () => {
       screen.getByRole('button', { name: /4–5 разів/i }),
     ).toBeInTheDocument();
 
-    act(() => useOnboardingStore.getState().setStep(11));
+    act(() => useOnboardingStore.getState().setStep(12));
 
     expect(
       screen.getByRole('button', { name: /Їм пізно ввечері або вночі/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Які звички/i)).toBeInTheDocument();
+  });
+
+  it('renders the physique slider after the current and desired body steps', async () => {
+    const user = userEvent.setup();
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      currentBody: 'toned',
+      desiredBody: '1',
+      step: 3,
+    });
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(screen.getByText(/загальна статура/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Варіант 2/i }),
+    ).not.toBeInTheDocument();
+
+    const slider = screen.getByRole('slider', { name: /Статура/i });
+    slider.focus();
+    await user.keyboard('{End}');
+
+    expect(useOnboardingStore.getState().physiqueLevel).toBe('9');
+    expect(useOnboardingStore.getState().currentBody).toBe('toned');
   });
 });

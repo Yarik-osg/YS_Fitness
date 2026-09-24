@@ -84,6 +84,7 @@ export interface OnboardingResponsesRecord {
   nutritionCurrent: NutritionCurrent;
   mealsPerDay: string;
   eatingHabits: string[];
+  physiqueLevel: string | null;
   createdAt: string;
   updatedAt: string;
 }

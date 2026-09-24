@@ -33,6 +33,7 @@ describe('saveOnboarding', () => {
       programTrack: 'female',
       currentBody: 'slim',
       desiredBody: '1',
+      physiqueLevel: '4',
       mainGoal: 'get_stronger',
       experience: 'intermediate',
       trainingFrequency: '3',
