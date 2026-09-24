@@ -96,12 +96,23 @@ describe('applyAuthRedirect', () => {
     ).toBeNull();
   });
 
-  it('keeps incomplete onboarding away from checkout', () => {
+  it('lets a new account open checkout before the onboarding hint flips', () => {
     expect(
       applyAuthRedirect({
         pathnameWithoutLocale: '/checkout',
         locale: 'uk',
         fullPathname: '/uk/checkout',
+        hint: 'onboarding',
+      }),
+    ).toBeNull();
+  });
+
+  it('keeps an incomplete session away from the dashboard', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/dashboard',
+        locale: 'uk',
+        fullPathname: '/uk/dashboard',
         hint: 'onboarding',
       }),
     ).toBe('/uk/onboarding');

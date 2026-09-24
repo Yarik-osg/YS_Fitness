@@ -153,6 +153,8 @@ describe('CheckoutPage', () => {
         name: /погоджуюсь з умовами надання послуг/i,
       }),
     );
+    expect(pay).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /додати картку/i }));
     await user.click(pay);
 
     await waitFor(() => {
@@ -163,5 +165,31 @@ describe('CheckoutPage', () => {
       'href',
       '/dashboard',
     );
+  });
+
+  it('shows a retry when the plan catalog cannot be loaded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 500 })),
+    );
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <CheckoutPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(
+      await screen.findByRole(
+        'button',
+        { name: /спробувати ще/i },
+        { timeout: 8000 },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /обери абонемент/i }),
+    ).not.toBeInTheDocument();
   });
 });

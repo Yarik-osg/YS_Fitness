@@ -18,6 +18,7 @@ import {
   monthlyHryvnia,
 } from '@/lib/subscriptions/money';
 import {
+  clearSelectedPlanId,
   persistSelectedPlanId,
   readProgramTrack,
   readSelectedPlanId,
@@ -95,11 +96,12 @@ function CheckoutFlow() {
   }, []);
 
   async function pay() {
-    if (!selected || !agreed) return;
+    if (!selected || !agreed || !cardAdded) return;
     setError(null);
     persistSelectedPlanId(selected.id);
     try {
       const result = await checkout.mutateAsync(selected.id);
+      clearSelectedPlanId();
       setSubscription(result.subscription);
     } catch (cause) {
       setError(getUserFacingError(cause, tAuth) || t('error'));
@@ -110,7 +112,7 @@ function CheckoutFlow() {
     return <CheckoutSuccess subscription={subscription} />;
   }
 
-  if (plansQuery.isLoading) {
+  if (plansQuery.isPending || plansQuery.isLoading) {
     return (
       <CheckoutFrame>
         <p className="font-label text-[10px] uppercase tracking-[0.2em] text-accent">
@@ -481,7 +483,7 @@ function PaymentStep({
 
       <Button
         className="mt-6 w-full"
-        disabled={!agreed || pending}
+        disabled={!agreed || !cardAdded || pending}
         onClick={onPay}
       >
         {pending

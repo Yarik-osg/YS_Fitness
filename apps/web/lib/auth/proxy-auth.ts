@@ -76,11 +76,7 @@ export function applyAuthRedirect({
     return prefixed('/dashboard');
   }
 
-  if (
-    (pathnameWithoutLocale.startsWith('/dashboard') ||
-      pathnameWithoutLocale.startsWith('/checkout')) &&
-    hint === 'onboarding'
-  ) {
+  if (pathnameWithoutLocale.startsWith('/dashboard') && hint === 'onboarding') {
     return prefixed('/onboarding');
   }
 

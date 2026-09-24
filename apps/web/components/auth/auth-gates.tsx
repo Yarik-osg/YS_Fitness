@@ -88,7 +88,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       } catch {
         if (!active) return;
         useAuthStore.getState().clearSession();
-        resetOnboardingDraft();
+        if (!pathname.startsWith('/checkout')) {
+          resetOnboardingDraft();
+        }
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       }
     }
@@ -120,13 +122,18 @@ export function GuestGate({ children }: { children: ReactNode }) {
           );
           return;
         }
+        let saved = false;
         try {
-          await persistGuestOnboardingIfReady();
+          saved = Boolean(await persistGuestOnboardingIfReady());
         } catch {
-          // Registration still continues to checkout.
+          // Leave the register form in place when the quiz cannot be saved.
+        }
+        if (pathname.startsWith('/register') && saved) {
+          router.replace(getPostRegisterPath());
+          return;
         }
         if (pathname.startsWith('/register')) {
-          router.replace(getPostRegisterPath());
+          if (active) setReady(true);
           return;
         }
         const destination = resolveIncompleteGuestDestination(pathname);
