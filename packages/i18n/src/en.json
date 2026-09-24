@@ -59,17 +59,53 @@
       "bio3": "My approach is training with logic, discipline without extremes, and work toward a real result."
     },
     "pricing": {
-      "eyebrow": "Choose your plan",
-      "heading": "Start now",
-      "featuredBadge": "Better value",
-      "threeMonthsLabel": "3 months",
-      "perMonth": "{amount} ₴ / month",
-      "savings": "Save {amount} ₴",
-      "chooseThreeMonths": "Choose 3 months",
-      "oneMonthLabel": "1 month",
-      "oneMonthAccess": "30 days of access",
-      "chooseOneMonth": "Choose 1 month",
-      "choosing": "Please wait…"
+      "eyebrow": "Memberships",
+      "heading": "Choose yours",
+      "featuredBadge": "Most popular",
+      "perMonth": "{amount} ₴/mo",
+      "savings": "−{amount} ₴",
+      "choosing": "Please wait…",
+      "includes": "What's included",
+      "collapse": "Collapse",
+      "plans": {
+        "1_MONTH": {
+          "name": "BASIC",
+          "period": "1 month",
+          "description": "A personal program for one month — ideal to start.",
+          "choose": "Choose BASIC",
+          "features": [
+            "12-week training plan",
+            "Personal macros and meal plan",
+            "Cabinet access 24/7",
+            "Chat support"
+          ]
+        },
+        "3_MONTHS": {
+          "name": "PROGRESS",
+          "period": "3 months",
+          "description": "Three months of work, result review, and program adjustment.",
+          "choose": "Choose PROGRESS",
+          "features": [
+            "Everything from BASIC",
+            "Video instructions for every exercise",
+            "Progress review every 4 weeks",
+            "Plan adjustment based on results",
+            "Priority chat support"
+          ]
+        },
+        "FULL_ACCESS": {
+          "name": "FULL ACCESS",
+          "period": "3 months",
+          "description": "Maximum access — including the full YS FITNESS exercise library.",
+          "choose": "Choose FULL ACCESS",
+          "features": [
+            "Everything from PROGRESS",
+            "Full exercise library",
+            "Early access to new programs",
+            "Personal exercise technique review"
+          ]
+        }
+      }
     },
     "included": {
       "eyebrow": "Included",
@@ -108,8 +144,8 @@
           "a": "Access to the personal cabinet and progress data will stop. You can renew the subscription at any time."
         },
         {
-          "q": "What is the difference between the 1- and 3-month plans?",
-          "a": "The features are the same. The difference is duration and price. The 3-month plan is 480 ₴ more advantageous."
+          "q": "What is the difference between the plans?",
+          "a": "BASIC is 1 month. PROGRESS and FULL ACCESS are 3 months; PROGRESS saves 480 ₴. FULL ACCESS includes the full exercise library."
         }
       ]
     },
@@ -178,6 +214,7 @@
   "onboarding": {
     "back": "Back",
     "continue": "Continue →",
+    "chooseForm": "Choose this shape →",
     "saving": "Saving…",
     "variant": "Option {index}",
     "physiqueSlider": {
@@ -230,20 +267,20 @@
       },
       "activity": {
         "SEDENTARY": {
-          "label": "Minimal",
-          "description": "Mostly a sedentary day"
+          "label": "Sedentary",
+          "description": "I sit most of the day"
         },
         "LIGHTLY_ACTIVE": {
-          "label": "Light",
-          "description": "Light activity 1–3 days a week"
+          "label": "Low",
+          "description": "I move little during the day"
         },
         "MODERATELY_ACTIVE": {
-          "label": "Moderate",
-          "description": "Activity 3–5 days a week"
+          "label": "Medium",
+          "description": "I walk a lot and stay regularly active"
         },
         "VERY_ACTIVE": {
           "label": "High",
-          "description": "Intense activity 6–7 days"
+          "description": "I am physically active most of the day"
         },
         "EXTRA_ACTIVE": {
           "label": "Very high",
@@ -320,12 +357,12 @@
       "currentBody": {
         "eyebrow": "Current shape",
         "title": "What is your <accent>shape now?</accent>",
-        "description": "Choose the photo that best matches your answer."
+        "description": "Choose the photo that best matches your current shape"
       },
       "desiredBody": {
         "eyebrow": "Desired shape",
         "title": "What shape do you <accent>want to reach?</accent>",
-        "description": "Choose the photo that best matches your answer."
+        "description": "Choose the photo that best matches your desired result"
       },
       "physique": {
         "eyebrow": "Physique",
@@ -352,9 +389,9 @@
         "description": "Choose a realistic number of workouts you can maintain."
       },
       "activity": {
-        "eyebrow": "Daily activity",
-        "title": "How <accent>active are you daily?</accent>",
-        "description": "Do not include planned workouts — evaluate a usual day."
+        "eyebrow": "Activity level",
+        "title": "What is your <accent>activity during the day?</accent>",
+        "description": "Do not count workouts — only usual daily activity"
       },
       "focus": {
         "eyebrow": "Training focus",
@@ -389,12 +426,31 @@
     },
     "analysis": {
       "eyebrow": "Answer analysis",
-      "title": "We are forming your <accent>personal foundation</accent>"
+      "title": "Analyzing your <accent>answers</accent>",
+      "subtitle": "We are forming a recommendation from your goal, level, and habits",
+      "label": "Analysis",
+      "steps": [
+        "Reviewing your goals…",
+        "Assessing your training level…",
+        "Matching a training direction…",
+        "Accounting for eating habits…",
+        "Forming a personal recommendation…"
+      ]
     },
     "result": {
       "eyebrow": "Personal result",
-      "title": "Your base is <accent>ready</accent>",
-      "button": "View plan →",
+      "title": "Your plan is <accent>ready</accent>",
+      "subtitle": "Based on your answers we selected the best-fit program",
+      "button": "View recommended plan →",
+      "mainGoal": "Main goal",
+      "experience": "Training level",
+      "frequency": "Workouts per week",
+      "frequencyValue": "{count} times",
+      "focus": "Training focus",
+      "shape": "Shape",
+      "current": "Current #{index}",
+      "desired": "Desired #{index}",
+      "highlight": "Your program will be fully adapted to your data and goals",
       "age": "Age",
       "height": "Height",
       "weight": "Weight",
@@ -403,17 +459,107 @@
       "note": "The profile is saved. The calorie and macro calculation will appear in a separate nutrition module — we do not replace it with static values."
     },
     "plan": {
-      "eyebrow": "Recommended plan",
-      "title": "Your rhythm. <accent>Your progress.</accent>",
-      "button": "Go to cabinet →",
+      "eyebrow": "Recommended program",
+      "title": "Your <accent>program</accent>",
+      "button": "Get access →",
+      "forYou": "For you",
+      "frequency": "Frequency",
+      "frequencyValue": "{count}×/week",
+      "focus": "Focus",
+      "duration": "Duration",
+      "durationValue": "12 weeks",
+      "includes": "Included",
+      "price": "Price",
+      "priceValue": "2 990",
+      "priceLabel": "UAH / 3 months",
+      "lock": "Registration and payment are required to access the program",
       "training": "Training",
       "trainingValue": "{count} times a week",
       "level": "Level",
       "levelFallback": "Personal",
-      "focus": "Focus",
       "focusFullBody": "Whole body",
       "focusZones": "{count} priority zones",
-      "disclaimer": "This is a local preview. Answers about shape, experience, training, and eating habits are not yet saved on the server."
+      "disclaimer": "This is a local preview. Your answers are already saved. A generated workout program will appear in a later module.",
+      "preview": {
+        "slim_tone": {
+          "name": "YS SLIM & TONE",
+          "tagline": "Fat loss · Tone · Definition",
+          "whoFor": "For women who want to lose fat and improve body quality",
+          "description": "A complete program that combines strength and cardio blocks to burn fat while keeping muscle tone.",
+          "includes": [
+            "A 12-week training program",
+            "Video instructions for every exercise",
+            "A basic nutrition plan",
+            "A weekly progress tracker",
+            "Personal cabinet access 24/7"
+          ]
+        },
+        "power_build": {
+          "name": "YS POWER BUILD",
+          "tagline": "Muscle · Strength · Definition",
+          "whoFor": "For women who want to gain muscle and get stronger",
+          "description": "A progressive strength program for muscle gain and strength, with load tracking on every session.",
+          "includes": [
+            "A 12-week strength program",
+            "Video instructions for every exercise",
+            "A mass-gain nutrition protocol",
+            "A weekly progress tracker",
+            "Personal cabinet access 24/7"
+          ]
+        },
+        "maintain": {
+          "name": "YS MAINTAIN",
+          "tagline": "Shape · Energy · Balance",
+          "whoFor": "For women who want to keep and improve their shape",
+          "description": "A balanced program for shape and wellbeing: strength, functional, and recovery work.",
+          "includes": [
+            "A 12-week training program",
+            "Video instructions for every exercise",
+            "Nutrition recommendations",
+            "A weekly progress tracker",
+            "Personal cabinet access 24/7"
+          ]
+        },
+        "lean_build": {
+          "name": "YS LEAN BUILD",
+          "tagline": "Fat loss · Definition · Strength",
+          "whoFor": "For men who want to lose fat and build definition",
+          "description": "A progressive mix of strength and metabolic blocks. Burns fat and keeps muscle — without extreme cardio or diets.",
+          "includes": [
+            "A 12-week training program",
+            "Video instructions for every exercise",
+            "A basic nutrition plan",
+            "A weekly progress tracker",
+            "Personal cabinet access 24/7"
+          ]
+        },
+        "mass_power": {
+          "name": "YS MASS & POWER",
+          "tagline": "Mass · Strength · Definition",
+          "whoFor": "For men who want to gain muscle and get stronger",
+          "description": "A classic strength program with progressive overload, structured split, and recovery-first programming.",
+          "includes": [
+            "A 12-week strength program",
+            "Video instructions for every exercise",
+            "A mass-gain nutrition protocol",
+            "A weekly progress tracker",
+            "Personal cabinet access 24/7"
+          ]
+        },
+        "maintain_pro": {
+          "name": "YS MAINTAIN PRO",
+          "tagline": "Shape · Energy · Balance",
+          "whoFor": "For men who want to keep and improve their shape",
+          "description": "A balanced program for shape and wellbeing: strength, functional, and recovery blocks.",
+          "includes": [
+            "A 12-week training program",
+            "Video instructions for every exercise",
+            "Nutrition recommendations",
+            "A weekly progress tracker",
+            "Personal cabinet access 24/7"
+          ]
+        }
+      }
     }
   },
   "dashboard": {
@@ -440,12 +586,36 @@
   },
   "checkout": {
     "title": "Checkout",
-    "eyebrow": "Subscription",
+    "eyebrow": "Access activated",
     "loading": "Confirming access…",
-    "successTitle": "Access is open",
+    "loadingPlans": "Loading plans…",
+    "selectEyebrow": "Payment — step 1 / 2",
+    "selectTitle": "Choose a <accent>plan</accent>",
+    "payEyebrow": "Payment — step 2 / 2",
+    "payTitle": "Last <accent>step</accent>",
+    "selectedPlan": "Selected plan",
+    "goToPayment": "Go to payment →",
+    "order": "Your order",
+    "programFallback": "Your program",
+    "accessDuration": "Access duration",
+    "cabinet": "Cabinet",
+    "cabinetValue": "24/7",
+    "nutritionPlan": "Nutrition plan",
+    "included": "Included",
+    "paymentMethod": "Payment method",
+    "cardMasked": "•••• •••• •••• ••••",
+    "cardAdded": "•••• •••• •••• 4242",
+    "addCard": "Add card",
+    "cardReady": "Added",
+    "agreement": "I agree to the terms of service and the privacy policy",
+    "secure": "🔒 Secure payment",
+    "ssl": "✓ SSL encryption",
+    "pay": "Pay {amount} ₴ →",
+    "paying": "Processing…",
+    "successTitle": "Welcome. <accent>You're in.</accent>",
     "successBody": "The {plan} plan is active until {periodEnd}.",
     "dashboardCta": "Go to cabinet →",
-    "missingPlan": "Choose a plan on the home page first.",
+    "missingPlan": "Plans are unavailable right now. Try again from the home page.",
     "choosePlanCta": "Choose a plan",
     "error": "We could not confirm the subscription. Try again.",
     "retry": "Try again"

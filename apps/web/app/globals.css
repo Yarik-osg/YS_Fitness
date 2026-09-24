@@ -1,11 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&family=Manrope:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800&family=Oswald:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --font-body: 'Manrope', sans-serif;
-  --font-heading: 'Oswald', sans-serif;
-  --font-label: 'Montserrat', sans-serif;
-  --font-serif: 'Cormorant Garamond', serif;
+  --font-body: var(--font-manrope), 'Manrope', sans-serif;
+  --font-heading: var(--font-oswald), Oswald, sans-serif;
+  --font-label: var(--font-montserrat), 'Montserrat', sans-serif;
+  --font-serif: var(--font-cormorant), 'Cormorant Garamond', serif;
   --color-ink: #f5f4ef;
   --color-muted: #9c9d9f;
   --color-panel: #17191c;
@@ -15,8 +14,8 @@
 
 :root {
   color-scheme: dark;
-  --accent: #5bf4d6;
-  --background: #090b0d;
+  --accent: #35f5e8;
+  --background: #0b0b0b;
   --foreground: #f5f4ef;
 }
 
@@ -39,6 +38,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.font-heading {
+  font-family: var(--font-oswald), Oswald, sans-serif;
+}
+
 button,
 input {
   font: inherit;
@@ -59,8 +62,14 @@ a {
   background: var(--accent);
 }
 
+.track-female {
+  --accent: #35f5e8;
+  --color-accent: #35f5e8;
+}
+
 .track-male {
-  --accent: #d5fa42;
+  --accent: #c8ff2e;
+  --color-accent: #c8ff2e;
 }
 
 .noise-overlay::before {

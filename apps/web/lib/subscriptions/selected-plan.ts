@@ -19,3 +19,16 @@ export function clearSelectedPlanId() {
   if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem(PLAN_STORAGE_KEY);
 }
+
+const TRACK_STORAGE_KEY = 'ys_program_track';
+
+export function persistProgramTrack(track: 'female' | 'male') {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(TRACK_STORAGE_KEY, track);
+}
+
+export function readProgramTrack(): 'female' | 'male' | null {
+  if (typeof window === 'undefined') return null;
+  const value = window.sessionStorage.getItem(TRACK_STORAGE_KEY);
+  return value === 'female' || value === 'male' ? value : null;
+}

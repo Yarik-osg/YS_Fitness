@@ -64,6 +64,14 @@ describeWithDatabase('subscriptions (e2e)', () => {
           intervalMonths: 1,
           isActive: true,
         },
+        {
+          code: 'FULL_ACCESS',
+          name: 'FULL ACCESS',
+          priceAmount: 349_000,
+          currency: 'UAH',
+          intervalMonths: 3,
+          isActive: true,
+        },
       ],
     });
   });
@@ -71,6 +79,27 @@ describeWithDatabase('subscriptions (e2e)', () => {
   afterAll(async () => {
     await prisma?.$disconnect();
     await app?.close();
+  });
+
+  it('lists three active catalog plans', async () => {
+    const plans = await request(app.getHttpServer())
+      .get('/api/v1/subscriptions/plans')
+      .expect(200);
+
+    expect(plans.body).toHaveLength(3);
+    expect(plans.body.map((plan: { code: string }) => plan.code)).toEqual([
+      '3_MONTHS',
+      'FULL_ACCESS',
+      '1_MONTH',
+    ]);
+    expect(
+      plans.body.find((plan: { code: string }) => plan.code === 'FULL_ACCESS'),
+    ).toMatchObject({
+      name: 'FULL ACCESS',
+      priceAmount: 349_000,
+      intervalMonths: 3,
+      isActive: true,
+    });
   });
 
   it('registers, onboard, checkouts, and returns the active subscription', async () => {
@@ -121,6 +150,48 @@ describeWithDatabase('subscriptions (e2e)', () => {
 
     expect(mine.body.subscription.status).toBe('ACTIVE');
     expect(mine.body.subscription.plan.code).toBe('1_MONTH');
+  });
+
+  it('registers, onboard, and checkouts FULL_ACCESS end to end', async () => {
+    const registration = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        email: 'full-access@example.com',
+        password: 'strong-password',
+        clientType: 'MOBILE',
+      })
+      .expect(201);
+
+    const authorization = `Bearer ${registration.body.tokens.accessToken}`;
+    await request(app.getHttpServer())
+      .put('/api/v1/users/me/onboarding')
+      .set('Authorization', authorization)
+      .send(FEMALE_ONBOARDING)
+      .expect(200);
+
+    const fullAccess = await prisma.plan.findUniqueOrThrow({
+      where: { code: 'FULL_ACCESS' },
+    });
+
+    const checkout = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/checkout')
+      .set('Authorization', authorization)
+      .send({ planId: fullAccess.id })
+      .expect(201);
+
+    expect(checkout.body.subscription.status).toBe('ACTIVE');
+    expect(checkout.body.subscription.plan.code).toBe('FULL_ACCESS');
+    expect(checkout.body.subscription.plan.priceAmount).toBe(349_000);
+    expect(checkout.body.subscription.plan.intervalMonths).toBe(3);
+    expect(checkout.body.checkoutUrl).toBeNull();
+
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/subscriptions/me')
+      .set('Authorization', authorization)
+      .expect(200);
+
+    expect(mine.body.subscription.status).toBe('ACTIVE');
+    expect(mine.body.subscription.plan.code).toBe('FULL_ACCESS');
   });
 
   it('lets only one of two concurrent checkouts succeed', async () => {

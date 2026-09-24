@@ -48,6 +48,24 @@ describe('onboarding draft ownership', () => {
     });
   });
 
+  it('lets register claim a guest quiz instead of wiping it', () => {
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      biologicalSexForCalculation: 'FEMALE',
+      currentBody: 'toned',
+      step: 4,
+    });
+
+    bindOnboardingDraftToUser('user-new', { claimGuest: true });
+
+    expect(useOnboardingStore.getState()).toMatchObject({
+      ownerUserId: 'user-new',
+      programTrack: 'female',
+      currentBody: 'toned',
+      step: 4,
+    });
+  });
+
   it('replaces the current draft when register asks for a fresh quiz', () => {
     useOnboardingStore.setState({
       ownerUserId: 'user-a',

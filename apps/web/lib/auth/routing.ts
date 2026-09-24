@@ -23,3 +23,20 @@ export function getPostAuthPath(
 
   return '/dashboard';
 }
+
+export function getPostRegisterPath(
+  selectedPlanId: string | null = readSelectedPlanId() ?? readPlanIdFromQuery(),
+) {
+  if (selectedPlanId) {
+    persistSelectedPlanId(selectedPlanId);
+    return `/checkout?planId=${encodeURIComponent(selectedPlanId)}`;
+  }
+
+  return '/checkout';
+}
+
+export function resolveIncompleteGuestDestination(
+  pathname: string,
+): string | null {
+  return pathname.startsWith('/register') ? null : '/onboarding';
+}

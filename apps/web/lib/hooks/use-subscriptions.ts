@@ -14,6 +14,7 @@ export function usePlans() {
   return useQuery({
     queryKey: plansQueryKey,
     queryFn: listPlans,
+    retry: 2,
   });
 }
 

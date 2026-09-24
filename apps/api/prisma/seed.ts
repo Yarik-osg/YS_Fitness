@@ -2,23 +2,9 @@ import 'dotenv/config';
 import { PrismaClient, UserRole } from '@prisma/client';
 import { hash } from 'argon2';
 import { readSeedEnvironment } from '../src/config/seed-environment.js';
+import { CATALOG_PLANS } from './catalog-plans.js';
 
 const prisma = new PrismaClient();
-
-const CATALOG_PLANS = [
-  {
-    code: '3_MONTHS',
-    name: '3 months',
-    priceAmount: 249_000,
-    intervalMonths: 3,
-  },
-  {
-    code: '1_MONTH',
-    name: '1 month',
-    priceAmount: 99_000,
-    intervalMonths: 1,
-  },
-] as const;
 
 async function seedPlans(): Promise<void> {
   for (const plan of CATALOG_PLANS) {

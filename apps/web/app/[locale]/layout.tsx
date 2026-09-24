@@ -2,18 +2,43 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
-import localFont from 'next/font/local';
+import {
+  Cormorant_Garamond,
+  Manrope,
+  Montserrat,
+  Oswald,
+} from 'next/font/google';
 import { Providers } from '@/components/providers';
 import { routing } from '@/i18n/routing';
 import '../globals.css';
 
-const geistSans = localFont({
-  src: '../fonts/GeistVF.woff',
-  variable: '--font-geist-sans',
+const oswald = Oswald({
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-oswald',
+  display: 'swap',
 });
-const geistMono = localFont({
-  src: '../fonts/GeistMonoVF.woff',
-  variable: '--font-geist-mono',
+
+const manrope = Manrope({
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-manrope',
+  display: 'swap',
+});
+
+const montserrat = Montserrat({
+  subsets: ['latin', 'cyrillic'],
+  weight: ['500', '600', '700', '800'],
+  variable: '--font-montserrat',
+  display: 'swap',
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500'],
+  style: ['normal', 'italic'],
+  variable: '--font-cormorant',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -40,10 +65,11 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   return (
-    <html lang={locale}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} noise-overlay`}
-      >
+    <html
+      lang={locale}
+      className={`${oswald.variable} ${manrope.variable} ${montserrat.variable} ${cormorant.variable}`}
+    >
+      <body className="noise-overlay">
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

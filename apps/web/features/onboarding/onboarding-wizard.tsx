@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { ActivityLevel } from '@repo/shared-types';
 import { onboardingProfileSchema } from '@repo/validation';
-import { CheckCircle2, Dumbbell, Sparkles } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
@@ -11,16 +12,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
+import { cn } from '@/lib/utils';
+import { clearSessionHint } from '@/lib/auth/session-cookie';
 import { useSaveOnboarding } from '@/lib/hooks/use-users';
-import { readSelectedPlanId } from '@/lib/subscriptions/selected-plan';
-import { BodyPhysiqueSlider } from './physique-slider';
-import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { resolvePostQuizAccessHref } from '@/lib/subscriptions/plan-cta';
 import {
-  resetOnboardingDraft,
-  useOnboardingStore,
-  type OnboardingState,
-} from './onboarding-store';
-import { buildOnboardingPayload } from './payload';
+  persistProgramTrack,
+  readSelectedPlanId,
+} from '@/lib/subscriptions/selected-plan';
+import { ActivitySlider } from './activity-slider';
+import { BodyCarousel } from './body-carousel';
+import { bodySliderSrc } from './body-figure';
+import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
+import { bodyVariantIndex, previewProgramId } from './preview-program';
+import { useOnboardingStore, type OnboardingState } from './onboarding-store';
+import { tryBuildOnboardingPayload } from './payload';
 import {
   biologicalSexFromProgramTrack,
   ONBOARDING_WIZARD_STEPS,
@@ -28,36 +35,14 @@ import {
 import { StepShell } from './step-shell';
 
 const FEMALE_CURRENT_PHOTOS = [
-  ['slim', 'photo-1531520563951-4c0e3d3fcacc'],
-  ['toned', 'photo-1606902965551-dce093cda6e7'],
-  ['athletic', 'photo-1538240175502-ec4eb4455f34'],
-  ['defined', 'photo-1574680088814-c9e8a10d8a4d'],
-  ['full', 'photo-1541534741688-6078c6bfb5c5'],
+  ['slim', 0],
+  ['toned', 2],
+  ['athletic', 4],
+  ['defined', 6],
+  ['full', 8],
 ] as const;
 
-const FEMALE_DESIRED_IMAGES = [
-  'photo-1531520563951-4c0e3d3fcacc',
-  'photo-1606902965551-dce093cda6e7',
-  'photo-1538240175502-ec4eb4455f34',
-  'photo-1574680088814-c9e8a10d8a4d',
-  'photo-1534367610401-9f5ed68180aa',
-];
-
-const MALE_CURRENT_IMAGES = [
-  'photo-1613702973353-a854c7dc7a3b',
-  'photo-1614396648745-d5de9c9e037e',
-  'photo-1532384816664-01b8b7238c8d',
-  'photo-1578924608828-79a71150f711',
-  'photo-1610312856669-2cee66b2949c',
-];
-
-const MALE_DESIRED_IMAGES = [
-  'photo-1614396648745-d5de9c9e037e',
-  'photo-1532384816664-01b8b7238c8d',
-  'photo-1578924608828-79a71150f711',
-  'photo-1672866332205-9246ee75ca14',
-  'photo-1621750627159-cf77b0b91aac',
-];
+const BODY_VARIANT_STEPS = [0, 2, 4, 6, 8] as const;
 
 const TOTAL_STEPS = ONBOARDING_WIZARD_STEPS;
 
@@ -94,60 +79,72 @@ export function OnboardingWizard() {
   const age = calculateAge(draft.dateOfBirth);
   const currentBodyChoices = useMemo(() => {
     if (!male) {
-      return FEMALE_CURRENT_PHOTOS.map(([value, photo], index) => ({
+      return FEMALE_CURRENT_PHOTOS.map(([value, step], index) => ({
         value,
         label: t('variant', { index: index + 1 }),
-        image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
+        image: bodySliderSrc('female', step),
       }));
     }
-    return MALE_CURRENT_IMAGES.map((photo, index) => ({
+    return BODY_VARIANT_STEPS.map((step, index) => ({
       value: String(index),
       label: t('variant', { index: index + 1 }),
-      image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
+      image: bodySliderSrc('male', step),
     }));
   }, [male, t]);
   const desiredBodyChoices = useMemo(
     () =>
-      (male ? MALE_DESIRED_IMAGES : FEMALE_DESIRED_IMAGES).map(
-        (photo, index) => ({
-          value: String(index),
-          label: t('variant', { index: index + 1 }),
-          image: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=80`,
-        }),
-      ),
+      BODY_VARIANT_STEPS.map((step, index) => ({
+        value: String(index),
+        label: t('variant', { index: index + 1 }),
+        image: bodySliderSrc(male ? 'male' : 'female', step),
+      })),
     [male, t],
   );
 
   const mainGoalChoices: Choice[] = [
-    { value: 'lose_weight', label: t('choices.mainGoal.lose_weight') },
-    { value: 'build_muscle', label: t('choices.mainGoal.build_muscle') },
-    { value: 'improve_body', label: t('choices.mainGoal.improve_body') },
-    { value: 'maintain', label: t('choices.mainGoal.maintain') },
+    {
+      value: 'lose_weight',
+      label: t('choices.mainGoal.lose_weight'),
+      icon: '↓',
+    },
+    {
+      value: 'build_muscle',
+      label: t('choices.mainGoal.build_muscle'),
+      icon: '↑',
+    },
+    {
+      value: 'improve_body',
+      label: t('choices.mainGoal.improve_body'),
+      icon: '◈',
+    },
+    { value: 'maintain', label: t('choices.mainGoal.maintain'), icon: '⟳' },
     {
       value: 'get_stronger',
       label: male
         ? t('choices.mainGoal.get_stronger_male')
         : t('choices.mainGoal.get_stronger_female'),
+      icon: '⚡',
     },
   ];
 
-  const weightGoalChoices: Choice[] = [
-    {
-      value: 'LOSE_WEIGHT',
-      label: t('choices.weightGoal.LOSE_WEIGHT.label'),
-      description: t('choices.weightGoal.LOSE_WEIGHT.description'),
+  const activityLabels = {
+    SEDENTARY: {
+      label: t('choices.activity.SEDENTARY.label'),
+      description: t('choices.activity.SEDENTARY.description'),
     },
-    {
-      value: 'MAINTAIN_WEIGHT',
-      label: t('choices.weightGoal.MAINTAIN_WEIGHT.label'),
-      description: t('choices.weightGoal.MAINTAIN_WEIGHT.description'),
+    LIGHTLY_ACTIVE: {
+      label: t('choices.activity.LIGHTLY_ACTIVE.label'),
+      description: t('choices.activity.LIGHTLY_ACTIVE.description'),
     },
-    {
-      value: 'GAIN_WEIGHT',
-      label: t('choices.weightGoal.GAIN_WEIGHT.label'),
-      description: t('choices.weightGoal.GAIN_WEIGHT.description'),
+    MODERATELY_ACTIVE: {
+      label: t('choices.activity.MODERATELY_ACTIVE.label'),
+      description: t('choices.activity.MODERATELY_ACTIVE.description'),
     },
-  ];
+    VERY_ACTIVE: {
+      label: t('choices.activity.VERY_ACTIVE.label'),
+      description: t('choices.activity.VERY_ACTIVE.description'),
+    },
+  };
 
   const experienceChoices: Choice[] = [
     {
@@ -184,34 +181,6 @@ export function OnboardingWizard() {
       value: '4',
       label: t('choices.frequency.4.label'),
       description: t('choices.frequency.4.description'),
-    },
-  ];
-
-  const activityChoices: Choice[] = [
-    {
-      value: 'SEDENTARY',
-      label: t('choices.activity.SEDENTARY.label'),
-      description: t('choices.activity.SEDENTARY.description'),
-    },
-    {
-      value: 'LIGHTLY_ACTIVE',
-      label: t('choices.activity.LIGHTLY_ACTIVE.label'),
-      description: t('choices.activity.LIGHTLY_ACTIVE.description'),
-    },
-    {
-      value: 'MODERATELY_ACTIVE',
-      label: t('choices.activity.MODERATELY_ACTIVE.label'),
-      description: t('choices.activity.MODERATELY_ACTIVE.description'),
-    },
-    {
-      value: 'VERY_ACTIVE',
-      label: t('choices.activity.VERY_ACTIVE.label'),
-      description: t('choices.activity.VERY_ACTIVE.description'),
-    },
-    {
-      value: 'EXTRA_ACTIVE',
-      label: t('choices.activity.EXTRA_ACTIVE.label'),
-      description: t('choices.activity.EXTRA_ACTIVE.description'),
     },
   ];
 
@@ -327,9 +296,24 @@ export function OnboardingWizard() {
 
   useEffect(() => {
     if (phase !== 'analysis') return;
-    const timer = window.setTimeout(() => setPhase('result'), 1800);
+    const timer = window.setTimeout(() => setPhase('result'), 3400);
     return () => window.clearTimeout(timer);
   }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'plan' && draft.programTrack) {
+      persistProgramTrack(draft.programTrack);
+    }
+  }, [draft.programTrack, phase]);
+
+  useEffect(() => {
+    if (step === 1 && !draft.currentBody && currentBodyChoices[0]) {
+      draft.setAnswer({ currentBody: currentBodyChoices[0].value });
+    }
+    if (step === 6 && !draft.activityLevel) {
+      draft.setAnswer({ activityLevel: 'MODERATELY_ACTIVE' });
+    }
+  }, [currentBodyChoices, draft, step]);
 
   function previous() {
     if (step === 0) {
@@ -346,8 +330,19 @@ export function OnboardingWizard() {
       return;
     }
 
+    if (!useAuthStore.getState().accessToken) {
+      setPhase('analysis');
+      return;
+    }
+
+    const payload = tryBuildOnboardingPayload(draft);
+    if (!payload) {
+      setPhase('analysis');
+      return;
+    }
+
     try {
-      await saveOnboarding.mutateAsync(buildOnboardingPayload(draft));
+      await saveOnboarding.mutateAsync(payload);
       setPhase('analysis');
     } catch {
       // The mutation error is rendered without clearing the persisted draft.
@@ -363,30 +358,22 @@ export function OnboardingWizard() {
       case 2:
         return Boolean(draft.desiredBody);
       case 3:
-        return Boolean(draft.physiqueLevel);
-      case 4:
         return Boolean(draft.mainGoal);
-      case 5:
-        return onboardingProfileSchema
-          .pick({ goal: true })
-          .safeParse({ goal: draft.goal }).success;
-      case 6:
+      case 4:
         return Boolean(draft.experience);
-      case 7:
+      case 5:
         return Boolean(draft.trainingFrequency);
-      case 8:
-        return onboardingProfileSchema
-          .pick({ activityLevel: true })
-          .safeParse({ activityLevel: draft.activityLevel }).success;
-      case 9:
+      case 6:
+        return Boolean(draft.activityLevel);
+      case 7:
         return draft.focusAreas.length > 0;
-      case 10:
+      case 8:
         return Boolean(draft.nutritionCurrent);
-      case 11:
+      case 9:
         return Boolean(draft.mealsPerDay);
-      case 12:
+      case 10:
         return draft.eatingHabits.length > 0;
-      case 13:
+      case 11:
         return onboardingProfileSchema
           .pick({ dateOfBirth: true, heightCm: true, weightKg: true })
           .safeParse({
@@ -399,20 +386,37 @@ export function OnboardingWizard() {
     }
   }
 
-  if (phase === 'analysis') return <Analysis />;
+  const trackClass =
+    step === 0 ? undefined : male ? 'track-male' : 'track-female';
+  const shellClass = trackClass;
+
+  if (phase === 'analysis') return <Analysis className={shellClass} />;
   if (phase === 'result') {
     return (
-      <Result age={age} draft={draft} onContinue={() => setPhase('plan')} />
+      <Result
+        draft={draft}
+        className={shellClass}
+        onContinue={() => setPhase('plan')}
+      />
     );
   }
   if (phase === 'plan') {
     return (
       <Plan
         draft={draft}
+        className={shellClass}
         onContinue={() => {
-          resetOnboardingDraft();
           const planId = readSelectedPlanId();
-          router.replace(planId ? `/checkout?planId=${planId}` : '/dashboard');
+          const authenticated = Boolean(useAuthStore.getState().accessToken);
+          if (!authenticated) {
+            clearSessionHint();
+          }
+          router.push(
+            resolvePostQuizAccessHref({
+              authenticated,
+              planId,
+            }),
+          );
         }}
       />
     );
@@ -428,6 +432,14 @@ export function OnboardingWizard() {
     error: saveOnboarding.error
       ? getUserFacingError(saveOnboarding.error, tAuth)
       : null,
+    className: trackClass,
+    continueLabel: step === 1 ? t('chooseForm') : undefined,
+    continueClassName:
+      step === 0 && male
+        ? 'bg-[#c8ff2e] text-[#0b0b0b] shadow-none'
+        : step === 0 && draft.programTrack === 'female'
+          ? 'bg-[#00c7c8] text-[#0b0b0b] shadow-none'
+          : undefined,
   };
 
   switch (step) {
@@ -454,73 +466,52 @@ export function OnboardingWizard() {
                 value: 'female',
                 label: t('choices.program.female.label'),
                 description: t('choices.program.female.description'),
-                image:
-                  'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&w=800&q=80',
+                image: '/marketing/hero.png',
               },
               {
                 value: 'male',
                 label: t('choices.program.male.label'),
                 description: t('choices.program.male.description'),
-                image:
-                  'https://images.unsplash.com/photo-1578924608828-79a71150f711?auto=format&fit=crop&w=800&q=80',
+                image: bodySliderSrc('male', 6),
               },
             ]}
           />
         </StepShell>
       );
     case 1:
-    case 2: {
-      const current = step === 1;
       return (
         <StepShell
           {...common}
-          eyebrow={
-            current
-              ? t('steps.currentBody.eyebrow')
-              : t('steps.desiredBody.eyebrow')
-          }
-          title={t.rich(
-            current ? 'steps.currentBody.title' : 'steps.desiredBody.title',
-            { accent },
-          )}
-          description={
-            current
-              ? t('steps.currentBody.description')
-              : t('steps.desiredBody.description')
-          }
+          eyebrow={t('steps.currentBody.eyebrow')}
+          title={t.rich('steps.currentBody.title', { accent })}
+          description={t('steps.currentBody.description')}
+        >
+          <BodyCarousel
+            choices={currentBodyChoices}
+            value={draft.currentBody}
+            label={t('physiqueSlider.label')}
+            onChange={(currentBody) => draft.setAnswer({ currentBody })}
+          />
+        </StepShell>
+      );
+    case 2:
+      return (
+        <StepShell
+          {...common}
+          eyebrow={t('steps.desiredBody.eyebrow')}
+          title={t.rich('steps.desiredBody.title', { accent })}
+          description={t('steps.desiredBody.description')}
         >
           <ChoiceList
             grid
             imageGrid
-            choices={current ? currentBodyChoices : desiredBodyChoices}
-            value={current ? draft.currentBody : draft.desiredBody}
-            onChange={(value) =>
-              draft.setAnswer(
-                current ? { currentBody: value } : { desiredBody: value },
-              )
-            }
+            choices={desiredBodyChoices}
+            value={draft.desiredBody}
+            onChange={(desiredBody) => draft.setAnswer({ desiredBody })}
           />
         </StepShell>
       );
-    }
     case 3:
-      return (
-        <StepShell
-          {...common}
-          eyebrow={t('steps.physique.eyebrow')}
-          title={t.rich('steps.physique.title', { accent })}
-          description={t('steps.physique.description')}
-        >
-          <BodyPhysiqueSlider
-            track={draft.programTrack ?? 'female'}
-            value={draft.physiqueLevel}
-            onChange={(physiqueLevel) => draft.setAnswer({ physiqueLevel })}
-            label={t('physiqueSlider.label')}
-            valueLabel={(index) => t('variant', { index: index + 1 })}
-          />
-        </StepShell>
-      );
-    case 4:
       return (
         <StepShell
           {...common}
@@ -528,32 +519,14 @@ export function OnboardingWizard() {
           title={t.rich('steps.mainGoal.title', { accent })}
         >
           <ChoiceList
+            goal
             choices={mainGoalChoices}
             value={draft.mainGoal}
             onChange={(mainGoal) => draft.setAnswer({ mainGoal })}
           />
         </StepShell>
       );
-    case 5:
-      return (
-        <StepShell
-          {...common}
-          eyebrow={t('steps.weightGoal.eyebrow')}
-          title={t.rich('steps.weightGoal.title', { accent })}
-          description={t('steps.weightGoal.description')}
-        >
-          <ChoiceList
-            choices={weightGoalChoices}
-            value={draft.goal}
-            onChange={(goal) =>
-              draft.setAnswer({
-                goal: goal as 'LOSE_WEIGHT' | 'MAINTAIN_WEIGHT' | 'GAIN_WEIGHT',
-              })
-            }
-          />
-        </StepShell>
-      );
-    case 6:
+    case 4:
       return (
         <StepShell
           {...common}
@@ -567,7 +540,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 7:
+    case 5:
       return (
         <StepShell
           {...common}
@@ -587,7 +560,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 8:
+    case 6:
       return (
         <StepShell
           {...common}
@@ -595,23 +568,17 @@ export function OnboardingWizard() {
           title={t.rich('steps.activity.title', { accent })}
           description={t('steps.activity.description')}
         >
-          <ChoiceList
-            choices={activityChoices}
+          <ActivitySlider
             value={draft.activityLevel}
-            onChange={(activityLevel) =>
-              draft.setAnswer({
-                activityLevel: activityLevel as
-                  | 'SEDENTARY'
-                  | 'LIGHTLY_ACTIVE'
-                  | 'MODERATELY_ACTIVE'
-                  | 'VERY_ACTIVE'
-                  | 'EXTRA_ACTIVE',
-              })
+            labels={activityLabels}
+            label={t('steps.activity.eyebrow')}
+            onChange={(activityLevel: ActivityLevel) =>
+              draft.setAnswer({ activityLevel })
             }
           />
         </StepShell>
       );
-    case 9:
+    case 7:
       return (
         <StepShell
           {...common}
@@ -626,7 +593,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 10:
+    case 8:
       return (
         <StepShell
           {...common}
@@ -642,7 +609,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 11:
+    case 9:
       return (
         <StepShell
           {...common}
@@ -658,7 +625,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 12:
+    case 10:
       return (
         <StepShell
           {...common}
@@ -680,7 +647,7 @@ export function OnboardingWizard() {
           />
         </StepShell>
       );
-    case 13:
+    case 11:
       return (
         <StepShell
           {...common}
@@ -754,78 +721,261 @@ export function OnboardingWizard() {
   }
 }
 
-function Analysis() {
+function Analysis({ className }: { className?: string }) {
   const t = useTranslations('onboarding');
+  const steps = t.raw('analysis.steps') as string[];
+  const [currentStep, setCurrentStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const stepDuration = 360;
+    const timers = steps.map((_, index) =>
+      window.setTimeout(() => setCurrentStep(index), index * stepDuration),
+    );
+    const interval = window.setInterval(() => {
+      setProgress((value) => (value >= 100 ? 100 : value + 2.2));
+    }, 40);
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.clearInterval(interval);
+    };
+  }, [steps]);
 
   return (
-    <main className="relative mx-auto grid min-h-screen w-full max-w-md place-items-center border-x border-white/5 px-8 text-center">
+    <main
+      className={cn(
+        'relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center border-x border-white/5 bg-[#0b0b0b] px-8 text-center',
+        className,
+      )}
+    >
+      <div className="pointer-events-none absolute top-[30%] left-1/2 size-[19rem] -translate-x-1/2 rounded-full bg-accent/6 blur-3xl" />
       <div className="absolute top-8 right-6">
         <LocaleSwitcher />
       </div>
-      <div>
-        <Sparkles
-          className="mx-auto mb-7 animate-pulse text-accent"
-          size={42}
-        />
-        <p className="font-label text-[10px] uppercase tracking-[0.2em] text-accent">
-          {t('analysis.eyebrow')}
-        </p>
-        <h1 className="mt-4 font-heading text-4xl uppercase leading-tight">
+      <div className="relative w-full max-w-80">
+        <div className="flex justify-center">
+          <BrandMark />
+        </div>
+        <h1 className="mt-12 font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em]">
           {t.rich('analysis.title', { accent })}
         </h1>
-        <div className="mx-auto mt-8 h-1 w-48 overflow-hidden bg-line">
-          <div className="h-full w-2/3 animate-pulse bg-accent" />
+        <div className="mx-auto my-4 h-px w-15 bg-accent" />
+        <p className="mx-auto mb-12 max-w-[17.5rem] text-xs leading-[1.65] text-white/55">
+          {t('analysis.subtitle')}
+        </p>
+        <div className="mb-9">
+          <div className="relative h-0.5 w-full bg-white/10">
+            <div
+              className="absolute inset-y-0 left-0 bg-accent shadow-[0_0_12px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-[width] duration-100"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="mt-2 flex justify-between font-label text-[9px] tracking-[0.1em] uppercase">
+            <span className="text-white/30">{t('analysis.label')}</span>
+            <span className="font-semibold text-accent">
+              {Math.round(progress)}%
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 text-left">
+          {steps.map((step, index) => {
+            const done = index < currentStep;
+            const active = index === currentStep;
+            return (
+              <div
+                key={step}
+                className={cn(
+                  'flex items-center gap-3 transition-opacity duration-300',
+                  index > currentStep ? 'opacity-20' : 'opacity-100',
+                )}
+              >
+                <span
+                  className={cn(
+                    'grid size-5 shrink-0 place-items-center rounded-full border',
+                    done || active ? 'border-accent' : 'border-white/20',
+                    done && 'bg-accent',
+                  )}
+                >
+                  {done ? (
+                    <Check
+                      size={9}
+                      strokeWidth={3}
+                      className="text-[#0b0b0b]"
+                    />
+                  ) : active ? (
+                    <span className="size-1.5 rounded-full bg-accent" />
+                  ) : null}
+                </span>
+                <span
+                  className={cn(
+                    'text-xs',
+                    done && 'text-white/50',
+                    active && 'text-white',
+                    !done && !active && 'text-white/30',
+                  )}
+                >
+                  {step}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </main>
   );
 }
 
+function mainGoalLabel(
+  t: ReturnType<typeof useTranslations<'onboarding'>>,
+  mainGoal: string | undefined,
+  male: boolean,
+) {
+  switch (mainGoal) {
+    case 'lose_weight':
+      return t('choices.mainGoal.lose_weight');
+    case 'build_muscle':
+      return t('choices.mainGoal.build_muscle');
+    case 'improve_body':
+      return t('choices.mainGoal.improve_body');
+    case 'maintain':
+      return t('choices.mainGoal.maintain');
+    case 'get_stronger':
+      return male
+        ? t('choices.mainGoal.get_stronger_male')
+        : t('choices.mainGoal.get_stronger_female');
+    default:
+      return '—';
+  }
+}
+
+function experienceLabelFor(
+  t: ReturnType<typeof useTranslations<'onboarding'>>,
+  experience: string | undefined,
+  male: boolean,
+) {
+  switch (experience) {
+    case 'beginner':
+      return t('choices.experience.beginner.label');
+    case 'intermediate':
+      return t('choices.experience.intermediate.label');
+    case 'advanced':
+      return male
+        ? t('choices.experience.advanced_male')
+        : t('choices.experience.advanced_female');
+    default:
+      return '—';
+  }
+}
+
+function focusAreaLabel(
+  t: ReturnType<typeof useTranslations<'onboarding'>>,
+  area: string,
+) {
+  switch (area) {
+    case 'glutes':
+      return t('choices.focus.glutes');
+    case 'legs':
+      return t('choices.focus.legs');
+    case 'shoulders':
+      return t('choices.focus.shoulders');
+    case 'back':
+      return t('choices.focus.back');
+    case 'arms':
+      return t('choices.focus.arms');
+    case 'abs':
+      return t('choices.focus.abs');
+    case 'full_body':
+      return t('choices.focus.full_body');
+    case 'chest':
+      return t('choices.focus.chest');
+    default:
+      return area;
+  }
+}
+
+function focusAreasLabel(
+  t: ReturnType<typeof useTranslations<'onboarding'>>,
+  areas: string[],
+) {
+  return areas.map((area) => focusAreaLabel(t, area)).join(', ');
+}
+
 function Result({
-  age,
   draft,
   onContinue,
+  className,
 }: {
-  age: number | null;
   draft: OnboardingState;
   onContinue: () => void;
+  className?: string;
 }) {
   const t = useTranslations('onboarding');
+  const male = draft.programTrack === 'male';
+  const goalLabel = mainGoalLabel(t, draft.mainGoal, male);
+  const experienceLabel = experienceLabelFor(t, draft.experience, male);
+  const focusLabel = focusAreasLabel(t, draft.focusAreas) || '—';
+
+  const rows = [
+    [t('result.mainGoal'), goalLabel],
+    [t('result.experience'), experienceLabel],
+    [
+      t('result.frequency'),
+      draft.trainingFrequency
+        ? t('result.frequencyValue', { count: draft.trainingFrequency })
+        : '—',
+    ],
+    [t('result.focus'), focusLabel],
+  ];
 
   return (
     <SummaryScreen
       eyebrow={t('result.eyebrow')}
       title={t.rich('result.title', { accent })}
-      icon={<CheckCircle2 size={38} />}
+      description={t('result.subtitle')}
       onContinue={onContinue}
       button={t('result.button')}
+      className={className}
     >
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          [t('result.age'), age ?? '—'],
-          [
-            t('result.height'),
-            t('result.heightValue', { value: draft.heightCm ?? '—' }),
-          ],
-          [
-            t('result.weight'),
-            t('result.weightValue', { value: draft.weightKg ?? '—' }),
-          ],
-        ].map(([label, value]) => (
+      <div className="relative mb-5 border border-accent/25 bg-accent/4 px-[18px] py-5">
+        <div className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
+        {rows.map(([label, value], index) => (
           <div
             key={label}
-            className="border border-line bg-panel p-3 text-center"
+            className={cn(
+              'flex items-start justify-between gap-3',
+              index < rows.length - 1 &&
+                'mb-3.5 border-b border-white/7 pb-3.5',
+            )}
           >
-            <strong className="block font-heading text-xl text-accent">
+            <span className="shrink-0 text-[11px] text-white/45">{label}</span>
+            <span className="text-right text-xs font-semibold leading-5 text-white">
               {value}
-            </strong>
-            <span className="text-[9px] uppercase tracking-wider text-muted">
-              {label}
             </span>
           </div>
         ))}
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/7 pt-4">
+          <span className="text-[11px] text-white/45">{t('result.shape')}</span>
+          <span className="flex items-center gap-2 text-[11px] font-semibold">
+            <span className="text-white/50">
+              {t('result.current', {
+                index: bodyVariantIndex(draft.currentBody),
+              })}
+            </span>
+            <span className="text-accent">→</span>
+            <span className="text-accent">
+              {t('result.desired', {
+                index: bodyVariantIndex(draft.desiredBody),
+              })}
+            </span>
+          </span>
+        </div>
       </div>
-      <p className="mt-5 text-xs leading-6 text-muted">{t('result.note')}</p>
+      <div className="mb-5 flex items-center gap-3.5 border border-accent/20 bg-accent/4 px-[18px] py-3.5">
+        <span className="text-accent">⚡</span>
+        <p className="text-xs leading-5 text-white/75">
+          {t('result.highlight')}
+        </p>
+      </div>
     </SummaryScreen>
   );
 }
@@ -833,89 +983,159 @@ function Result({
 function Plan({
   draft,
   onContinue,
+  className,
 }: {
   draft: OnboardingState;
   onContinue: () => void;
+  className?: string;
 }) {
   const t = useTranslations('onboarding');
+  const programId = previewProgramId(draft);
+  const includes = t.raw(`plan.preview.${programId}.includes`) as string[];
+  const focusLabel =
+    focusAreasLabel(t, draft.focusAreas) || t('choices.focus.full_body');
 
   return (
     <SummaryScreen
       eyebrow={t('plan.eyebrow')}
       title={t.rich('plan.title', { accent })}
-      icon={<Dumbbell size={38} />}
       onContinue={onContinue}
       button={t('plan.button')}
+      className={className}
     >
-      <div className="space-y-3">
-        <PlanRow
-          label={t('plan.training')}
-          value={t('plan.trainingValue', {
-            count: draft.trainingFrequency ?? '3',
-          })}
-        />
-        <PlanRow
-          label={t('plan.level')}
-          value={draft.experience ?? t('plan.levelFallback')}
-        />
-        <PlanRow
-          label={t('plan.focus')}
-          value={
-            draft.focusAreas.includes('full_body')
-              ? t('plan.focusFullBody')
-              : t('plan.focusZones', { count: draft.focusAreas.length })
-          }
-        />
+      <article className="mb-4 overflow-hidden border border-accent/30 bg-white/2">
+        <div className="relative border-b border-accent/15 bg-accent/8 px-[18px] pt-[18px] pb-4">
+          <div className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
+          <div className="flex items-start justify-between gap-2.5">
+            <div>
+              <p className="font-label text-xl font-bold tracking-wide text-accent">
+                {t(`plan.preview.${programId}.name`)}
+              </p>
+              <p className="mt-1.5 text-[10px] tracking-wide text-white/45">
+                {t(`plan.preview.${programId}.tagline`)}
+              </p>
+            </div>
+            <span className="shrink-0 bg-accent px-2.5 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
+              {t('plan.forYou')}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3.5 px-[18px] py-4">
+          <p className="text-xs leading-5 text-white/60">
+            {t(`plan.preview.${programId}.whoFor`)}
+          </p>
+          <div className="flex">
+            {[
+              [
+                t('plan.frequency'),
+                t('plan.frequencyValue', {
+                  count: draft.trainingFrequency ?? '3',
+                }),
+              ],
+              [t('plan.focus'), focusLabel],
+              [t('plan.duration'), t('plan.durationValue')],
+            ].map(([label, value], index) => (
+              <div
+                key={label}
+                className={cn(
+                  'min-w-0 flex-1 py-2.5',
+                  index > 0 && 'border-l border-white/7 pl-2.5',
+                  index < 2 && 'pr-2.5',
+                )}
+              >
+                <p className="mb-1 font-label text-[7px] font-semibold tracking-[0.12em] text-white/30 uppercase">
+                  {label}
+                </p>
+                <p className="truncate text-[11px] font-semibold leading-4 text-white">
+                  {value}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="h-px bg-white/7" />
+          <p className="text-xs leading-6 text-white/60">
+            {t(`plan.preview.${programId}.description`)}
+          </p>
+          <div>
+            <p className="mb-2.5 font-label text-[9px] font-semibold tracking-[0.14em] text-accent uppercase">
+              {t('plan.includes')}
+            </p>
+            <ul className="flex flex-col gap-2">
+              {includes.map((item) => (
+                <li key={item} className="flex items-center gap-2.5">
+                  <span className="grid size-4 shrink-0 place-items-center rounded-full border border-accent/30 bg-accent/12">
+                    <Check size={8} strokeWidth={3} className="text-accent" />
+                  </span>
+                  <span className="text-xs text-white/65">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex items-center justify-between border-t border-white/7 pt-3.5">
+            <span className="text-[11px] text-white/40">{t('plan.price')}</span>
+            <span>
+              <span className="font-heading text-2xl">
+                {t('plan.priceValue')}
+              </span>{' '}
+              <span className="text-[11px] text-white/45">
+                {t('plan.priceLabel')}
+              </span>
+            </span>
+          </div>
+        </div>
+      </article>
+      <div className="mb-5 flex items-center gap-2.5 border border-white/8 bg-white/2 px-4 py-3">
+        <span className="text-white/35">🔒</span>
+        <p className="text-[11px] leading-5 text-white/40">{t('plan.lock')}</p>
       </div>
-      <p className="mt-5 border-l-2 border-accent/50 pl-3 text-[10px] leading-5 text-muted">
-        {t('plan.disclaimer')}
-      </p>
     </SummaryScreen>
-  );
-}
-
-function PlanRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-line py-3">
-      <span className="font-label text-[10px] uppercase tracking-wider text-muted">
-        {label}
-      </span>
-      <strong className="text-sm text-ink">{value}</strong>
-    </div>
   );
 }
 
 function SummaryScreen({
   eyebrow,
   title,
-  icon,
+  description,
   children,
   onContinue,
   button,
+  className,
 }: {
   eyebrow: string;
   title: React.ReactNode;
-  icon: React.ReactNode;
+  description?: string;
   children: React.ReactNode;
   onContinue: () => void;
   button: string;
+  className?: string;
 }) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 px-6 pb-10 pt-8">
-      <header className="flex items-center justify-between">
+    <main
+      className={cn(
+        'relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden border-x border-white/5 bg-[#0b0b0b] px-5 pb-10 pt-4',
+        className,
+      )}
+    >
+      <div className="pointer-events-none absolute top-[15%] right-[-60px] size-[14rem] rounded-full bg-accent/7 blur-3xl" />
+      <header className="relative flex items-center justify-between pb-3">
         <BrandMark />
         <LocaleSwitcher />
       </header>
-      <div className="mt-16 text-accent">{icon}</div>
-      <p className="mt-5 font-label text-[9px] font-semibold uppercase tracking-[0.2em] text-accent">
+      <div className="h-px bg-white/8" />
+      <p className="relative mt-7 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
         {eyebrow}
       </p>
-      <h1 className="mt-3 font-heading text-4xl uppercase leading-tight">
+      <h1 className="relative mt-2.5 font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em]">
         {title}
       </h1>
-      <div className="my-6 h-px w-16 bg-accent" />
-      <div className="flex-1">{children}</div>
-      <Button className="mt-8 w-full" onClick={onContinue}>
+      <div className="relative my-2.5 h-px w-15 bg-accent" />
+      {description ? (
+        <p className="relative mb-5 text-[11px] leading-5 text-[#d9d9d9]">
+          {description}
+        </p>
+      ) : null}
+      <div className="relative flex-1">{children}</div>
+      <Button className="relative mt-8 w-full" onClick={onContinue}>
         {button}
       </Button>
     </main>
