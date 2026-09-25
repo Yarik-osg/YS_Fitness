@@ -8,8 +8,6 @@ import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { cn } from '@/lib/utils';
@@ -25,7 +23,7 @@ import { ActivitySlider } from './activity-slider';
 import { BodyCarousel } from './body-carousel';
 import { bodySliderSrc } from './body-figure';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
-import { bodyVariantIndex, previewProgramId } from './preview-program';
+import { previewProgramId } from './preview-program';
 import { useOnboardingStore, type OnboardingState } from './onboarding-store';
 import { tryBuildOnboardingPayload } from './payload';
 import {
@@ -46,19 +44,37 @@ const BODY_VARIANT_STEPS = [0, 2, 4, 6, 8] as const;
 
 const TOTAL_STEPS = ONBOARDING_WIZARD_STEPS;
 
-function calculateAge(dateOfBirth?: string) {
-  if (!dateOfBirth) return null;
-  const born = new Date(`${dateOfBirth}T00:00:00`);
-  const now = new Date();
-  let age = now.getFullYear() - born.getFullYear();
-  if (
-    now.getMonth() < born.getMonth() ||
-    (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())
-  ) {
-    age -= 1;
-  }
-  return age;
+function MetricField({
+  id,
+  label,
+  unit,
+  children,
+}: {
+  id: string;
+  label: string;
+  unit?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-2 block font-label text-[9px] font-semibold tracking-[0.16em] text-white/50 uppercase"
+      >
+        {label}
+      </label>
+      <div className="flex items-center gap-2 border border-white/12 bg-white/4 px-4 py-3.5 focus-within:border-accent">
+        <div className="min-w-0 flex-1">{children}</div>
+        {unit ? (
+          <span className="shrink-0 text-xs text-white/40">{unit}</span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
+
+const metricInputClass =
+  'w-full border-0 bg-transparent p-0 font-heading text-[32px] text-white shadow-none outline-none ring-0 placeholder:text-white/25 focus:bg-transparent focus:outline-none focus:ring-0';
 
 function accent(chunks: ReactNode) {
   return <span className="text-accent">{chunks}</span>;
@@ -70,13 +86,10 @@ export function OnboardingWizard() {
   const saveOnboarding = useSaveOnboarding();
   const t = useTranslations('onboarding');
   const tAuth = useTranslations('auth');
-  const [phase, setPhase] = useState<'wizard' | 'analysis' | 'result' | 'plan'>(
-    'wizard',
-  );
+  const [phase, setPhase] = useState<'wizard' | 'analysis' | 'plan'>('wizard');
 
   const step = Math.min(Math.max(draft.step, 0), TOTAL_STEPS - 1);
   const male = draft.programTrack === 'male';
-  const age = calculateAge(draft.dateOfBirth);
   const currentBodyChoices = useMemo(() => {
     if (!male) {
       return FEMALE_CURRENT_PHOTOS.map(([value, step], index) => ({
@@ -296,7 +309,7 @@ export function OnboardingWizard() {
 
   useEffect(() => {
     if (phase !== 'analysis') return;
-    const timer = window.setTimeout(() => setPhase('result'), 3400);
+    const timer = window.setTimeout(() => setPhase('plan'), 3400);
     return () => window.clearTimeout(timer);
   }, [phase]);
 
@@ -391,15 +404,6 @@ export function OnboardingWizard() {
   const shellClass = trackClass;
 
   if (phase === 'analysis') return <Analysis className={shellClass} />;
-  if (phase === 'result') {
-    return (
-      <Result
-        draft={draft}
-        className={shellClass}
-        onContinue={() => setPhase('plan')}
-      />
-    );
-  }
   if (phase === 'plan') {
     return (
       <Plan
@@ -653,66 +657,75 @@ export function OnboardingWizard() {
           {...common}
           eyebrow={t('steps.metrics.eyebrow')}
           title={t.rich('steps.metrics.title', { accent })}
-          description={
-            age === null
-              ? t('steps.metrics.unitsNote')
-              : t('steps.metrics.ageNote', { age })
-          }
+          description={t('steps.metrics.description')}
+          continueLabel={t('steps.metrics.build')}
         >
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">
-                {t('steps.metrics.dateOfBirth')}
-              </Label>
-              <Input
+          <div className="space-y-4">
+            <MetricField
+              id="dateOfBirth"
+              label={t('steps.metrics.dateOfBirth')}
+            >
+              <input
                 id="dateOfBirth"
                 type="date"
                 max={new Date().toISOString().slice(0, 10)}
                 value={draft.dateOfBirth ?? ''}
+                className={`${metricInputClass} [color-scheme:dark]`}
                 onChange={(event) =>
                   draft.setAnswer({ dateOfBirth: event.target.value })
                 }
               />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="heightCm">{t('steps.metrics.height')}</Label>
-                <Input
-                  id="heightCm"
-                  type="number"
-                  inputMode="decimal"
-                  min={80}
-                  max={250}
-                  value={draft.heightCm ?? ''}
-                  onChange={(event) =>
-                    draft.setAnswer({
-                      heightCm: event.target.value
-                        ? event.target.valueAsNumber
-                        : undefined,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="weightKg">{t('steps.metrics.weight')}</Label>
-                <Input
-                  id="weightKg"
-                  type="number"
-                  inputMode="decimal"
-                  min={25}
-                  max={500}
-                  step="0.1"
-                  value={draft.weightKg ?? ''}
-                  onChange={(event) =>
-                    draft.setAnswer({
-                      weightKg: event.target.value
-                        ? event.target.valueAsNumber
-                        : undefined,
-                    })
-                  }
-                />
-              </div>
-            </div>
+            </MetricField>
+            <MetricField
+              id="heightCm"
+              label={t('steps.metrics.height')}
+              unit={t('steps.metrics.heightUnit')}
+            >
+              <input
+                id="heightCm"
+                type="number"
+                inputMode="decimal"
+                min={80}
+                max={250}
+                placeholder="180"
+                value={draft.heightCm ?? ''}
+                className={`${metricInputClass} appearance-none`}
+                onChange={(event) =>
+                  draft.setAnswer({
+                    heightCm: event.target.value
+                      ? event.target.valueAsNumber
+                      : undefined,
+                  })
+                }
+              />
+            </MetricField>
+            <MetricField
+              id="weightKg"
+              label={t('steps.metrics.weight')}
+              unit={t('steps.metrics.weightUnit')}
+            >
+              <input
+                id="weightKg"
+                type="number"
+                inputMode="decimal"
+                min={25}
+                max={500}
+                step="0.1"
+                placeholder="80"
+                value={draft.weightKg ?? ''}
+                className={`${metricInputClass} appearance-none`}
+                onChange={(event) =>
+                  draft.setAnswer({
+                    weightKg: event.target.value
+                      ? event.target.valueAsNumber
+                      : undefined,
+                  })
+                }
+              />
+            </MetricField>
+            <p className="border border-accent/18 bg-accent/5 px-4 py-3.5 text-[11px] leading-relaxed text-white/55">
+              {t('steps.metrics.privacy')}
+            </p>
           </div>
         </StepShell>
       );
@@ -900,86 +913,6 @@ function focusAreasLabel(
   return areas.map((area) => focusAreaLabel(t, area)).join(', ');
 }
 
-function Result({
-  draft,
-  onContinue,
-  className,
-}: {
-  draft: OnboardingState;
-  onContinue: () => void;
-  className?: string;
-}) {
-  const t = useTranslations('onboarding');
-  const male = draft.programTrack === 'male';
-  const goalLabel = mainGoalLabel(t, draft.mainGoal, male);
-  const experienceLabel = experienceLabelFor(t, draft.experience, male);
-  const focusLabel = focusAreasLabel(t, draft.focusAreas) || '—';
-
-  const rows = [
-    [t('result.mainGoal'), goalLabel],
-    [t('result.experience'), experienceLabel],
-    [
-      t('result.frequency'),
-      draft.trainingFrequency
-        ? t('result.frequencyValue', { count: draft.trainingFrequency })
-        : '—',
-    ],
-    [t('result.focus'), focusLabel],
-  ];
-
-  return (
-    <SummaryScreen
-      eyebrow={t('result.eyebrow')}
-      title={t.rich('result.title', { accent })}
-      description={t('result.subtitle')}
-      onContinue={onContinue}
-      button={t('result.button')}
-      className={className}
-    >
-      <div className="relative mb-5 border border-accent/25 bg-accent/4 px-[18px] py-5">
-        <div className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
-        {rows.map(([label, value], index) => (
-          <div
-            key={label}
-            className={cn(
-              'flex items-start justify-between gap-3',
-              index < rows.length - 1 &&
-                'mb-3.5 border-b border-white/7 pb-3.5',
-            )}
-          >
-            <span className="shrink-0 text-[11px] text-white/45">{label}</span>
-            <span className="text-right text-xs font-semibold leading-5 text-white">
-              {value}
-            </span>
-          </div>
-        ))}
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/7 pt-4">
-          <span className="text-[11px] text-white/45">{t('result.shape')}</span>
-          <span className="flex items-center gap-2 text-[11px] font-semibold">
-            <span className="text-white/50">
-              {t('result.current', {
-                index: bodyVariantIndex(draft.currentBody),
-              })}
-            </span>
-            <span className="text-accent">→</span>
-            <span className="text-accent">
-              {t('result.desired', {
-                index: bodyVariantIndex(draft.desiredBody),
-              })}
-            </span>
-          </span>
-        </div>
-      </div>
-      <div className="mb-5 flex items-center gap-3.5 border border-accent/20 bg-accent/4 px-[18px] py-3.5">
-        <span className="text-accent">⚡</span>
-        <p className="text-xs leading-5 text-white/75">
-          {t('result.highlight')}
-        </p>
-      </div>
-    </SummaryScreen>
-  );
-}
-
 function Plan({
   draft,
   onContinue,
@@ -992,8 +925,18 @@ function Plan({
   const t = useTranslations('onboarding');
   const programId = previewProgramId(draft);
   const includes = t.raw(`plan.preview.${programId}.includes`) as string[];
+  const male = draft.programTrack === 'male';
   const focusLabel =
     focusAreasLabel(t, draft.focusAreas) || t('choices.focus.full_body');
+  const rows = [
+    [t('result.mainGoal'), mainGoalLabel(t, draft.mainGoal, male)],
+    [t('plan.level'), experienceLabelFor(t, draft.experience, male)],
+    [
+      t('plan.frequency'),
+      t('plan.frequencyValue', { count: draft.trainingFrequency ?? '3' }),
+    ],
+    [t('plan.focus'), focusLabel],
+  ];
 
   return (
     <SummaryScreen
@@ -1011,9 +954,6 @@ function Plan({
               <p className="font-label text-xl font-bold tracking-wide text-accent">
                 {t(`plan.preview.${programId}.name`)}
               </p>
-              <p className="mt-1.5 text-[10px] tracking-wide text-white/45">
-                {t(`plan.preview.${programId}.tagline`)}
-              </p>
             </div>
             <span className="shrink-0 bg-accent px-2.5 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
               {t('plan.forYou')}
@@ -1021,34 +961,23 @@ function Plan({
           </div>
         </div>
         <div className="flex flex-col gap-3.5 px-[18px] py-4">
-          <p className="text-xs leading-5 text-white/60">
-            {t(`plan.preview.${programId}.whoFor`)}
-          </p>
-          <div className="flex">
-            {[
-              [
-                t('plan.frequency'),
-                t('plan.frequencyValue', {
-                  count: draft.trainingFrequency ?? '3',
-                }),
-              ],
-              [t('plan.focus'), focusLabel],
-              [t('plan.duration'), t('plan.durationValue')],
-            ].map(([label, value], index) => (
+          <p className="text-xs leading-5 text-white/60">{t('plan.intro')}</p>
+          <div>
+            {rows.map(([label, value], index) => (
               <div
                 key={label}
                 className={cn(
-                  'min-w-0 flex-1 py-2.5',
-                  index > 0 && 'border-l border-white/7 pl-2.5',
-                  index < 2 && 'pr-2.5',
+                  'flex items-start justify-between gap-3',
+                  index < rows.length - 1 &&
+                    'mb-3.5 border-b border-white/7 pb-3.5',
                 )}
               >
-                <p className="mb-1 font-label text-[7px] font-semibold tracking-[0.12em] text-white/30 uppercase">
+                <span className="shrink-0 font-label text-[9px] font-semibold tracking-[0.12em] text-white/35 uppercase">
                   {label}
-                </p>
-                <p className="truncate text-[11px] font-semibold leading-4 text-white">
+                </span>
+                <span className="text-right text-xs font-semibold text-white">
                   {value}
-                </p>
+                </span>
               </div>
             ))}
           </div>
@@ -1071,23 +1000,8 @@ function Plan({
               ))}
             </ul>
           </div>
-          <div className="flex items-center justify-between border-t border-white/7 pt-3.5">
-            <span className="text-[11px] text-white/40">{t('plan.price')}</span>
-            <span>
-              <span className="font-heading text-2xl">
-                {t('plan.priceValue')}
-              </span>{' '}
-              <span className="text-[11px] text-white/45">
-                {t('plan.priceLabel')}
-              </span>
-            </span>
-          </div>
         </div>
       </article>
-      <div className="mb-5 flex items-center gap-2.5 border border-white/8 bg-white/2 px-4 py-3">
-        <span className="text-white/35">🔒</span>
-        <p className="text-[11px] leading-5 text-white/40">{t('plan.lock')}</p>
-      </div>
     </SummaryScreen>
   );
 }

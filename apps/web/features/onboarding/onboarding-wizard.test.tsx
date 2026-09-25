@@ -252,7 +252,9 @@ describe('OnboardingWizard', () => {
       </I18nTestProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: /Продовжити/i }));
+    await user.click(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    );
 
     expect(
       screen.getByText(/Формуємо рекомендацію відповідно до твоєї мети/i),
@@ -289,15 +291,32 @@ describe('OnboardingWizard', () => {
       </I18nTestProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: /Продовжити/i }));
-    await user.click(
-      await screen.findByRole(
-        'button',
-        { name: /Переглянути рекомендований план/i },
-        { timeout: 4000 },
-      ),
+    expect(screen.getByLabelText(/Дата народження/i)).not.toHaveClass(
+      'appearance-none',
     );
-    await user.click(screen.getByRole('button', { name: /Отримати доступ/i }));
+    expect(screen.getByLabelText(/Зріст/i)).toHaveClass('appearance-none');
+
+    await user.click(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    );
+    const access = await screen.findByRole(
+      'button',
+      { name: /Отримати доступ/i },
+      { timeout: 4000 },
+    );
+
+    expect(screen.getByText('Основна мета')).toBeInTheDocument();
+    expect(screen.getByText("Набрати м'язову масу")).toBeInTheDocument();
+    expect(screen.getByText('Рівень')).toBeInTheDocument();
+    expect(screen.getByText('Середній рівень')).toBeInTheDocument();
+    expect(screen.getByText('Частота')).toBeInTheDocument();
+    expect(screen.getByText('3×/тиждень')).toBeInTheDocument();
+    expect(screen.getByText('Акцент')).toBeInTheDocument();
+    expect(screen.getByText('Руки')).toBeInTheDocument();
+    expect(screen.queryByText('2 990')).not.toBeInTheDocument();
+    expect(screen.queryByText('Вартість')).not.toBeInTheDocument();
+
+    await user.click(access);
 
     expect(push).toHaveBeenCalledWith({ pathname: '/register' });
   }, 10000);
@@ -326,7 +345,9 @@ describe('OnboardingWizard', () => {
       </I18nTestProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: /Продовжити/i }));
+    await user.click(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    );
 
     expect(
       screen.getByText(/Формуємо рекомендацію відповідно до твоєї мети/i),

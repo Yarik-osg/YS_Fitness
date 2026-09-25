@@ -416,12 +416,15 @@
       },
       "metrics": {
         "eyebrow": "Personal data",
-        "title": "Tell us about <accent>your body</accent>",
-        "unitsNote": "We use metric units only.",
-        "ageNote": "Calculated age: {age}",
+        "title": "Tell us a bit <accent>about you</accent>",
+        "description": "These details let us match the training load and nutrition to you",
+        "privacy": "Your personal data is protected and used only to personalize the program",
+        "build": "Build my plan →",
         "dateOfBirth": "Date of birth",
-        "height": "Height, cm",
-        "weight": "Weight, kg"
+        "height": "Height",
+        "heightUnit": "cm",
+        "weight": "Weight",
+        "weightUnit": "kg"
       }
     },
     "analysis": {
@@ -464,6 +467,7 @@
       "button": "Get access →",
       "forYou": "For you",
       "frequency": "Frequency",
+      "intro": "Based on your answers, we matched a program to your goal, training level, and priorities.",
       "frequencyValue": "{count}×/week",
       "focus": "Focus",
       "duration": "Duration",

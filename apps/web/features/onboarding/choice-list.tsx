@@ -244,7 +244,7 @@ export function MultiChoiceList({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="flex flex-col gap-3">
       {choices.map((choice) => {
         const selected = value.includes(choice.value);
         return (
@@ -254,18 +254,34 @@ export function MultiChoiceList({
             aria-pressed={selected}
             onClick={() => toggle(choice.value)}
             className={cn(
-              'relative min-h-16 border px-4 py-3 text-left font-heading text-sm uppercase tracking-wide transition',
+              'relative flex w-full items-center gap-3.5 border px-4 py-3.5 text-left transition',
               selected
-                ? 'border-accent bg-accent/7 text-ink'
-                : 'border-white/12 bg-white/3 text-muted',
-              (choice.value === 'none' || choice.value === 'full_body') &&
-                'col-span-2',
+                ? 'border-accent bg-accent/7'
+                : 'border-white/12 bg-white/3',
             )}
           >
-            {choice.label}
-            {selected && (
-              <Check className="absolute right-3 top-3 text-accent" size={15} />
-            )}
+            {selected ? (
+              <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
+            ) : null}
+            <span
+              className={cn(
+                'grid size-[18px] shrink-0 place-items-center rounded-[3px] border',
+                selected
+                  ? 'border-accent bg-accent text-[#0b0b0b]'
+                  : 'border-white/20',
+              )}
+            >
+              {selected ? <Check size={10} strokeWidth={3} /> : null}
+            </span>
+            <span
+              className={cn(
+                'text-[13px] leading-snug',
+                selected ? 'font-semibold text-accent' : 'text-white/70',
+                choice.value === 'none' && selected && 'text-accent',
+              )}
+            >
+              {choice.label}
+            </span>
           </button>
         );
       })}
