@@ -144,7 +144,7 @@ describe('shared API contracts', () => {
 
     expect(issuePaths(chestOnFemale)).toContainEqual(['focusAreas', 0]);
     expect(issuePaths(snackingOnMale)).toContainEqual(['eatingHabits', 0]);
-    expect(issuePaths(mixedFocus)).toContainEqual(['focusAreas']);
+    expect(issuePaths(mixedFocus)).toEqual([['focusAreas'], ['focusAreas', 1]]);
   });
 
   it('accepts physiqueLevel 0-9 and rejects values outside that scale', () => {
