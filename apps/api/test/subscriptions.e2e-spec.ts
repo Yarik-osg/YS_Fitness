@@ -7,14 +7,47 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
+import { MockPaymentProvider } from '../src/subscriptions/providers/mock-payment-provider.js';
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+} from '../src/subscriptions/providers/payment-provider.interface.js';
 import { FEMALE_ONBOARDING } from './onboarding.fixture.js';
 
 const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
 
+class FailOnceProvider implements PaymentProvider {
+  failNext = false;
+  private readonly mock = new MockPaymentProvider();
+
+  createCheckout(input: Parameters<PaymentProvider['createCheckout']>[0]) {
+    if (this.failNext) {
+      this.failNext = false;
+      return Promise.reject(new Error('provider unavailable'));
+    }
+    return this.mock.createCheckout(input);
+  }
+}
+
 describeWithDatabase('subscriptions (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaClient;
+  const paymentProvider = new FailOnceProvider();
+
+  async function createUser(email: string, role: UserRole = UserRole.CLIENT) {
+    const user = await prisma.user.create({
+      data: { email, passwordHash: await hash('strong-password'), role },
+    });
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'strong-password', clientType: 'MOBILE' })
+      .expect(200);
+    return {
+      userId: user.id,
+      authorization: `Bearer ${login.body.tokens.accessToken}`,
+    };
+  }
 
   beforeAll(async () => {
     configureE2eEnvironment(testDatabaseUrl);
@@ -25,7 +58,10 @@ describeWithDatabase('subscriptions (e2e)', () => {
     ]);
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PAYMENT_PROVIDER)
+      .useValue(paymentProvider)
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
@@ -284,5 +320,93 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .expect((response) => {
         expect(response.body.code).toBe('SUBSCRIPTION_ALREADY_ACTIVE');
       });
+  });
+
+  it('leaves no row when the provider fails and lets a retry succeed', async () => {
+    const { userId, authorization } = await createUser(
+      'provider-failure@example.com',
+    );
+    const plan = await prisma.plan.findUniqueOrThrow({
+      where: { code: '1_MONTH' },
+    });
+
+    paymentProvider.failNext = true;
+    await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/checkout')
+      .set('Authorization', authorization)
+      .send({ planId: plan.id })
+      .expect(500);
+    expect(await prisma.subscription.count({ where: { userId } })).toBe(0);
+
+    const retry = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/checkout')
+      .set('Authorization', authorization)
+      .send({ planId: plan.id })
+      .expect(201);
+    expect(retry.body.subscription.status).toBe('ACTIVE');
+  });
+
+  it('expires a lapsed subscription on read and allows a new checkout', async () => {
+    const { userId, authorization } = await createUser('lapsed@example.com');
+    const plan = await prisma.plan.findUniqueOrThrow({
+      where: { code: '1_MONTH' },
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/checkout')
+      .set('Authorization', authorization)
+      .send({ planId: plan.id })
+      .expect(201);
+    await prisma.subscription.updateMany({
+      where: { userId },
+      data: { currentPeriodEnd: new Date(Date.now() - 60_000) },
+    });
+
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/subscriptions/me')
+      .set('Authorization', authorization)
+      .expect(200);
+    expect(mine.body).toEqual({ subscription: null });
+
+    const renewed = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/checkout')
+      .set('Authorization', authorization)
+      .send({ planId: plan.id })
+      .expect(201);
+    expect(renewed.body.subscription.status).toBe('ACTIVE');
+
+    const statuses = await prisma.subscription.findMany({
+      where: { userId },
+      select: { status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(statuses.map((row) => row.status)).toEqual(['EXPIRED', 'ACTIVE']);
+  });
+
+  it('rejects a grant whose expiresAt is in the past', async () => {
+    const { id: userId } = await prisma.user.create({
+      data: {
+        email: 'past-grant@example.com',
+        passwordHash: await hash('strong-password'),
+      },
+    });
+    const plan = await prisma.plan.findUniqueOrThrow({
+      where: { code: '3_MONTHS' },
+    });
+    const trainer = await createUser(
+      'trainer-past-grant@example.com',
+      UserRole.TRAINER,
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/grant')
+      .set('Authorization', trainer.authorization)
+      .send({
+        userId,
+        planId: plan.id,
+        expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
+      })
+      .expect(400);
+    expect(await prisma.subscription.count({ where: { userId } })).toBe(0);
   });
 });

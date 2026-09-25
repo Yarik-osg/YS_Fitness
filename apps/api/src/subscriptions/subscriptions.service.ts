@@ -36,14 +36,12 @@ export class SubscriptionsService {
   }
 
   async getMine(userId: string): Promise<SubscriptionResponse | null> {
-    const subscription =
-      await this.subscriptions.findNonTerminalByUserId(userId);
+    const subscription = await this.findCurrent(userId);
     return subscription ? toSubscriptionResponse(subscription) : null;
   }
 
   async hasActiveAccess(userId: string): Promise<boolean> {
-    const subscription =
-      await this.subscriptions.findNonTerminalByUserId(userId);
+    const subscription = await this.findCurrent(userId);
     return isActiveAccess(subscription);
   }
 
@@ -52,35 +50,43 @@ export class SubscriptionsService {
     input: CheckoutInput,
   ): Promise<CheckoutResponse> {
     const plan = await this.requireActivePlan(input.planId);
-    await this.assertNoNonTerminal(userId);
 
-    let subscription: SubscriptionWithPlan;
     try {
-      subscription = await this.subscriptions.createPending({
-        userId,
-        planId: plan.id,
+      return await this.subscriptions.transaction(async (transaction) => {
+        await this.assertNoNonTerminal(userId, transaction);
+
+        let subscription = await this.subscriptions.createPending(
+          { userId, planId: plan.id },
+          transaction,
+        );
+
+        const checkout = await this.paymentProvider.createCheckout({
+          subscriptionId: subscription.id,
+          planIntervalMonths: plan.intervalMonths,
+        });
+
+        if (checkout.immediateConfirmation) {
+          subscription = await this.subscriptions.activate(
+            {
+              id: subscription.id,
+              providerReference: checkout.providerReference,
+              currentPeriodEnd: addCalendarMonths(
+                new Date(),
+                plan.intervalMonths,
+              ),
+            },
+            transaction,
+          );
+        }
+
+        return {
+          subscription: toSubscriptionResponse(subscription),
+          checkoutUrl: checkout.checkoutUrl,
+        };
       });
     } catch (error) {
       rethrowSubscriptionConflict(error);
     }
-
-    const checkout = await this.paymentProvider.createCheckout({
-      subscriptionId: subscription.id,
-      planIntervalMonths: plan.intervalMonths,
-    });
-
-    if (checkout.immediateConfirmation) {
-      subscription = await this.subscriptions.activate({
-        id: subscription.id,
-        providerReference: checkout.providerReference,
-        currentPeriodEnd: addCalendarMonths(new Date(), plan.intervalMonths),
-      });
-    }
-
-    return {
-      subscription: toSubscriptionResponse(subscription),
-      checkoutUrl: checkout.checkoutUrl,
-    };
   }
 
   async grant(
@@ -96,20 +102,24 @@ export class SubscriptionsService {
       });
     }
 
-    await this.assertNoNonTerminal(input.userId);
-
     const currentPeriodEnd = input.expiresAt
       ? new Date(input.expiresAt)
       : addCalendarMonths(new Date(), plan.intervalMonths);
 
     try {
-      const subscription = await this.subscriptions.createManualGrant({
-        userId: input.userId,
-        planId: plan.id,
-        grantedByUserId,
-        currentPeriodEnd,
+      return await this.subscriptions.transaction(async (transaction) => {
+        await this.assertNoNonTerminal(input.userId, transaction);
+        const subscription = await this.subscriptions.createManualGrant(
+          {
+            userId: input.userId,
+            planId: plan.id,
+            grantedByUserId,
+            currentPeriodEnd,
+          },
+          transaction,
+        );
+        return toSubscriptionResponse(subscription);
       });
-      return toSubscriptionResponse(subscription);
     } catch (error) {
       rethrowSubscriptionConflict(error);
     }
@@ -152,8 +162,19 @@ export class SubscriptionsService {
     return plan;
   }
 
-  private async assertNoNonTerminal(userId: string): Promise<void> {
-    const existing = await this.subscriptions.findNonTerminalByUserId(userId);
+  private async findCurrent(
+    userId: string,
+    transaction?: Prisma.TransactionClient,
+  ): Promise<SubscriptionWithPlan | null> {
+    await this.subscriptions.expireLapsed(userId, new Date(), transaction);
+    return this.subscriptions.findNonTerminalByUserId(userId, transaction);
+  }
+
+  private async assertNoNonTerminal(
+    userId: string,
+    transaction: Prisma.TransactionClient,
+  ): Promise<void> {
+    const existing = await this.findCurrent(userId, transaction);
     if (existing) {
       throw alreadyActiveConflict();
     }
