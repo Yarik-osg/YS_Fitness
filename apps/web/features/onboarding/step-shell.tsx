@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 export function StepShell({
   step,
@@ -20,6 +20,9 @@ export function StepShell({
   onContinue,
   pending = false,
   error,
+  continueLabel,
+  continueClassName,
+  className,
 }: {
   step: number;
   total: number;
@@ -32,42 +35,62 @@ export function StepShell({
   onContinue: () => void;
   pending?: boolean;
   error?: string | null;
+  continueLabel?: string;
+  continueClassName?: string;
+  className?: string;
 }) {
   const t = useTranslations('onboarding');
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-[#0b0d0f]/95">
-      <nav className="border-b border-white/8 px-5 pb-4 pt-5">
-        <div className="mb-4 flex items-center justify-between gap-2">
+    <main
+      className={cn(
+        'mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-[#0b0b0b]',
+        className,
+      )}
+    >
+      <nav className="border-b border-white/8 px-4 pt-4 pb-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1.5 font-label text-[10px] font-semibold uppercase tracking-widest text-accent"
+            className="flex items-center gap-1.5 font-label text-[10px] font-medium uppercase tracking-[0.1em] text-accent"
           >
-            <ArrowLeft size={16} /> {t('back')}
+            <ArrowLeft size={20} /> {t('back')}
           </button>
           <BrandMark />
           <div className="flex min-w-15 flex-col items-end gap-1">
-            <span className="font-label text-[10px] text-muted">
+            <span className="font-label text-[10px] text-white/35">
               {step + 1}/{total}
             </span>
             <LocaleSwitcher />
           </div>
         </div>
-        <Progress value={((step + 1) / total) * 100} />
+        <div className="flex gap-1" aria-hidden>
+          {Array.from({ length: total }, (_, index) => (
+            <span
+              key={index}
+              className={cn(
+                'h-[3px] flex-1 rounded-sm',
+                index <= step ? 'bg-accent' : 'bg-white/18',
+              )}
+            />
+          ))}
+        </div>
       </nav>
 
-      <section className="flex flex-1 flex-col px-5 pb-8 pt-8">
-        <header className="mb-7">
-          <p className="mb-2 font-label text-[9px] font-semibold uppercase tracking-[0.2em] text-accent">
+      <section className="flex flex-1 flex-col px-5 pb-8 pt-7">
+        <header className="mb-6">
+          <p className="mb-2.5 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
             {eyebrow}
           </p>
-          <h1 className="font-heading text-[1.8rem] font-normal uppercase leading-[1.12] tracking-tight text-ink">
+          <h1 className="font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em] text-white">
             {title}
           </h1>
-          <div className="my-3 h-px w-15 bg-accent" />
+          <div className="my-2.5 h-px w-15 bg-accent" />
           {description && (
-            <p className="text-[11px] leading-5 text-muted">{description}</p>
+            <p className="max-w-[19rem] text-[12px] leading-[1.6] text-[#d9d9d9]">
+              {description}
+            </p>
           )}
         </header>
 
@@ -83,11 +106,11 @@ export function StepShell({
         )}
 
         <Button
-          className="mt-7 w-full"
+          className={cn('mt-7 w-full', continueClassName)}
           disabled={!canContinue || pending}
           onClick={onContinue}
         >
-          {pending ? t('saving') : t('continue')}
+          {pending ? t('saving') : (continueLabel ?? t('continue'))}
         </Button>
       </section>
     </main>

@@ -27,7 +27,7 @@ export class SubscriptionsRepository {
   listActivePlans(): Promise<Plan[]> {
     return this.prisma.plan.findMany({
       where: { isActive: true },
-      orderBy: { intervalMonths: 'desc' },
+      orderBy: [{ intervalMonths: 'desc' }, { priceAmount: 'asc' }],
     });
   }
 

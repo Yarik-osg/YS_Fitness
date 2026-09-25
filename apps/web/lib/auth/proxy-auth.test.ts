@@ -73,12 +73,46 @@ describe('applyAuthRedirect', () => {
     ).toBe('/en/login?next=%2Fen%2Fcheckout');
   });
 
-  it('keeps incomplete onboarding away from checkout', () => {
+  it('lets guests open onboarding without an account', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/onboarding',
+        locale: 'uk',
+        fullPathname: '/uk/onboarding',
+        hint: null,
+      }),
+    ).toBeNull();
+  });
+
+  it('lets a guest reach register after the quiz even with a leftover onboarding hint', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/register',
+        locale: 'en',
+        fullPathname: '/en/register',
+        hint: 'onboarding',
+        planId: 'plan-3',
+      }),
+    ).toBeNull();
+  });
+
+  it('lets a new account open checkout before the onboarding hint flips', () => {
     expect(
       applyAuthRedirect({
         pathnameWithoutLocale: '/checkout',
         locale: 'uk',
         fullPathname: '/uk/checkout',
+        hint: 'onboarding',
+      }),
+    ).toBeNull();
+  });
+
+  it('keeps an incomplete session away from the dashboard', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/dashboard',
+        locale: 'uk',
+        fullPathname: '/uk/dashboard',
         hint: 'onboarding',
       }),
     ).toBe('/uk/onboarding');

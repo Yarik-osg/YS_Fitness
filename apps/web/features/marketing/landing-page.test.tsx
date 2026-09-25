@@ -27,6 +27,15 @@ const PLANS = [
     intervalMonths: 1,
     isActive: true,
   },
+  {
+    id: 'plan-full',
+    code: 'FULL_ACCESS',
+    name: 'FULL ACCESS',
+    priceAmount: 349_000,
+    currency: 'UAH',
+    intervalMonths: 3,
+    isActive: true,
+  },
 ];
 
 vi.mock('@/i18n/navigation', () => ({
@@ -85,7 +94,7 @@ describe('LandingPage', () => {
     );
 
     const heroCta = screen.getAllByRole('link', { name: /Почати зміни/i })[0];
-    expect(heroCta).toHaveAttribute('href', '/register');
+    expect(heroCta).toHaveAttribute('href', '/onboarding');
     expect(screen.getByRole('link', { name: /Увійти/i })).toHaveAttribute(
       'href',
       '/login',
@@ -95,12 +104,12 @@ describe('LandingPage', () => {
     ).toBeInTheDocument();
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: /Обрати 3 місяці/i }),
+        screen.getByRole('button', { name: /Обрати PROGRESS/i }),
       ).toBeEnabled();
     });
   });
 
-  it('enables plan buttons from catalog prices and sends guests to register', async () => {
+  it('enables plan buttons from catalog prices and sends guests to onboarding', async () => {
     const user = userEvent.setup();
     render(
       <I18nTestProvider>
@@ -110,24 +119,71 @@ describe('LandingPage', () => {
       </I18nTestProvider>,
     );
 
-    const threeMonths = await screen.findByRole('button', {
-      name: /Обрати 3 місяці/i,
+    const progress = await screen.findByRole('button', {
+      name: /Обрати PROGRESS/i,
     });
-    const oneMonth = await screen.findByRole('button', {
-      name: /Обрати 1 місяць/i,
+    const basic = await screen.findByRole('button', {
+      name: /Обрати BASIC/i,
+    });
+    const fullAccess = await screen.findByRole('button', {
+      name: /Обрати FULL ACCESS/i,
     });
 
-    expect(threeMonths).toBeEnabled();
-    expect(oneMonth).toBeEnabled();
+    expect(progress).toBeEnabled();
+    expect(basic).toBeEnabled();
+    expect(fullAccess).toBeEnabled();
     expect(screen.getByText('2490')).toBeInTheDocument();
     expect(screen.getByText('990')).toBeInTheDocument();
+    expect(screen.getByText('3490')).toBeInTheDocument();
+    expect(screen.getByText('Найпопулярніший')).toBeInTheDocument();
+    expect(screen.getAllByText('Найпопулярніший')).toHaveLength(1);
+    expect(screen.queryByText('Все з PROGRESS')).not.toBeInTheDocument();
 
-    await user.click(threeMonths);
+    const includesToggles = screen.getAllByRole('button', {
+      name: /Що входить/i,
+    });
+    const progressIncludes = includesToggles[1];
+    const fullIncludes = includesToggles[2];
+    if (!progressIncludes || !fullIncludes) {
+      throw new Error('expected three includes toggles');
+    }
+    await user.click(progressIncludes);
+    expect(screen.getByText('Все з BASIC')).toBeInTheDocument();
+    expect(screen.queryByText('Все з PROGRESS')).not.toBeInTheDocument();
+    await user.click(fullIncludes);
+    expect(screen.getByText('Все з PROGRESS')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Згорнути/i }),
+    ).toBeInTheDocument();
+
+    await user.click(progress);
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith('/register?planId=plan-3');
+      expect(push).toHaveBeenCalledWith('/onboarding');
     });
     expect(window.sessionStorage.getItem('ys_selected_plan_id')).toBe('plan-3');
+  });
+
+  it('sends FULL ACCESS guests to onboarding and keeps that plan id', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <LandingPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: /Обрати FULL ACCESS/i }),
+    );
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith('/onboarding');
+    });
+    expect(window.sessionStorage.getItem('ys_selected_plan_id')).toBe(
+      'plan-full',
+    );
   });
 
   it('sends a completed session to the dashboard instead of login', () => {

@@ -12,7 +12,7 @@ describe('biologicalSexFromProgramTrack', () => {
 });
 
 describe('ONBOARDING_WIZARD_STEPS', () => {
-  it('includes the additive physique step', () => {
-    expect(ONBOARDING_WIZARD_STEPS).toBe(14);
+  it('matches the design-reference questionnaire length', () => {
+    expect(ONBOARDING_WIZARD_STEPS).toBe(12);
   });
 });

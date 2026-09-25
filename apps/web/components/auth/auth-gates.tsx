@@ -9,11 +9,16 @@ import {
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { refresh } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/users';
-import { getPostAuthPath } from '@/lib/auth/routing';
+import { persistGuestOnboardingIfReady } from '@/lib/hooks/use-auth';
+import {
+  getPostAuthPath,
+  getPostRegisterPath,
+  resolveIncompleteGuestDestination,
+} from '@/lib/auth/routing';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 
-async function restoreSession() {
+async function restoreSession(options: { claimGuest?: boolean } = {}) {
   const response = await refresh();
   const user = await getMe();
   useAuthStore
@@ -25,7 +30,7 @@ async function restoreSession() {
   if (user.profile?.onboardingCompletedAt) {
     resetOnboardingDraft();
   } else {
-    bindOnboardingDraftToUser(user.id);
+    bindOnboardingDraftToUser(user.id, { claimGuest: options.claimGuest });
   }
   return user;
 }
@@ -57,17 +62,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
     async function validate() {
       useAuthStore.getState().setChecking();
       try {
-        const restoredUser = await restoreSession();
+        const restoredUser = await restoreSession({ claimGuest: true });
         if (!active) return;
-        const destination = getPostAuthPath(restoredUser);
-        const onOnboarding = pathname.startsWith('/onboarding');
-        const onDashboard = pathname.startsWith('/dashboard');
-        const onCheckout = pathname.startsWith('/checkout');
-
         if (
-          (onOnboarding && !destination.startsWith('/onboarding')) ||
-          (onDashboard && destination.startsWith('/onboarding')) ||
-          (onCheckout && destination.startsWith('/onboarding'))
+          pathname.startsWith('/checkout') &&
+          !restoredUser.profile?.onboardingCompletedAt
+        ) {
+          try {
+            await persistGuestOnboardingIfReady();
+          } catch {
+            // Stay on checkout so registration is not sent back through the quiz.
+          }
+          if (active) setReady(true);
+          return;
+        }
+        const destination = getPostAuthPath(restoredUser);
+        if (
+          pathname.startsWith('/dashboard') &&
+          destination.startsWith('/onboarding')
         ) {
           router.replace(destination);
           return;
@@ -76,7 +88,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       } catch {
         if (!active) return;
         useAuthStore.getState().clearSession();
-        resetOnboardingDraft();
+        if (!pathname.startsWith('/checkout')) {
+          resetOnboardingDraft();
+        }
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       }
     }
@@ -92,13 +106,42 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 export function GuestGate({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
-    restoreSession()
-      .then((user) => {
-        if (active) router.replace(getPostAuthPath(user));
+    restoreSession({ claimGuest: true })
+      .then(async (user) => {
+        if (!active) return;
+        if (user.profile?.onboardingCompletedAt) {
+          router.replace(
+            pathname.startsWith('/register')
+              ? getPostRegisterPath()
+              : getPostAuthPath(user),
+          );
+          return;
+        }
+        let saved = false;
+        try {
+          saved = Boolean(await persistGuestOnboardingIfReady());
+        } catch {
+          // Leave the register form in place when the quiz cannot be saved.
+        }
+        if (pathname.startsWith('/register') && saved) {
+          router.replace(getPostRegisterPath());
+          return;
+        }
+        if (pathname.startsWith('/register')) {
+          if (active) setReady(true);
+          return;
+        }
+        const destination = resolveIncompleteGuestDestination(pathname);
+        if (destination) {
+          router.replace(destination);
+          return;
+        }
+        if (active) setReady(true);
       })
       .catch(() => {
         if (active) setReady(true);
@@ -107,7 +150,7 @@ export function GuestGate({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [pathname, router]);
 
   return ready ? children : <LoadingScreen />;
 }

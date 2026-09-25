@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOnboardingPayload } from './payload';
+import { buildOnboardingPayload, tryBuildOnboardingPayload } from './payload';
 
 const femaleDraft = {
   programTrack: 'female' as const,
@@ -87,5 +87,31 @@ describe('buildOnboardingPayload', () => {
     );
 
     expect(payload.biologicalSexForCalculation).toBe('FEMALE');
+  });
+
+  it('derives profile fields that the mock questionnaire no longer asks', () => {
+    const payload = buildOnboardingPayload(
+      {
+        ...femaleDraft,
+        physiqueLevel: undefined,
+        activityLevel: undefined,
+        goal: undefined,
+      },
+      'Europe/Kyiv',
+    );
+
+    expect(payload.physiqueLevel).toBe('0');
+    expect(payload.activityLevel).toBe('MODERATELY_ACTIVE');
+    expect(payload.goal).toBe('GAIN_WEIGHT');
+  });
+
+  it('returns null for an incomplete guest draft', () => {
+    expect(
+      tryBuildOnboardingPayload({
+        focusAreas: [],
+        eatingHabits: [],
+        programTrack: 'female',
+      }),
+    ).toBeNull();
   });
 });

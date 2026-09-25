@@ -7,8 +7,20 @@ import { Link } from '@/i18n/navigation';
 
 export function BrandMark() {
   return (
-    <span className="font-serif text-3xl italic leading-none text-accent">
-      YS
+    <span className="relative inline-block size-9 shrink-0 select-none font-serif leading-none text-[#00c7c8]">
+      <span className="sr-only">YS</span>
+      <span
+        aria-hidden
+        className="absolute top-[-4px] left-0 text-[32px] not-italic"
+      >
+        Y
+      </span>
+      <span
+        aria-hidden
+        className="absolute top-1.5 left-2 text-[32px] not-italic"
+      >
+        S
+      </span>
     </span>
   );
 }

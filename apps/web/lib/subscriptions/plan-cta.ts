@@ -12,7 +12,7 @@ export function resolvePlanCtaPath({
   const encoded = encodeURIComponent(planId);
 
   if (!authenticated) {
-    return `/register?planId=${encoded}`;
+    return '/onboarding';
   }
 
   if (!onboarded) {
@@ -24,4 +24,25 @@ export function resolvePlanCtaPath({
   }
 
   return `/checkout?planId=${encoded}`;
+}
+
+export function resolvePostQuizAccessHref({
+  authenticated,
+  planId,
+}: {
+  authenticated: boolean;
+  planId: string | null;
+}): {
+  pathname: '/register' | '/checkout' | '/dashboard';
+  query?: { planId: string };
+} {
+  if (!authenticated) {
+    return planId
+      ? { pathname: '/register', query: { planId } }
+      : { pathname: '/register' };
+  }
+
+  return planId
+    ? { pathname: '/checkout', query: { planId } }
+    : { pathname: '/dashboard' };
 }

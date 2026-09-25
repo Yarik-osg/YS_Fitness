@@ -136,11 +136,15 @@ export function resetOnboardingDraft() {
 
 export function bindOnboardingDraftToUser(
   userId: string,
-  options: { replace?: boolean } = {},
+  options: { replace?: boolean; claimGuest?: boolean } = {},
 ) {
   const apply = () => {
     const state = useOnboardingStore.getState();
-    if (options.replace || state.ownerUserId !== userId) {
+    const ownedByOther = Boolean(
+      state.ownerUserId && state.ownerUserId !== userId,
+    );
+    const unowned = !state.ownerUserId;
+    if (options.replace || ownedByOther || (unowned && !options.claimGuest)) {
       resetOnboardingDraft();
     }
     useOnboardingStore.setState({ ownerUserId: userId });

@@ -133,11 +133,12 @@ export function BodyPhysiqueSlider({
             data-physique-src={physiqueAsset(track, layer.index)}
             aria-hidden
             className={cn(
-              'absolute inset-0 bg-accent',
+              'absolute inset-0',
               animateCrossfade && 'transition-opacity duration-150',
             )}
             style={{
               opacity: layer.opacity,
+              backgroundColor: 'var(--accent)',
               maskImage: `url("${physiqueAsset(track, layer.index)}")`,
               WebkitMaskImage: `url("${physiqueAsset(track, layer.index)}")`,
               maskRepeat: 'no-repeat',
@@ -175,7 +176,7 @@ export function BodyPhysiqueSlider({
           />
         </div>
         <div
-          className="absolute top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-accent shadow-[0_0_0_4px_rgb(9_11_13_/_70%)]"
+          className="absolute top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-accent shadow-[0_0_0_4px_rgb(11_11_11_/_70%)]"
           style={{ left: `${fillPercent}%` }}
         />
       </div>
