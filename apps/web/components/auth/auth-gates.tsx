@@ -20,20 +20,12 @@ import {
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 
-async function currentSessionUser(): Promise<OnboardingStatusUser> {
-  const { accessToken, user } = useAuthStore.getState();
-  if (user && isAccessTokenFresh(accessToken)) {
-    return { profile: { onboardingCompletedAt: user.onboardingCompletedAt } };
-  }
-  return restoreSession({ claimGuest: true });
-}
-
-async function restoreSession(options: { claimGuest?: boolean } = {}) {
-  const response = await refresh();
-  const user = await getMe();
-  useAuthStore
-    .getState()
-    .setSession(response.tokens.accessToken, normalizeSessionUser(user));
+function applyMe(
+  accessToken: string,
+  user: Awaited<ReturnType<typeof getMe>>,
+  options: { claimGuest?: boolean } = {},
+) {
+  useAuthStore.getState().setSession(accessToken, normalizeSessionUser(user));
   writeSessionHint(
     user.profile?.onboardingCompletedAt ? 'complete' : 'onboarding',
   );
@@ -43,6 +35,19 @@ async function restoreSession(options: { claimGuest?: boolean } = {}) {
     bindOnboardingDraftToUser(user.id, { claimGuest: options.claimGuest });
   }
   return user;
+}
+
+async function currentSessionUser(): Promise<OnboardingStatusUser> {
+  const { accessToken, user } = useAuthStore.getState();
+  if (user && accessToken && isAccessTokenFresh(accessToken)) {
+    return applyMe(accessToken, await getMe(), { claimGuest: true });
+  }
+  return restoreSession({ claimGuest: true });
+}
+
+async function restoreSession(options: { claimGuest?: boolean } = {}) {
+  const response = await refresh();
+  return applyMe(response.tokens.accessToken, await getMe(), options);
 }
 
 function LoadingScreen() {
@@ -64,7 +69,7 @@ function LoadingScreen() {
 export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
+  const [readyPath, setReadyPath] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -92,7 +97,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         const saved = await persistGuestOnboardingIfReady().catch(() => null);
         if (!active) return;
         if (saved?.kind === 'saved') {
-          setReady(true);
+          setReadyPath(pathname);
         } else {
           router.replace('/onboarding');
         }
@@ -107,7 +112,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         router.replace(destination);
         return;
       }
-      setReady(true);
+      setReadyPath(pathname);
     }
 
     void validate();
@@ -116,13 +121,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     };
   }, [pathname, router]);
 
-  return ready ? children : <LoadingScreen />;
+  return readyPath === pathname ? children : <LoadingScreen />;
 }
 
 export function GuestGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
+  const [readyPath, setReadyPath] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -150,10 +155,10 @@ export function GuestGate({ children }: { children: ReactNode }) {
           router.replace(destination);
           return;
         }
-        if (active) setReady(true);
+        if (active) setReadyPath(pathname);
       })
       .catch(() => {
-        if (active) setReady(true);
+        if (active) setReadyPath(pathname);
       });
 
     return () => {
@@ -161,5 +166,5 @@ export function GuestGate({ children }: { children: ReactNode }) {
     };
   }, [pathname, router]);
 
-  return ready ? children : <LoadingScreen />;
+  return readyPath === pathname ? children : <LoadingScreen />;
 }

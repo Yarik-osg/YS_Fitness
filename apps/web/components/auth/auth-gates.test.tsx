@@ -2,7 +2,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { readSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
-import { AuthGate } from './auth-gates';
+import { useOnboardingStore } from '@/features/onboarding/onboarding-store';
+import { AuthGate, GuestGate } from './auth-gates';
 
 const navigation = vi.hoisted(() => ({
   pathname: '/dashboard',
@@ -70,6 +71,9 @@ describe('AuthGate', () => {
 
   it('does not refresh on navigation while the access token is fresh', async () => {
     useAuthStore.getState().setSession(tokenExpiringIn(600), completedUser);
+    api.getMe.mockResolvedValue(
+      meResponse(completedUser.onboardingCompletedAt),
+    );
 
     const view = renderGate();
     expect(await screen.findByText('protected content')).toBeInTheDocument();
@@ -83,7 +87,45 @@ describe('AuthGate', () => {
     expect(await screen.findByText('protected content')).toBeInTheDocument();
 
     expect(api.refresh).not.toHaveBeenCalled();
-    expect(api.getMe).not.toHaveBeenCalled();
+    expect(api.getMe).toHaveBeenCalled();
+  });
+
+  it('hides checkout while the path change is rechecked', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), completedUser);
+    api.getMe.mockResolvedValue(
+      meResponse(completedUser.onboardingCompletedAt),
+    );
+
+    const view = renderGate();
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+
+    navigation.pathname = '/checkout';
+    view.rerender(
+      <AuthGate>
+        <p>protected content</p>
+      </AuthGate>,
+    );
+
+    expect(screen.queryByText('protected content')).not.toBeInTheDocument();
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+  });
+
+  it('uses /users/me onboarding status when the store is stale', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue(
+      meResponse(completedUser.onboardingCompletedAt),
+    );
+
+    renderGate();
+
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().user?.onboardingCompletedAt).toBe(
+      completedUser.onboardingCompletedAt,
+    );
   });
 
   it('refreshes once when the token is about to expire', async () => {
@@ -124,6 +166,7 @@ describe('AuthGate', () => {
       ...completedUser,
       onboardingCompletedAt: null,
     });
+    api.getMe.mockResolvedValue(meResponse(null));
     api.persistGuestOnboardingIfReady.mockResolvedValue({
       kind: 'failed',
       step: 11,
@@ -144,6 +187,7 @@ describe('AuthGate', () => {
       ...completedUser,
       onboardingCompletedAt: null,
     });
+    api.getMe.mockResolvedValue(meResponse(null));
     api.persistGuestOnboardingIfReady.mockResolvedValue({
       kind: 'saved',
       user: meResponse(completedUser.onboardingCompletedAt),
@@ -152,6 +196,68 @@ describe('AuthGate', () => {
     renderGate();
 
     expect(await screen.findByText('protected content')).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+});
+
+function renderGuestGate() {
+  return render(
+    <GuestGate>
+      <p>guest content</p>
+    </GuestGate>,
+  );
+}
+
+describe('GuestGate', () => {
+  beforeEach(() => {
+    cleanup();
+    navigation.pathname = '/register';
+    navigation.replace.mockReset();
+    api.refresh.mockReset();
+    api.getMe.mockReset();
+    api.persistGuestOnboardingIfReady.mockReset();
+    useAuthStore.getState().clearSession();
+    useOnboardingStore.getState().reset();
+    document.cookie = 'ys_web_session=; Path=/; Max-Age=0';
+  });
+
+  it('sends a logged-in incomplete user from register to onboarding when persist fails', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue(meResponse(null));
+    api.persistGuestOnboardingIfReady.mockImplementation(async () => {
+      useOnboardingStore.setState({
+        step: 11,
+        submitError: { code: 'INVALID_DATE_OF_BIRTH' },
+      });
+      return {
+        kind: 'failed',
+        step: 11,
+        error: new Error('INVALID_DATE_OF_BIRTH'),
+      };
+    });
+
+    renderGuestGate();
+
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/onboarding'),
+    );
+    expect(screen.queryByText('guest content')).not.toBeInTheDocument();
+    expect(useOnboardingStore.getState()).toMatchObject({
+      step: 11,
+      submitError: { code: 'INVALID_DATE_OF_BIRTH' },
+    });
+    expect(api.refresh).not.toHaveBeenCalled();
+  });
+
+  it('lets a visitor without a session see the register form', async () => {
+    api.refresh.mockRejectedValue(new Error('no session'));
+
+    renderGuestGate();
+
+    expect(await screen.findByText('guest content')).toBeInTheDocument();
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 });

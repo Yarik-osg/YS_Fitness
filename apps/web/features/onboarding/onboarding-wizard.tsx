@@ -700,26 +700,28 @@ export function OnboardingWizard() {
           continueLabel={t('steps.metrics.build')}
         >
           <div className="space-y-4">
-            <MetricField
-              id="dateOfBirth"
-              label={t('steps.metrics.dateOfBirth')}
-            >
-              <input
+            <div>
+              <MetricField
                 id="dateOfBirth"
-                type="date"
-                max={new Date().toISOString().slice(0, 10)}
-                value={draft.dateOfBirth ?? ''}
-                className={`${metricInputClass} [color-scheme:dark]`}
-                onChange={(event) =>
-                  draft.setAnswer({ dateOfBirth: event.target.value })
-                }
-              />
+                label={t('steps.metrics.dateOfBirth')}
+              >
+                <input
+                  id="dateOfBirth"
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={draft.dateOfBirth ?? ''}
+                  className={`${metricInputClass} [color-scheme:dark]`}
+                  onChange={(event) =>
+                    draft.setAnswer({ dateOfBirth: event.target.value })
+                  }
+                />
+              </MetricField>
               {dateImplausible ? (
                 <p role="alert" className="mt-2 text-xs text-red-300">
                   {t('errors.dateOfBirth')}
                 </p>
               ) : null}
-            </MetricField>
+            </div>
             <MetricField
               id="heightCm"
               label={t('steps.metrics.height')}
