@@ -1,15 +1,18 @@
 'use client';
 
-import type { AuthResponse } from '@repo/shared-types';
+import type { AuthResponse, MeResponse } from '@repo/shared-types';
 import type { LoginInput, RegisterInput } from '@repo/validation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   bindOnboardingDraftToUser,
+  reportOnboardingSubmitError,
   resetOnboardingDraft,
   useOnboardingStore,
 } from '@/features/onboarding/onboarding-store';
-import { tryBuildOnboardingPayload } from '@/features/onboarding/payload';
+import { validateOnboardingDraft } from '@/features/onboarding/payload';
+import { ONBOARDING_WIZARD_STEPS } from '@/features/onboarding/program-track';
 import * as authApi from '@/lib/api/auth';
+import { ApiClientError } from '@/lib/api/client';
 import { getMe, saveOnboarding } from '@/lib/api/users';
 import { getPostAuthPath, getPostRegisterPath } from '@/lib/auth/routing';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
@@ -43,15 +46,35 @@ function syncOnboardingDraft(
   bindOnboardingDraftToUser(user.id, options);
 }
 
-export async function persistGuestOnboardingIfReady() {
-  const draft = useOnboardingStore.getState();
-  if (draft.programTrack) {
-    persistProgramTrack(draft.programTrack);
-  }
-  const payload = tryBuildOnboardingPayload(draft);
-  if (!payload) return null;
+export type GuestOnboardingResult =
+  | { kind: 'saved'; user: MeResponse }
+  | { kind: 'empty' }
+  | { kind: 'invalid'; step: number }
+  | { kind: 'failed'; step: number; error: unknown };
 
-  const response = await saveOnboarding(payload);
+const PROFILE_STEP = ONBOARDING_WIZARD_STEPS - 1;
+
+export async function persistGuestOnboardingIfReady(): Promise<GuestOnboardingResult> {
+  const draft = useOnboardingStore.getState();
+  if (!draft.programTrack) return { kind: 'empty' };
+  persistProgramTrack(draft.programTrack);
+
+  const validation = validateOnboardingDraft(draft);
+  if (!validation.ok) {
+    reportOnboardingSubmitError(validation.step, {
+      code: 'ONBOARDING_INCOMPLETE',
+    });
+    return { kind: 'invalid', step: validation.step };
+  }
+
+  let response: Awaited<ReturnType<typeof saveOnboarding>>;
+  try {
+    response = await saveOnboarding(validation.payload);
+  } catch (error) {
+    reportOnboardingSubmitError(PROFILE_STEP, submitErrorFrom(error));
+    return { kind: 'failed', step: PROFILE_STEP, error };
+  }
+
   const currentUser = useAuthStore.getState().user;
   if (currentUser) {
     useAuthStore.setState({
@@ -70,7 +93,13 @@ export async function persistGuestOnboardingIfReady() {
       useAuthStore.getState().accessToken ?? '',
       normalizeSessionUser(user),
     );
-  return user;
+  return { kind: 'saved', user };
+}
+
+function submitErrorFrom(error: unknown) {
+  return error instanceof ApiClientError
+    ? { code: error.code, status: error.status, message: error.message }
+    : { code: 'ONBOARDING_SAVE_FAILED' };
 }
 
 export function useLogin() {
@@ -87,17 +116,14 @@ export function useRegister() {
         await authApi.register(input),
         { claimGuest: true },
       );
-      if (!result.user.profile?.onboardingCompletedAt) {
-        try {
-          const user = await persistGuestOnboardingIfReady();
-          if (user) {
-            return { user, destination: getPostRegisterPath() };
-          }
-        } catch {
-          // The quiz stays local; checkout can save it after the account exists.
-        }
+      if (result.user.profile?.onboardingCompletedAt) {
+        return { user: result.user, destination: getPostRegisterPath() };
       }
-      return { user: result.user, destination: getPostRegisterPath() };
+      const saved = await persistGuestOnboardingIfReady();
+      if (saved.kind === 'saved') {
+        return { user: saved.user, destination: getPostRegisterPath() };
+      }
+      return { user: result.user, destination: '/onboarding' };
     },
   });
 }

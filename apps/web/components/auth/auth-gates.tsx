@@ -10,13 +10,23 @@ import { usePathname, useRouter } from '@/i18n/navigation';
 import { refresh } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/users';
 import { persistGuestOnboardingIfReady } from '@/lib/hooks/use-auth';
+import { isAccessTokenFresh } from '@/lib/auth/access-token';
 import {
   getPostAuthPath,
   getPostRegisterPath,
   resolveIncompleteGuestDestination,
+  type OnboardingStatusUser,
 } from '@/lib/auth/routing';
-import { writeSessionHint } from '@/lib/auth/session-cookie';
+import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
+
+async function currentSessionUser(): Promise<OnboardingStatusUser> {
+  const { accessToken, user } = useAuthStore.getState();
+  if (user && isAccessTokenFresh(accessToken)) {
+    return { profile: { onboardingCompletedAt: user.onboardingCompletedAt } };
+  }
+  return restoreSession({ claimGuest: true });
+}
 
 async function restoreSession(options: { claimGuest?: boolean } = {}) {
   const response = await refresh();
@@ -60,39 +70,44 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let active = true;
 
     async function validate() {
-      useAuthStore.getState().setChecking();
+      let sessionUser: OnboardingStatusUser;
       try {
-        const restoredUser = await restoreSession({ claimGuest: true });
-        if (!active) return;
-        if (
-          pathname.startsWith('/checkout') &&
-          !restoredUser.profile?.onboardingCompletedAt
-        ) {
-          try {
-            await persistGuestOnboardingIfReady();
-          } catch {
-            // Stay on checkout so registration is not sent back through the quiz.
-          }
-          if (active) setReady(true);
-          return;
-        }
-        const destination = getPostAuthPath(restoredUser);
-        if (
-          pathname.startsWith('/dashboard') &&
-          destination.startsWith('/onboarding')
-        ) {
-          router.replace(destination);
-          return;
-        }
-        setReady(true);
+        sessionUser = await currentSessionUser();
       } catch {
         if (!active) return;
         useAuthStore.getState().clearSession();
+        clearSessionHint();
         if (!pathname.startsWith('/checkout')) {
           resetOnboardingDraft();
         }
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        return;
       }
+      if (!active) return;
+
+      if (
+        pathname.startsWith('/checkout') &&
+        !sessionUser.profile?.onboardingCompletedAt
+      ) {
+        const saved = await persistGuestOnboardingIfReady().catch(() => null);
+        if (!active) return;
+        if (saved?.kind === 'saved') {
+          setReady(true);
+        } else {
+          router.replace('/onboarding');
+        }
+        return;
+      }
+
+      const destination = getPostAuthPath(sessionUser);
+      if (
+        pathname.startsWith('/dashboard') &&
+        destination.startsWith('/onboarding')
+      ) {
+        router.replace(destination);
+        return;
+      }
+      setReady(true);
     }
 
     void validate();
@@ -111,7 +126,7 @@ export function GuestGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    restoreSession({ claimGuest: true })
+    currentSessionUser()
       .then(async (user) => {
         if (!active) return;
         if (user.profile?.onboardingCompletedAt) {
@@ -122,18 +137,12 @@ export function GuestGate({ children }: { children: ReactNode }) {
           );
           return;
         }
-        let saved = false;
-        try {
-          saved = Boolean(await persistGuestOnboardingIfReady());
-        } catch {
-          // Leave the register form in place when the quiz cannot be saved.
-        }
-        if (pathname.startsWith('/register') && saved) {
-          router.replace(getPostRegisterPath());
-          return;
-        }
+        const saved = await persistGuestOnboardingIfReady().catch(() => null);
+        if (!active) return;
         if (pathname.startsWith('/register')) {
-          if (active) setReady(true);
+          router.replace(
+            saved?.kind === 'saved' ? getPostRegisterPath() : '/onboarding',
+          );
           return;
         }
         const destination = resolveIncompleteGuestDestination(pathname);

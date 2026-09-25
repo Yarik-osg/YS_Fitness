@@ -5,6 +5,7 @@ import type {
   BiologicalSexForCalculation,
   WeightGoal,
 } from '@repo/shared-types';
+import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
@@ -38,10 +39,17 @@ export interface OnboardingDraft {
   biologicalSexForCalculation?: BiologicalSexForCalculation;
 }
 
+export interface OnboardingSubmitError {
+  code: string;
+  status?: number;
+  message?: string;
+}
+
 export interface OnboardingState extends OnboardingDraft {
   step: number;
   ownerUserId?: string;
   bodyScaleVersion?: number;
+  submitError?: OnboardingSubmitError;
   setAnswer: (patch: Partial<OnboardingDraft>) => void;
   setStep: (step: number) => void;
   reset: () => void;
@@ -61,9 +69,11 @@ const initialState: OnboardingDraft & {
   step: number;
   ownerUserId?: string;
   bodyScaleVersion: number;
+  submitError?: OnboardingSubmitError;
 } = {
   step: 0,
   ownerUserId: undefined,
+  submitError: undefined,
   bodyScaleVersion: BODY_SCALE_VERSION,
   programTrack: undefined,
   currentBody: undefined,
@@ -88,7 +98,7 @@ export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set) => ({
       ...initialState,
-      setAnswer: (patch) => set(patch),
+      setAnswer: (patch) => set({ ...patch, submitError: undefined }),
       setStep: (step) => set({ step }),
       reset: () => set((state) => ({ ...state, ...initialState })),
     }),
@@ -116,6 +126,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         weightKg: state.weightKg,
         biologicalSexForCalculation: state.biologicalSexForCalculation,
         bodyScaleVersion: state.bodyScaleVersion,
+        submitError: state.submitError,
       }),
       merge: (persisted, current) =>
         migrateOnboardingDraft(
@@ -159,9 +170,28 @@ function migrateOnboardingDraft(
   return next;
 }
 
+function subscribeToHydration(onChange: () => void) {
+  return useOnboardingStore.persist.onFinishHydration(onChange);
+}
+
+export function useOnboardingHydrated() {
+  return useSyncExternalStore(
+    subscribeToHydration,
+    () => useOnboardingStore.persist.hasHydrated(),
+    () => false,
+  );
+}
+
 export function resetOnboardingDraft() {
   useOnboardingStore.getState().reset();
   void useOnboardingStore.persist.clearStorage();
+}
+
+export function reportOnboardingSubmitError(
+  step: number,
+  error: OnboardingSubmitError,
+) {
+  useOnboardingStore.setState({ step, submitError: error });
 }
 
 export function bindOnboardingDraftToUser(
