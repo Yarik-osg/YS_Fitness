@@ -232,7 +232,12 @@ export const checkoutSchema = z.object({
 export const grantSubscriptionSchema = z.object({
   userId: z.string().uuid(),
   planId: z.string().uuid(),
-  expiresAt: z.iso.datetime().optional(),
+  expiresAt: z.iso
+    .datetime()
+    .refine((value) => Date.parse(value) > Date.now(), {
+      message: 'expiresAt must be in the future',
+    })
+    .optional(),
 });
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>;

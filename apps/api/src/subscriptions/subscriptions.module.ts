@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
+import { SubscriptionIndexCheck } from './subscription-index.check.js';
 import { SubscriptionGuard } from './subscription.guard.js';
 import { SubscriptionsController } from './subscriptions.controller.js';
 import { SubscriptionsRepository } from './subscriptions.repository.js';
 import { SubscriptionsService } from './subscriptions.service.js';
-import { MockPaymentProvider } from './providers/mock-payment-provider.js';
-import { PAYMENT_PROVIDER } from './providers/payment-provider.interface.js';
+import { paymentProviderRegistration } from './providers/payment-provider.factory.js';
 
 @Module({
   imports: [AuthModule],
@@ -14,7 +14,8 @@ import { PAYMENT_PROVIDER } from './providers/payment-provider.interface.js';
     SubscriptionsRepository,
     SubscriptionsService,
     SubscriptionGuard,
-    { provide: PAYMENT_PROVIDER, useClass: MockPaymentProvider },
+    SubscriptionIndexCheck,
+    paymentProviderRegistration,
   ],
   exports: [SubscriptionsService, SubscriptionGuard],
 })

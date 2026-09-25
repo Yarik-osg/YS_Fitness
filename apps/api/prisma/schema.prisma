@@ -213,5 +213,10 @@ model Subscription {
   grantedBy User? @relation("GrantedSubscriptions", fields: [grantedByUserId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
+  // The partial unique index subscription_one_active_per_user (one PENDING or
+  // ACTIVE row per user) lives only in the add_plans_and_subscriptions
+  // migration SQL. `prisma db push` and schema-only rebuilds drop it; apply
+  // schema changes with `prisma migrate`. SubscriptionIndexCheck refuses to
+  // boot the API without it.
   @@map("subscriptions")
 }

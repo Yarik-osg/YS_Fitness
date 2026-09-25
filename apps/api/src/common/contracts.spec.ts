@@ -187,8 +187,24 @@ describe('shared API contracts', () => {
       grantSubscriptionSchema.safeParse({
         userId: '11111111-1111-4111-8111-111111111111',
         planId: '22222222-2222-4222-8222-222222222222',
-        expiresAt: '2026-12-01T00:00:00.000Z',
+        expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
       }).success,
     ).toBe(true);
+  });
+
+  it('rejects a grant expiresAt that is not in the future', () => {
+    const result = grantSubscriptionSchema.safeParse({
+      userId: '11111111-1111-4111-8111-111111111111',
+      planId: '22222222-2222-4222-8222-222222222222',
+      expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({
+        path: ['expiresAt'],
+        message: 'expiresAt must be in the future',
+      }),
+    ]);
   });
 });

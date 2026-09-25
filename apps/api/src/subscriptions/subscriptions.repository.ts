@@ -20,27 +20,53 @@ export type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<
   typeof subscriptionWithPlan
 >;
 
+type Client = Prisma.TransactionClient;
+
 @Injectable()
 export class SubscriptionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  listActivePlans(): Promise<Plan[]> {
-    return this.prisma.plan.findMany({
+  transaction<T>(work: (client: Client) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(work);
+  }
+
+  listActivePlans(client: Client = this.prisma): Promise<Plan[]> {
+    return client.plan.findMany({
       where: { isActive: true },
       orderBy: [{ intervalMonths: 'desc' }, { priceAmount: 'asc' }],
     });
   }
 
-  findActivePlanById(id: string): Promise<Plan | null> {
-    return this.prisma.plan.findFirst({
+  findActivePlanById(
+    id: string,
+    client: Client = this.prisma,
+  ): Promise<Plan | null> {
+    return client.plan.findFirst({
       where: { id, isActive: true },
     });
   }
 
+  async expireLapsed(
+    userId: string,
+    now: Date,
+    client: Client = this.prisma,
+  ): Promise<number> {
+    const { count } = await client.subscription.updateMany({
+      where: {
+        userId,
+        status: SubscriptionStatus.ACTIVE,
+        currentPeriodEnd: { lte: now },
+      },
+      data: { status: SubscriptionStatus.EXPIRED },
+    });
+    return count;
+  }
+
   findNonTerminalByUserId(
     userId: string,
+    client: Client = this.prisma,
   ): Promise<SubscriptionWithPlan | null> {
-    return this.prisma.subscription.findFirst({
+    return client.subscription.findFirst({
       where: {
         userId,
         status: { in: NON_TERMINAL_STATUSES },
@@ -49,11 +75,11 @@ export class SubscriptionsRepository {
     });
   }
 
-  createPending(input: {
-    userId: string;
-    planId: string;
-  }): Promise<SubscriptionWithPlan> {
-    return this.prisma.subscription.create({
+  createPending(
+    input: { userId: string; planId: string },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan> {
+    return client.subscription.create({
       data: {
         userId: input.userId,
         planId: input.planId,
@@ -64,13 +90,16 @@ export class SubscriptionsRepository {
     });
   }
 
-  createManualGrant(input: {
-    userId: string;
-    planId: string;
-    grantedByUserId: string;
-    currentPeriodEnd: Date;
-  }): Promise<SubscriptionWithPlan> {
-    return this.prisma.subscription.create({
+  createManualGrant(
+    input: {
+      userId: string;
+      planId: string;
+      grantedByUserId: string;
+      currentPeriodEnd: Date;
+    },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan> {
+    return client.subscription.create({
       data: {
         userId: input.userId,
         planId: input.planId,
@@ -83,12 +112,11 @@ export class SubscriptionsRepository {
     });
   }
 
-  activate(input: {
-    id: string;
-    providerReference: string;
-    currentPeriodEnd: Date;
-  }): Promise<SubscriptionWithPlan> {
-    return this.prisma.subscription.update({
+  activate(
+    input: { id: string; providerReference: string; currentPeriodEnd: Date },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan> {
+    return client.subscription.update({
       where: { id: input.id },
       data: {
         status: SubscriptionStatus.ACTIVE,
@@ -101,15 +129,19 @@ export class SubscriptionsRepository {
 
   findByProviderReference(
     providerReference: string,
+    client: Client = this.prisma,
   ): Promise<SubscriptionWithPlan | null> {
-    return this.prisma.subscription.findFirst({
+    return client.subscription.findFirst({
       where: { providerReference },
       ...subscriptionWithPlan,
     });
   }
 
-  findUserId(userId: string): Promise<{ id: string } | null> {
-    return this.prisma.user.findUnique({
+  findUserId(
+    userId: string,
+    client: Client = this.prisma,
+  ): Promise<{ id: string } | null> {
+    return client.user.findUnique({
       where: { id: userId },
       select: { id: true },
     });

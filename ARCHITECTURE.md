@@ -86,6 +86,8 @@ Shared packages do not depend on applications or Prisma. Domain modules do not i
 
 The subscriptions module owns `plans` and `subscriptions`. Checkout talks to a `PAYMENT_PROVIDER` token; the current implementation is `MockPaymentProvider` (instant confirmation, no hosted page). Trainer/admin grants write `MANUAL` subscriptions and never call the provider. PostgreSQL enforces at most one `PENDING` or `ACTIVE` row per user with a partial unique index; the service `findFirst` is a fast path, not the lock. `GET /subscriptions/me` returns `{ subscription }` so a missing row is JSON `null` rather than an empty Nest body.
 
+The partial unique index `subscription_one_active_per_user` is hand-written in the `add_plans_and_subscriptions` migration because Prisma cannot model it (a comment on the `Subscription` model in `schema.prisma` points to it), so `prisma db push` and schema-only rebuilds drop it; `SubscriptionIndexCheck` queries `pg_indexes` at bootstrap and refuses to start without it. Because the index is keyed on status, lapsed subscriptions are expired lazily: every read of the current subscription (`GET /subscriptions/me`, `SubscriptionGuard`, checkout and grant conflict checks) first flips `ACTIVE` rows whose `currentPeriodEnd` has passed to `EXPIRED`. Checkout (create `PENDING`, provider call, activate) and grants each run in a single transaction, so a failure leaves no orphaned row. `MockPaymentProvider` is registered through a factory that throws when `NODE_ENV=production`.
+
 ## Architecture changes
 
 Changes to module ownership, cross-domain data flow, authentication trust boundaries, or shared-package responsibilities require an ADR and corresponding updates to this document.
