@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyVariantIndex, previewProgramId } from './preview-program';
+import { previewProgramId } from './preview-program';
 
 describe('previewProgramId', () => {
   it('picks the mock catalog offer from main goal and track', () => {
@@ -25,12 +25,5 @@ describe('previewProgramId', () => {
         eatingHabits: [],
       }),
     ).toBe('maintain');
-  });
-});
-
-describe('bodyVariantIndex', () => {
-  it('converts named and numeric body answers to 1-based labels', () => {
-    expect(bodyVariantIndex('toned')).toBe(2);
-    expect(bodyVariantIndex('3')).toBe(4);
   });
 });

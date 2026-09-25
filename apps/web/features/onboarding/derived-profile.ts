@@ -1,13 +1,5 @@
 import type { ActivityLevel, WeightGoal } from '@repo/shared-types';
 
-const FEMALE_BODY_TO_PHYSIQUE: Record<string, string> = {
-  slim: '0',
-  toned: '2',
-  athletic: '4',
-  defined: '6',
-  full: '8',
-};
-
 export function weightGoalFromMainGoal(
   mainGoal?: string,
 ): WeightGoal | undefined {
@@ -44,11 +36,8 @@ export function physiqueLevelFromCurrentBody(
   currentBody?: string,
 ): string | undefined {
   if (!currentBody) return undefined;
-  if (FEMALE_BODY_TO_PHYSIQUE[currentBody]) {
-    return FEMALE_BODY_TO_PHYSIQUE[currentBody];
-  }
-  if (/^[0-4]$/.test(currentBody)) {
-    return String(Number(currentBody) * 2);
+  if (/^[0-9]$/.test(currentBody)) {
+    return currentBody;
   }
   return undefined;
 }

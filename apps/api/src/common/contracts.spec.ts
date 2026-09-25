@@ -14,12 +14,12 @@ const femaleOnboarding = {
   goal: 'MAINTAIN_WEIGHT',
   timezone: 'UTC',
   programTrack: 'female',
-  currentBody: 'slim',
+  currentBody: '0',
   desiredBody: '1',
   mainGoal: 'get_stronger',
   experience: 'intermediate',
   trainingFrequency: '3',
-  focusAreas: ['glutes', 'legs'],
+  focusAreas: ['glutes'],
   nutritionCurrent: 'balanced',
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
@@ -40,7 +40,7 @@ const maleOnboarding = {
   mainGoal: 'build_muscle',
   experience: 'advanced',
   trainingFrequency: '4',
-  focusAreas: ['chest', 'abs'],
+  focusAreas: ['chest'],
   nutritionCurrent: 'structured',
   mealsPerDay: '4-5',
   eatingHabits: ['late_eating', 'none'],
@@ -79,12 +79,12 @@ describe('shared API contracts', () => {
       healthRestrictions: [{ type: 'lower_back_pain' }],
       timezone: 'UTC',
       programTrack: 'female',
-      currentBody: 'slim',
+      currentBody: '0',
       desiredBody: '1',
       mainGoal: 'get_stronger',
       experience: 'intermediate',
       trainingFrequency: '3',
-      focusAreas: ['glutes', 'legs'],
+      focusAreas: ['glutes'],
       nutritionCurrent: 'balanced',
       mealsPerDay: '3',
       eatingHabits: ['snacking', 'emotional'],
@@ -109,7 +109,7 @@ describe('shared API contracts', () => {
       mainGoal: 'build_muscle',
       experience: 'advanced',
       trainingFrequency: '4',
-      focusAreas: ['chest', 'abs'],
+      focusAreas: ['chest'],
       nutritionCurrent: 'structured',
       mealsPerDay: '4-5',
       eatingHabits: ['late_eating', 'none'],
@@ -119,17 +119,12 @@ describe('shared API contracts', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects female currentBody and meals that belong to the male track', () => {
-    const body = onboardingSchema.safeParse({
-      ...femaleOnboarding,
-      currentBody: '2',
-    });
+  it('rejects meals that belong to the other program track', () => {
     const meals = onboardingSchema.safeParse({
       ...femaleOnboarding,
       mealsPerDay: '4-5',
     });
 
-    expect(issuePaths(body)).toContainEqual(['currentBody']);
     expect(issuePaths(meals)).toContainEqual(['mealsPerDay']);
   });
 
@@ -149,7 +144,7 @@ describe('shared API contracts', () => {
 
     expect(issuePaths(chestOnFemale)).toContainEqual(['focusAreas', 0]);
     expect(issuePaths(snackingOnMale)).toContainEqual(['eatingHabits', 0]);
-    expect(issuePaths(mixedFocus)).toEqual([['focusAreas', 1]]);
+    expect(issuePaths(mixedFocus)).toContainEqual(['focusAreas']);
   });
 
   it('accepts physiqueLevel 0-9 and rejects values outside that scale', () => {

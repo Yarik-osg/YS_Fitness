@@ -21,8 +21,8 @@ describe('derived onboarding profile fields', () => {
   });
 
   it('maps current body onto the 0-9 physique scale', () => {
-    expect(physiqueLevelFromCurrentBody('slim')).toBe('0');
-    expect(physiqueLevelFromCurrentBody('full')).toBe('8');
-    expect(physiqueLevelFromCurrentBody('3')).toBe('6');
+    expect(physiqueLevelFromCurrentBody('0')).toBe('0');
+    expect(physiqueLevelFromCurrentBody('9')).toBe('9');
+    expect(physiqueLevelFromCurrentBody('slim')).toBeUndefined();
   });
 });

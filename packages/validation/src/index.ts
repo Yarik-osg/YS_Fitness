@@ -37,15 +37,21 @@ export const healthRestrictionSchema = z.object({
 });
 
 export const PROGRAM_TRACKS = ['female', 'male'] as const;
-export const FEMALE_CURRENT_BODIES = [
-  'slim',
-  'toned',
-  'athletic',
-  'defined',
-  'full',
+export const BODY_SCALE = [
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
 ] as const;
-export const MALE_CURRENT_BODIES = ['0', '1', '2', '3', '4'] as const;
-export const DESIRED_BODIES = ['0', '1', '2', '3', '4'] as const;
+export const FEMALE_CURRENT_BODIES = BODY_SCALE;
+export const MALE_CURRENT_BODIES = BODY_SCALE;
+export const DESIRED_BODIES = ['0', '1', '2', '3'] as const;
 export const MAIN_GOALS = [
   'lose_weight',
   'build_muscle',
@@ -117,10 +123,7 @@ export const PHYSIQUE_LEVELS = [
   '9',
 ] as const;
 
-const CURRENT_BODIES = [
-  ...FEMALE_CURRENT_BODIES,
-  ...MALE_CURRENT_BODIES,
-] as const;
+const CURRENT_BODIES = BODY_SCALE;
 const FOCUS_AREAS = [...MALE_FOCUS_AREAS] as const;
 const MEALS_PER_DAY = [...FEMALE_MEALS_PER_DAY, '4-5', '6+', 'varies'] as const;
 const EATING_HABITS = [
@@ -160,7 +163,7 @@ const onboardingQuestionnaireSchema = z.object({
   mainGoal: z.enum(MAIN_GOALS),
   experience: z.enum(EXPERIENCE_LEVELS),
   trainingFrequency: z.enum(TRAINING_FREQUENCIES),
-  focusAreas: z.array(z.enum(FOCUS_AREAS)).min(1),
+  focusAreas: z.array(z.enum(FOCUS_AREAS)).min(1).max(1),
   nutritionCurrent: z.enum(NUTRITION_CURRENT),
   mealsPerDay: z.enum(MEALS_PER_DAY),
   eatingHabits: z.array(z.enum(EATING_HABITS)).min(1),

@@ -3,13 +3,13 @@ import { buildOnboardingPayload, tryBuildOnboardingPayload } from './payload';
 
 const femaleDraft = {
   programTrack: 'female' as const,
-  currentBody: 'slim',
+  currentBody: '0',
   desiredBody: '1',
   physiqueLevel: '4',
   mainGoal: 'get_stronger',
   experience: 'intermediate',
   trainingFrequency: '3',
-  focusAreas: ['glutes', 'legs'],
+  focusAreas: ['glutes'],
   nutritionCurrent: 'balanced',
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
@@ -34,13 +34,13 @@ describe('buildOnboardingPayload', () => {
       goal: 'MAINTAIN_WEIGHT',
       timezone: 'Europe/Kyiv',
       programTrack: 'female',
-      currentBody: 'slim',
+      currentBody: '0',
       desiredBody: '1',
       physiqueLevel: '4',
       mainGoal: 'get_stronger',
       experience: 'intermediate',
       trainingFrequency: '3',
-      focusAreas: ['glutes', 'legs'],
+      focusAreas: ['glutes'],
       nutritionCurrent: 'balanced',
       mealsPerDay: '3',
       eatingHabits: ['snacking', 'emotional'],
@@ -57,7 +57,7 @@ describe('buildOnboardingPayload', () => {
         mainGoal: 'build_muscle',
         experience: 'advanced',
         trainingFrequency: '4',
-        focusAreas: ['chest', 'abs'],
+        focusAreas: ['chest'],
         nutritionCurrent: 'structured',
         mealsPerDay: '4-5',
         eatingHabits: ['late_eating'],
@@ -74,7 +74,7 @@ describe('buildOnboardingPayload', () => {
     expect(payload.biologicalSexForCalculation).toBe('MALE');
     expect(payload.programTrack).toBe('male');
     expect(payload.physiqueLevel).toBe('6');
-    expect(payload.focusAreas).toEqual(['chest', 'abs']);
+    expect(payload.focusAreas).toEqual(['chest']);
   });
 
   it('derives calculation sex from program track when the draft sex is missing', () => {

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 360" aria-hidden="true">
-  <g fill="#000" stroke="#000" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
-    <circle cx="100" cy="38" r="18" />
-    <path d="M 90 54 L 78 72 L 73 96 L 71 158 L 75 212 L 77 224 L 83 224 L 81 212 L 85 104 L 79 106 L 85 148 L 76 178 L 89 198 L 91.025 268 L 93.5 330 L 83.5 338 L 93 338 L 95 206 L 105 206 L 107 338 L 116.5 338 L 106.5 330 L 108.975 268 L 111 198 L 124 178 L 115 148 L 121 106 L 115 104 L 119 212 L 117 224 L 123 224 L 125 212 L 129 158 L 127 96 L 122 72 L 110 54 Z" />
-  </g>
-</svg>
