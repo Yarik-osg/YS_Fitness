@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiClientError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { readSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { useOnboardingStore } from '@/features/onboarding/onboarding-store';
@@ -140,15 +141,50 @@ describe('AuthGate', () => {
     renderGate();
 
     expect(await screen.findByText('protected content')).toBeInTheDocument();
-    expect(api.refresh).toHaveBeenCalledTimes(1);
+    expect(api.refresh).toHaveBeenCalled();
   });
 
-  it('clears the session hint and redirects to login once when /users/me fails after refresh', async () => {
-    writeSessionHint('complete');
-    api.refresh.mockResolvedValue({
-      tokens: { accessToken: tokenExpiringIn(900) },
+  it('keeps the rotated access token after getMe refreshes under the hood', async () => {
+    const stale = tokenExpiringIn(600);
+    const rotated = tokenExpiringIn(900);
+    useAuthStore.getState().setSession(stale, completedUser);
+    api.getMe.mockImplementation(async () => {
+      useAuthStore.getState().setAccessToken(rotated);
+      return meResponse(completedUser.onboardingCompletedAt);
     });
-    api.getMe.mockRejectedValue(new Error('users/me failed'));
+
+    renderGate();
+
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+    expect(useAuthStore.getState().accessToken).toBe(rotated);
+    expect(api.refresh).not.toHaveBeenCalled();
+  });
+
+  it('keeps the session when /users/me returns a server error', async () => {
+    writeSessionHint('complete');
+    const token = tokenExpiringIn(600);
+    useAuthStore.getState().setSession(token, completedUser);
+    api.getMe.mockRejectedValue(
+      new ApiClientError(500, 'INTERNAL_SERVER_ERROR', 'users/me failed'),
+    );
+
+    renderGate();
+
+    expect(await screen.findByText('protected content')).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().accessToken).toBe(token);
+    expect(readSessionHint()).toBe('complete');
+  });
+
+  it('clears the session hint and redirects to login once when the session is lost', async () => {
+    writeSessionHint('complete');
+    api.refresh.mockRejectedValue(
+      new ApiClientError(
+        401,
+        'INVALID_REFRESH_TOKEN',
+        'Refresh token is invalid',
+      ),
+    );
 
     renderGate();
 

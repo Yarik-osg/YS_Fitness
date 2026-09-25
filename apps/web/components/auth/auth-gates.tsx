@@ -10,6 +10,7 @@ import { usePathname, useRouter } from '@/i18n/navigation';
 import { refresh } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/users';
 import { persistGuestOnboardingIfReady } from '@/lib/hooks/use-auth';
+import { isSessionLostError } from '@/lib/api/errors';
 import { isAccessTokenFresh } from '@/lib/auth/access-token';
 import {
   getPostAuthPath,
@@ -37,17 +38,42 @@ function applyMe(
   return user;
 }
 
+function storeOnboardingUser(): OnboardingStatusUser | null {
+  const user = useAuthStore.getState().user;
+  if (!user) return null;
+  return { profile: { onboardingCompletedAt: user.onboardingCompletedAt } };
+}
+
+async function loadMe(
+  fallbackToken: string,
+  options: { claimGuest?: boolean } = {},
+) {
+  try {
+    const me = await getMe();
+    return applyMe(
+      useAuthStore.getState().accessToken ?? fallbackToken,
+      me,
+      options,
+    );
+  } catch (error) {
+    if (isSessionLostError(error)) throw error;
+    const stored = storeOnboardingUser();
+    if (!stored) throw error;
+    return stored;
+  }
+}
+
 async function currentSessionUser(): Promise<OnboardingStatusUser> {
   const { accessToken, user } = useAuthStore.getState();
   if (user && accessToken && isAccessTokenFresh(accessToken)) {
-    return applyMe(accessToken, await getMe(), { claimGuest: true });
+    return loadMe(accessToken, { claimGuest: true });
   }
   return restoreSession({ claimGuest: true });
 }
 
 async function restoreSession(options: { claimGuest?: boolean } = {}) {
   const response = await refresh();
-  return applyMe(response.tokens.accessToken, await getMe(), options);
+  return loadMe(response.tokens.accessToken, options);
 }
 
 function LoadingScreen() {
