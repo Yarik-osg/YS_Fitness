@@ -364,19 +364,9 @@
         "title": "What shape do you <accent>want to reach?</accent>",
         "description": "Choose the photo that best matches your desired result"
       },
-      "physique": {
-        "eyebrow": "Physique",
-        "title": "What is your <accent>overall physique?</accent>",
-        "description": "Move the slider to choose the illustration that best matches your answer."
-      },
       "mainGoal": {
         "eyebrow": "Main goal",
         "title": "What is your <accent>main goal?</accent>"
-      },
-      "weightGoal": {
-        "eyebrow": "Weight goal",
-        "title": "How should <accent>your weight</accent> change?",
-        "description": "This is a separate parameter for a future calorie calculation."
       },
       "experience": {
         "eyebrow": "Training level",
@@ -396,7 +386,7 @@
       "focus": {
         "eyebrow": "Training focus",
         "title": "What do you want to <accent>focus on?</accent>",
-        "description": "You can choose several options."
+        "description": "Choose one option."
       },
       "nutrition": {
         "eyebrow": "Nutrition now",
@@ -441,25 +431,7 @@
       ]
     },
     "result": {
-      "eyebrow": "Personal result",
-      "title": "Your plan is <accent>ready</accent>",
-      "subtitle": "Based on your answers we selected the best-fit program",
-      "button": "View recommended plan →",
-      "mainGoal": "Main goal",
-      "experience": "Training level",
-      "frequency": "Workouts per week",
-      "frequencyValue": "{count} times",
-      "focus": "Training focus",
-      "shape": "Shape",
-      "current": "Current #{index}",
-      "desired": "Desired #{index}",
-      "highlight": "Your program will be fully adapted to your data and goals",
-      "age": "Age",
-      "height": "Height",
-      "weight": "Weight",
-      "heightValue": "{value} cm",
-      "weightValue": "{value} kg",
-      "note": "The profile is saved. The calorie and macro calculation will appear in a separate nutrition module — we do not replace it with static values."
+      "mainGoal": "Main goal"
     },
     "plan": {
       "eyebrow": "Recommended program",
@@ -470,25 +442,11 @@
       "intro": "Based on your answers, we matched a program to your goal, training level, and priorities.",
       "frequencyValue": "{count}×/week",
       "focus": "Focus",
-      "duration": "Duration",
-      "durationValue": "12 weeks",
       "includes": "Included",
-      "price": "Price",
-      "priceValue": "2 990",
-      "priceLabel": "UAH / 3 months",
-      "lock": "Registration and payment are required to access the program",
-      "training": "Training",
-      "trainingValue": "{count} times a week",
       "level": "Level",
-      "levelFallback": "Personal",
-      "focusFullBody": "Whole body",
-      "focusZones": "{count} priority zones",
-      "disclaimer": "This is a local preview. Your answers are already saved. A generated workout program will appear in a later module.",
       "preview": {
         "slim_tone": {
           "name": "YS SLIM & TONE",
-          "tagline": "Fat loss · Tone · Definition",
-          "whoFor": "For women who want to lose fat and improve body quality",
           "description": "A complete program that combines strength and cardio blocks to burn fat while keeping muscle tone.",
           "includes": [
             "A 12-week training program",
@@ -500,8 +458,6 @@
         },
         "power_build": {
           "name": "YS POWER BUILD",
-          "tagline": "Muscle · Strength · Definition",
-          "whoFor": "For women who want to gain muscle and get stronger",
           "description": "A progressive strength program for muscle gain and strength, with load tracking on every session.",
           "includes": [
             "A 12-week strength program",
@@ -513,8 +469,6 @@
         },
         "maintain": {
           "name": "YS MAINTAIN",
-          "tagline": "Shape · Energy · Balance",
-          "whoFor": "For women who want to keep and improve their shape",
           "description": "A balanced program for shape and wellbeing: strength, functional, and recovery work.",
           "includes": [
             "A 12-week training program",
@@ -526,8 +480,6 @@
         },
         "lean_build": {
           "name": "YS LEAN BUILD",
-          "tagline": "Fat loss · Definition · Strength",
-          "whoFor": "For men who want to lose fat and build definition",
           "description": "A progressive mix of strength and metabolic blocks. Burns fat and keeps muscle — without extreme cardio or diets.",
           "includes": [
             "A 12-week training program",
@@ -539,8 +491,6 @@
         },
         "mass_power": {
           "name": "YS MASS & POWER",
-          "tagline": "Mass · Strength · Definition",
-          "whoFor": "For men who want to gain muscle and get stronger",
           "description": "A classic strength program with progressive overload, structured split, and recovery-first programming.",
           "includes": [
             "A 12-week strength program",
@@ -552,8 +502,6 @@
         },
         "maintain_pro": {
           "name": "YS MAINTAIN PRO",
-          "tagline": "Shape · Energy · Balance",
-          "whoFor": "For men who want to keep and improve their shape",
           "description": "A balanced program for shape and wellbeing: strength, functional, and recovery blocks.",
           "includes": [
             "A 12-week training program",

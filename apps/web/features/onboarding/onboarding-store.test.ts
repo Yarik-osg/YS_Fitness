@@ -66,6 +66,34 @@ describe('onboarding draft ownership', () => {
     });
   });
 
+  it('maps a saved five-step body draft onto the ten-point scale', async () => {
+    await useOnboardingStore.persist.clearStorage();
+    window.sessionStorage.setItem(
+      'ys-onboarding-draft',
+      JSON.stringify({
+        state: {
+          programTrack: 'male',
+          currentBody: '2',
+          desiredBody: '4',
+          physiqueLevel: '9',
+          focusAreas: ['arms', 'back'],
+          step: 7,
+        },
+        version: 0,
+      }),
+    );
+
+    await useOnboardingStore.persist.rehydrate();
+
+    expect(useOnboardingStore.getState()).toMatchObject({
+      currentBody: '4',
+      desiredBody: '3',
+      focusAreas: ['arms'],
+      bodyScaleVersion: 2,
+    });
+    expect(useOnboardingStore.getState().physiqueLevel).toBeUndefined();
+  });
+
   it('replaces the current draft when register asks for a fresh quiz', () => {
     useOnboardingStore.setState({
       ownerUserId: 'user-a',

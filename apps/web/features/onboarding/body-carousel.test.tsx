@@ -2,24 +2,13 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BodyCarousel } from './body-carousel';
+import { currentBodyPhoto } from './body-figure';
 
-const choices = [
-  {
-    value: 'slim',
-    label: 'Варіант 1',
-    image: '/marketing/body-slider/male-0.svg',
-  },
-  {
-    value: 'toned',
-    label: 'Варіант 2',
-    image: '/marketing/body-slider/male-2.svg',
-  },
-  {
-    value: 'athletic',
-    label: 'Варіант 3',
-    image: '/marketing/body-slider/male-4.svg',
-  },
-];
+const choices = [0, 1, 2].map((step) => ({
+  value: String(step),
+  label: `Варіант ${step + 1}`,
+  image: currentBodyPhoto('male', step),
+}));
 
 describe('BodyCarousel', () => {
   afterEach(() => {
@@ -32,7 +21,7 @@ describe('BodyCarousel', () => {
     render(
       <BodyCarousel
         choices={choices}
-        value="slim"
+        value="0"
         label="Статура"
         onChange={onChange}
       />,
@@ -42,6 +31,6 @@ describe('BodyCarousel', () => {
     expect(slider).toHaveAttribute('aria-valuenow', '0');
     slider.focus();
     await user.keyboard('{ArrowRight}');
-    expect(onChange).toHaveBeenCalledWith('toned');
+    expect(onChange).toHaveBeenCalledWith('1');
   });
 });

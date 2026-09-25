@@ -21,7 +21,11 @@ import {
 } from '@/lib/subscriptions/selected-plan';
 import { ActivitySlider } from './activity-slider';
 import { BodyCarousel } from './body-carousel';
-import { bodySliderSrc } from './body-figure';
+import {
+  bodySliderSrc,
+  currentBodyPhoto,
+  desiredBodyPhoto,
+} from './body-figure';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
 import { previewProgramId } from './preview-program';
 import { useOnboardingStore, type OnboardingState } from './onboarding-store';
@@ -32,15 +36,8 @@ import {
 } from './program-track';
 import { StepShell } from './step-shell';
 
-const FEMALE_CURRENT_PHOTOS = [
-  ['slim', 0],
-  ['toned', 2],
-  ['athletic', 4],
-  ['defined', 6],
-  ['full', 8],
-] as const;
-
-const BODY_VARIANT_STEPS = [0, 2, 4, 6, 8] as const;
+const CURRENT_BODY_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+const DESIRED_BODY_STEPS = [0, 1, 2, 3] as const;
 
 const TOTAL_STEPS = ONBOARDING_WIZARD_STEPS;
 
@@ -90,26 +87,21 @@ export function OnboardingWizard() {
 
   const step = Math.min(Math.max(draft.step, 0), TOTAL_STEPS - 1);
   const male = draft.programTrack === 'male';
-  const currentBodyChoices = useMemo(() => {
-    if (!male) {
-      return FEMALE_CURRENT_PHOTOS.map(([value, step], index) => ({
-        value,
-        label: t('variant', { index: index + 1 }),
-        image: bodySliderSrc('female', step),
-      }));
-    }
-    return BODY_VARIANT_STEPS.map((step, index) => ({
-      value: String(index),
-      label: t('variant', { index: index + 1 }),
-      image: bodySliderSrc('male', step),
-    }));
-  }, [male, t]);
+  const currentBodyChoices = useMemo(
+    () =>
+      CURRENT_BODY_STEPS.map((step) => ({
+        value: String(step),
+        label: t('variant', { index: step + 1 }),
+        image: currentBodyPhoto(male ? 'male' : 'female', step),
+      })),
+    [male, t],
+  );
   const desiredBodyChoices = useMemo(
     () =>
-      BODY_VARIANT_STEPS.map((step, index) => ({
-        value: String(index),
-        label: t('variant', { index: index + 1 }),
-        image: bodySliderSrc(male ? 'male' : 'female', step),
+      DESIRED_BODY_STEPS.map((step) => ({
+        value: String(step),
+        label: t('variant', { index: step + 1 }),
+        image: desiredBodyPhoto(male ? 'male' : 'female', step),
       })),
     [male, t],
   );
@@ -591,6 +583,7 @@ export function OnboardingWizard() {
           description={t('steps.focus.description')}
         >
           <MultiChoiceList
+            single
             choices={male ? maleFocus : femaleFocus}
             value={draft.focusAreas}
             onChange={(focusAreas) => draft.setAnswer({ focusAreas })}

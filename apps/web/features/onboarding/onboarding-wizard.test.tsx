@@ -45,15 +45,17 @@ describe('OnboardingWizard', () => {
       screen.getByRole('button', { name: /Змінити мову/i }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Продовжити/i }));
+    expect(screen.getAllByRole('button', { name: /Варіант/ })).toHaveLength(10);
     await user.click(screen.getByRole('button', { name: /Варіант 2/i }));
     await user.click(screen.getByRole('button', { name: /Обрати цю форму/i }));
+    expect(screen.getAllByRole('button', { name: /Варіант/ })).toHaveLength(4);
     await user.click(screen.getByRole('button', { name: /Назад/i }));
 
     expect(screen.getByRole('button', { name: /Варіант 2/i })).toHaveAttribute(
       'aria-current',
       'true',
     );
-    expect(useOnboardingStore.getState().currentBody).toBe('toned');
+    expect(useOnboardingStore.getState().currentBody).toBe('1');
   });
 
   it('sets program track and BMR calculation sex from a female direction choice', async () => {
@@ -118,6 +120,23 @@ describe('OnboardingWizard', () => {
     expect(screen.getByText(/форма зараз/i)).toBeInTheDocument();
   });
 
+  it('keeps a single training focus when another area is chosen', async () => {
+    const user = userEvent.setup();
+    useOnboardingStore.setState({ programTrack: 'male', step: 7 });
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Плечі' }));
+    await user.click(screen.getByRole('button', { name: 'Спина' }));
+
+    expect(useOnboardingStore.getState().focusAreas).toEqual(['back']);
+  });
+
   it('uses the reference option sets for the male track', () => {
     useOnboardingStore.setState({ programTrack: 'male', step: 9 });
     render(
@@ -162,7 +181,7 @@ describe('OnboardingWizard', () => {
     useOnboardingStore.getState().reset();
     useOnboardingStore.setState({
       programTrack: 'female',
-      currentBody: 'toned',
+      currentBody: '1',
       step: 1,
     });
     const female = render(
@@ -203,7 +222,7 @@ describe('OnboardingWizard', () => {
     const user = userEvent.setup();
     useOnboardingStore.setState({
       programTrack: 'female',
-      currentBody: 'toned',
+      currentBody: '1',
       desiredBody: '1',
       step: 2,
     });
@@ -229,7 +248,7 @@ describe('OnboardingWizard', () => {
     vi.stubGlobal('fetch', fetchMock);
     useOnboardingStore.setState({
       programTrack: 'female',
-      currentBody: 'toned',
+      currentBody: '1',
       desiredBody: '1',
       mainGoal: 'lose_weight',
       experience: 'beginner',
@@ -268,7 +287,7 @@ describe('OnboardingWizard', () => {
     useOnboardingStore.setState({
       programTrack: 'male',
       currentBody: '2',
-      desiredBody: '4',
+      desiredBody: '3',
       mainGoal: 'build_muscle',
       experience: 'intermediate',
       trainingFrequency: '3',

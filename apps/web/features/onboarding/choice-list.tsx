@@ -46,6 +46,7 @@ export function ChoiceList({
             : 'var(--accent)';
         const lastOddImage =
           imageGrid && index === choices.length - 1 && choices.length % 2 === 1;
+        const textRow = !choice.image && !grid;
 
         return (
           <button
@@ -92,16 +93,20 @@ export function ChoiceList({
             {selected && goal && (
               <span className="absolute inset-y-0 left-0 w-[3px] bg-accent" />
             )}
-            {selected && !goal && (
+            {selected && !textRow && (
               <span
                 className={cn(
-                  'absolute top-2 right-2 grid size-[18px] place-items-center rounded-full text-[#0b0b0b]',
+                  'absolute grid size-[18px] place-items-center rounded-full text-[#0b0b0b]',
+                  grid && !imageGrid
+                    ? 'top-1/2 right-3 -translate-y-1/2'
+                    : 'top-2 right-2',
                   maleAccent
                     ? 'bg-[#c8ff2e]'
                     : femaleAccent
                       ? 'bg-[#00c7c8]'
                       : 'bg-accent',
-                  programCard && 'top-3.5 left-3.5 right-auto size-5',
+                  programCard &&
+                    'top-3.5 left-3.5 right-auto size-5 translate-y-0',
                 )}
               >
                 <Check size={11} strokeWidth={3} />
@@ -188,6 +193,11 @@ export function ChoiceList({
                       programCard ? 'text-[26px] leading-none' : 'text-base',
                       goal &&
                         'flex-1 text-[17px] leading-[1.2] tracking-[0.02em]',
+                      !programCard &&
+                        !grid &&
+                        !goal &&
+                        !choice.description &&
+                        'font-sans text-[13px] font-medium normal-case leading-[1.4] tracking-normal',
                     )}
                   >
                     {choice.label}
@@ -198,14 +208,14 @@ export function ChoiceList({
                     </span>
                   )}
                 </span>
-                {goal ? (
+                {textRow ? (
                   selected ? (
-                    <span className="ml-auto grid size-5 shrink-0 place-items-center rounded-full bg-accent text-[#0b0b0b]">
+                    <span className="ml-auto grid size-5 shrink-0 place-items-center self-center rounded-full bg-accent text-[#0b0b0b]">
                       <Check size={11} strokeWidth={3} />
                     </span>
-                  ) : (
-                    <span className="ml-auto size-5 shrink-0 rounded-full border-[1.5px] border-white/20" />
-                  )
+                  ) : goal ? (
+                    <span className="ml-auto size-5 shrink-0 self-center rounded-full border-[1.5px] border-white/20" />
+                  ) : null
                 ) : null}
               </>
             )}
@@ -223,12 +233,18 @@ export function MultiChoiceList({
   choices,
   value,
   onChange,
+  single = false,
 }: {
   choices: Choice[];
   value: string[];
   onChange: (value: string[]) => void;
+  single?: boolean;
 }) {
   function toggle(nextValue: string) {
+    if (single) {
+      onChange(value.includes(nextValue) ? [] : [nextValue]);
+      return;
+    }
     if (nextValue === 'none' || nextValue === 'full_body') {
       onChange(value.includes(nextValue) ? [] : [nextValue]);
       return;
@@ -254,7 +270,7 @@ export function MultiChoiceList({
             aria-pressed={selected}
             onClick={() => toggle(choice.value)}
             className={cn(
-              'relative flex w-full items-center gap-3.5 border px-4 py-3.5 text-left transition',
+              'relative flex w-full items-center gap-3.5 border px-4 py-3.5 text-left outline-none transition focus-visible:outline-none',
               selected
                 ? 'border-accent bg-accent/7'
                 : 'border-white/12 bg-white/3',

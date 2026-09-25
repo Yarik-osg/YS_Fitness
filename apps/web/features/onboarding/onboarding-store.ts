@@ -41,14 +41,30 @@ export interface OnboardingDraft {
 export interface OnboardingState extends OnboardingDraft {
   step: number;
   ownerUserId?: string;
+  bodyScaleVersion?: number;
   setAnswer: (patch: Partial<OnboardingDraft>) => void;
   setStep: (step: number) => void;
   reset: () => void;
 }
 
-const initialState: OnboardingDraft & { step: number; ownerUserId?: string } = {
+const BODY_SCALE_VERSION = 2;
+
+const LEGACY_NAMED_BODIES: Record<string, string> = {
+  slim: '0',
+  toned: '2',
+  athletic: '4',
+  defined: '6',
+  full: '8',
+};
+
+const initialState: OnboardingDraft & {
+  step: number;
+  ownerUserId?: string;
+  bodyScaleVersion: number;
+} = {
   step: 0,
   ownerUserId: undefined,
+  bodyScaleVersion: BODY_SCALE_VERSION,
   programTrack: undefined,
   currentBody: undefined,
   desiredBody: undefined,
@@ -99,6 +115,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         heightCm: state.heightCm,
         weightKg: state.weightKg,
         biologicalSexForCalculation: state.biologicalSexForCalculation,
+        bodyScaleVersion: state.bodyScaleVersion,
       }),
       merge: (persisted, current) =>
         migrateOnboardingDraft(
@@ -125,6 +142,19 @@ function migrateOnboardingDraft(
       next.programTrack,
     );
   }
+
+  if (persisted && persisted.bodyScaleVersion !== BODY_SCALE_VERSION) {
+    if (next.currentBody && LEGACY_NAMED_BODIES[next.currentBody]) {
+      next.currentBody = LEGACY_NAMED_BODIES[next.currentBody];
+    } else if (next.currentBody && /^[0-4]$/.test(next.currentBody)) {
+      next.currentBody = String(Number(next.currentBody) * 2);
+    }
+    if (next.desiredBody === '4') next.desiredBody = '3';
+    next.physiqueLevel = undefined;
+  }
+
+  next.focusAreas = next.focusAreas.slice(0, 1);
+  next.bodyScaleVersion = BODY_SCALE_VERSION;
 
   return next;
 }
