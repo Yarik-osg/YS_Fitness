@@ -30,7 +30,7 @@ pnpm dev
 
 The web app runs at `http://localhost:3000`; the API runs at `http://localhost:3001/api/v1`. Swagger is available at `/api/v1/docs`, and health checks use `GET /api/v1/health`.
 
-Set real random values for all secret variables and change the trainer seed password before running the seed. `pnpm db:seed` is explicit and idempotent; it also upserts the two catalog plans (`3_MONTHS` at 2490 ₴ and `1_MONTH` at 990 ₴, stored in kopiykas). Application startup never seeds data.
+Set real random values for all secret variables and change the trainer seed password before running the seed. `pnpm db:seed` is explicit and idempotent; it also upserts the catalog plans (`1_MONTH` at 990 ₴, `3_MONTHS` at 2490 ₴, and `FULL_ACCESS` at 3490 ₴, stored in kopiykas). Application startup never seeds data.
 
 ### Local containers
 
@@ -57,6 +57,7 @@ PostgreSQL data persists in the named `postgres_data` volume. The Compose file i
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/users/me`
 - `PUT /api/v1/users/me/onboarding`
+- `GET /api/v1/users/me/onboarding-responses`
 
 Passwords require at least eight characters and are hashed with Argon2. Access JWTs contain only `sub`, `sessionId`, `role`, `iat`, and `exp`. Refresh JWTs are rotated once, stored only as SHA-256 digests, and tracked as a token family. Reuse of a consumed token revokes the entire session.
 
@@ -66,7 +67,7 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 ## Onboarding
 
-`PUT /api/v1/users/me/onboarding` is bearer-authenticated and stores raw questionnaire data only. It upserts `UserProfile` and appends a `BodyMeasurement` when weight/body-fat data changed. An identical retry does not duplicate the measurement. Calorie targets and generated programs are deliberately separate future modules.
+`PUT /api/v1/users/me/onboarding` is bearer-authenticated. It upserts the calculation subset on `UserProfile` (name, date of birth, calculation sex, height, activity, goal, timezone, and restrictions), appends a `BodyMeasurement` when weight or body fat changed, and upserts the rest of the quiz on `OnboardingResponses`. An identical retry does not duplicate the measurement. `GET /api/v1/users/me/onboarding-responses` returns that quiz, or `{ responses: null }` when the user finished onboarding before the table existed. Calorie targets and generated programs are deliberately separate future modules.
 
 ## Subscriptions
 
@@ -77,7 +78,7 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 Prices are integers in kopiykas. A user may have at most one `PENDING` or `ACTIVE` subscription; that rule is enforced by a PostgreSQL partial unique index. A concurrent second checkout returns `409` with `SUBSCRIPTION_ALREADY_ACTIVE`.
 
-On the web app, landing plan CTAs store `planId` (query + `sessionStorage`). Guests go to register, new users finish onboarding, then `/checkout` posts and shows confirmation. Already-onboarded logins with a selected plan skip straight to checkout. Dashboard shows plan name and period end.
+On the web app, landing plan CTAs store `planId` in `sessionStorage`. Guests and users who have not finished onboarding go to `/onboarding`. After the quiz, a guest registers (keeping `planId` when one was chosen) and then `/checkout` confirms a mock payment and links to the dashboard. An onboarded user with a selected plan and no current subscription goes straight to checkout. The dashboard shows the saved name, with the email underneath, and falls back to the email when the profile has no name. It also shows the plan name and period end when a subscription is active.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md#subscriptions) for the payment-provider token and index details.
 

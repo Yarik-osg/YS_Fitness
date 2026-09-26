@@ -6,8 +6,8 @@ YS Fitness is a pnpm/Turborepo monorepo with a NestJS REST API, a Next.js web ap
 
 Questionnaire input, derived targets, and generated plans are separate domain concerns:
 
-- **Profile data** records facts supplied by the user: date of birth, calculation sex, height, activity level, goal, restrictions, and measurement history.
-- **Questionnaire input** is stored on `OnboardingResponses`, one row per user, separate from `UserProfile`. It holds the raw quiz (`programTrack`, body photos, design goal, experience, frequency, focus areas, nutrition habits). Nutrition and programs may read it later; they must not write it.
+- **Profile data** records facts supplied by the user: name, date of birth, calculation sex, height, activity level, goal, restrictions, and measurement history. Name is optional on older profiles and required for new onboarding saves.
+- **Questionnaire input** is stored on `OnboardingResponses`, one row per user, separate from `UserProfile`. It holds the raw quiz (`programTrack`, body photos, physique level, design goal, experience, frequency, focus areas, nutrition habits). Nutrition and programs may read it later; they must not write it.
 - **Nutrition** calculates and stores versioned calorie and macro targets from profile data. It must not add calculated values to `UserProfile`.
 - **Programs** generates and assigns workout programs. Program state must not be embedded in profile or nutrition records.
 - **Workouts** records performed sessions, sets, reps, and loads independently from program templates.
