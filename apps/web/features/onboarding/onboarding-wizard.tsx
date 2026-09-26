@@ -98,6 +98,9 @@ function MetricField({
   );
 }
 
+const DEFAULT_HEIGHT_CM = 170;
+const DEFAULT_WEIGHT_KG = 60;
+
 function StepperMetricField({
   id,
   label,
@@ -106,6 +109,7 @@ function StepperMetricField({
   min,
   max,
   step,
+  emptyValue,
   placeholder,
   decreaseLabel,
   increaseLabel,
@@ -119,6 +123,7 @@ function StepperMetricField({
   min: number;
   max: number;
   step: number;
+  emptyValue: number;
   placeholder: string;
   decreaseLabel: string;
   increaseLabel: string;
@@ -128,11 +133,9 @@ function StepperMetricField({
   const invalid = value !== undefined && (value < min || value > max);
 
   function bump(direction: 1 | -1) {
-    if (value === undefined || Number.isNaN(value)) {
-      onChange(direction > 0 ? min : max);
-      return;
-    }
-    const next = Math.round((value + direction * step) / step) * step;
+    const base =
+      value === undefined || Number.isNaN(value) ? emptyValue : value;
+    const next = Math.round((base + direction * step) / step) * step;
     onChange(Math.min(max, Math.max(min, next)));
   }
 
@@ -431,6 +434,15 @@ export function OnboardingWizard() {
     }
     if (step === 6 && !draft.activityLevel) {
       useOnboardingStore.setState({ activityLevel: 'MODERATELY_ACTIVE' });
+    }
+    if (
+      step === 11 &&
+      (draft.heightCm === undefined || draft.weightKg === undefined)
+    ) {
+      useOnboardingStore.setState({
+        heightCm: draft.heightCm ?? DEFAULT_HEIGHT_CM,
+        weightKg: draft.weightKg ?? DEFAULT_WEIGHT_KG,
+      });
     }
   }, [currentBodyChoices, draft, step]);
 
@@ -854,7 +866,8 @@ export function OnboardingWizard() {
               min={HEIGHT_CM.min}
               max={HEIGHT_CM.max}
               step={1}
-              placeholder="180"
+              emptyValue={DEFAULT_HEIGHT_CM}
+              placeholder="170"
               decreaseLabel={t('steps.metrics.decrease', {
                 field: t('steps.metrics.height'),
               })}
@@ -875,7 +888,8 @@ export function OnboardingWizard() {
               min={WEIGHT_KG.min}
               max={WEIGHT_KG.max}
               step={0.5}
-              placeholder="80"
+              emptyValue={DEFAULT_WEIGHT_KG}
+              placeholder="60"
               decreaseLabel={t('steps.metrics.decrease', {
                 field: t('steps.metrics.weight'),
               })}

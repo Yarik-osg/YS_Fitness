@@ -514,6 +514,26 @@ describe('OnboardingWizard', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens height and weight on the average values', () => {
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      step: 11,
+      heightCm: undefined,
+      weightKg: undefined,
+    });
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(screen.getByRole('spinbutton', { name: 'Зріст' })).toHaveValue(170);
+    expect(screen.getByRole('spinbutton', { name: 'Вага' })).toHaveValue(60);
+  });
+
   it('uses height arrows to move an out-of-range value onto the allowed minimum', async () => {
     const user = userEvent.setup();
     useOnboardingStore.setState({
