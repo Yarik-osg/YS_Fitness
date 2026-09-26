@@ -62,7 +62,7 @@ export class AuthController {
       input.clientType === 'WEB'
         ? this.csrf.readCookieToken(request)
         : this.requireBodyToken(input.refreshToken);
-    const result = await this.auth.refresh(token);
+    const result = await this.auth.refresh(token, input.clientType);
     return this.applyTransport(result, input.clientType, response);
   }
 
@@ -91,7 +91,7 @@ export class AuthController {
     clientType: 'WEB' | 'MOBILE',
     response: Response,
   ): AuthResponse {
-    if (clientType === 'WEB') {
+    if (clientType === 'WEB' && result.refreshToken) {
       this.csrf.setBrowserCookies(
         response,
         result.refreshToken,
@@ -103,7 +103,7 @@ export class AuthController {
       user: result.user,
       tokens: {
         ...result.tokens,
-        ...(clientType === 'MOBILE'
+        ...(clientType === 'MOBILE' && result.refreshToken
           ? { refreshToken: result.refreshToken }
           : {}),
       },

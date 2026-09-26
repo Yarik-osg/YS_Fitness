@@ -1,6 +1,7 @@
 import {
   checkoutSchema,
   grantSubscriptionSchema,
+  isPlausibleDateOfBirth,
   onboardingSchema,
   registerSchema,
 } from '@repo/validation';
@@ -190,6 +191,24 @@ describe('shared API contracts', () => {
         expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
       }).success,
     ).toBe(true);
+  });
+
+  it('accepts a real date of birth within the last 120 years', () => {
+    const now = new Date('2026-09-26T12:00:00.000Z');
+
+    expect(isPlausibleDateOfBirth('2006-09-26', now)).toBe(true);
+    expect(isPlausibleDateOfBirth('1906-09-26', now)).toBe(true);
+    expect(isPlausibleDateOfBirth('2026-09-26', now)).toBe(true);
+  });
+
+  it('rejects a date of birth that is not a real calendar date in range', () => {
+    const now = new Date('2026-09-26T12:00:00.000Z');
+
+    expect(isPlausibleDateOfBirth('2026-09-27', now)).toBe(false);
+    expect(isPlausibleDateOfBirth('1906-09-25', now)).toBe(false);
+    expect(isPlausibleDateOfBirth('1890-01-01', now)).toBe(false);
+    expect(isPlausibleDateOfBirth('2026-02-31', now)).toBe(false);
+    expect(isPlausibleDateOfBirth('26-09-2026', now)).toBe(false);
   });
 
   it('rejects a grant expiresAt that is not in the future', () => {

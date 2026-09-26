@@ -29,18 +29,19 @@ interface SessionMetadata {
 }
 
 export interface IssuedAuthResponse extends AuthResponse {
-  refreshToken: string;
+  refreshToken: string | null;
   refreshMaxAgeMs: number;
 }
 
+export const REFRESH_REUSE_GRACE_MS = 10_000;
+
+type SessionUserRecord = User & {
+  profile: { onboardingCompletedAt: Date | null } | null;
+};
+
 type RotationResult =
-  | {
-      kind: 'success';
-      user: User & {
-        profile: { onboardingCompletedAt: Date | null } | null;
-      };
-      refreshToken: string;
-    }
+  | { kind: 'success'; user: SessionUserRecord; refreshToken: string }
+  | { kind: 'grace'; user: SessionUserRecord }
   | { kind: 'replay' }
   | { kind: 'invalid' };
 
@@ -133,12 +134,65 @@ export class AuthService {
     });
   }
 
-  async refresh(refreshToken: string): Promise<IssuedAuthResponse> {
+  async refresh(
+    refreshToken: string,
+    clientType: 'WEB' | 'MOBILE',
+  ): Promise<IssuedAuthResponse> {
     const payload = await this.verifyRefreshToken(refreshToken);
+    const result = await this.rotateWithRetry(
+      refreshToken,
+      payload,
+      clientType,
+    );
+
+    if (result.kind === 'replay') {
+      throw new UnauthorizedException({
+        code: 'REFRESH_TOKEN_REUSED',
+        message: 'Refresh token reuse was detected; the session was revoked',
+      });
+    }
+
+    if (result.kind === 'invalid') {
+      throw new UnauthorizedException({
+        code: 'INVALID_REFRESH_TOKEN',
+        message: 'Refresh token is invalid or expired',
+      });
+    }
+
+    return this.buildResponse(
+      result.user,
+      payload.sessionId,
+      result.kind === 'success' ? result.refreshToken : null,
+    );
+  }
+
+  private async rotateWithRetry(
+    refreshToken: string,
+    payload: RefreshTokenPayload,
+    clientType: 'WEB' | 'MOBILE',
+  ): Promise<RotationResult> {
+    try {
+      return await this.rotate(refreshToken, payload, clientType);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      ) {
+        return this.rotate(refreshToken, payload, clientType);
+      }
+      throw error;
+    }
+  }
+
+  private rotate(
+    refreshToken: string,
+    payload: RefreshTokenPayload,
+    clientType: 'WEB' | 'MOBILE',
+  ): Promise<RotationResult> {
     const tokenHash = this.digest(refreshToken);
     const nextTokenId = randomUUID();
 
-    const result = await this.prisma.$transaction<RotationResult>(
+    return this.prisma.$transaction<RotationResult>(
       async (transaction) => {
         const storedToken = await transaction.authRefreshToken.findUnique({
           where: { id: payload.tokenId },
@@ -162,6 +216,25 @@ export class AuthService {
 
         if (storedToken.consumedAt) {
           const now = new Date();
+          if (
+            clientType === 'WEB' &&
+            now.getTime() - storedToken.consumedAt.getTime() <=
+              REFRESH_REUSE_GRACE_MS &&
+            !storedToken.revokedAt &&
+            !storedToken.session.revokedAt &&
+            storedToken.session.expiresAt > now &&
+            storedToken.session.user.isActive
+          ) {
+            const newerConsumed = await transaction.authRefreshToken.count({
+              where: {
+                sessionId: storedToken.sessionId,
+                consumedAt: { gt: storedToken.consumedAt },
+              },
+            });
+            if (newerConsumed === 0) {
+              return { kind: 'grace', user: storedToken.session.user };
+            }
+          }
           await transaction.authSession.update({
             where: { id: storedToken.sessionId },
             data: { revokedAt: now },
@@ -234,26 +307,6 @@ export class AuthService {
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-
-    if (result.kind === 'replay') {
-      throw new UnauthorizedException({
-        code: 'REFRESH_TOKEN_REUSED',
-        message: 'Refresh token reuse was detected; the session was revoked',
-      });
-    }
-
-    if (result.kind === 'invalid') {
-      throw new UnauthorizedException({
-        code: 'INVALID_REFRESH_TOKEN',
-        message: 'Refresh token is invalid or expired',
-      });
-    }
-
-    return this.buildResponse(
-      result.user,
-      payload.sessionId,
-      result.refreshToken,
     );
   }
 
@@ -334,7 +387,7 @@ export class AuthService {
       profile: { onboardingCompletedAt: Date | null } | null;
     },
     sessionId: string,
-    refreshToken: string,
+    refreshToken: string | null,
   ): Promise<IssuedAuthResponse> {
     const accessToken = await this.jwt.signAsync(
       {

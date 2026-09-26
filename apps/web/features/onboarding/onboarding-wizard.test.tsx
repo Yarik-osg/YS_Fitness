@@ -340,8 +340,10 @@ describe('OnboardingWizard', () => {
     expect(push).toHaveBeenCalledWith({ pathname: '/register' });
   }, 10000);
 
-  it('leaves the last quiz step even when a leftover session cannot save the draft', async () => {
+  it('sends a signed-in user to the first invalid step instead of treating an unsavable draft as done', async () => {
     const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     useAuthStore.getState().setSession('token', {
       id: 'user-1',
       email: 'client@example.com',
@@ -369,7 +371,112 @@ describe('OnboardingWizard', () => {
     );
 
     expect(
-      screen.getByText(/Формуємо рекомендацію відповідно до твоєї мети/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/Формуємо рекомендацію відповідно до твоєї мети/i),
+    ).not.toBeInTheDocument();
+    expect(useOnboardingStore.getState().step).toBe(1);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Деякі відповіді потрібно оновити/i,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('clears answers that belong to the previous track when the track changes', async () => {
+    const user = userEvent.setup();
+    useOnboardingStore.setState({
+      programTrack: 'male',
+      currentBody: '4',
+      physiqueLevel: '4',
+      desiredBody: '2',
+      focusAreas: ['chest'],
+      mealsPerDay: '4-5',
+      eatingHabits: ['late_eating'],
+      step: 0,
+    });
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Для жінок/i }));
+
+    const state = useOnboardingStore.getState();
+    expect(state.programTrack).toBe('female');
+    expect(state.currentBody).toBeUndefined();
+    expect(state.physiqueLevel).toBeUndefined();
+    expect(state.focusAreas).toEqual([]);
+    expect(state.mealsPerDay).toBeUndefined();
+    expect(state.eatingHabits).toEqual([]);
+    expect(state.desiredBody).toBe('2');
+  });
+
+  it('keeps answers when the same track is chosen again', async () => {
+    const user = userEvent.setup();
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      focusAreas: ['glutes'],
+      mealsPerDay: '3',
+      step: 0,
+    });
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Для жінок/i }));
+
+    expect(useOnboardingStore.getState().focusAreas).toEqual(['glutes']);
+    expect(useOnboardingStore.getState().mealsPerDay).toBe('3');
+  });
+
+  it('keeps step 11 blocked for a future date or a date older than 120 years', () => {
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      dateOfBirth: '1890-01-01',
+      heightCm: 168,
+      weightKg: 64,
+      step: 11,
+    });
+
+    const view = render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    ).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /реальну дату народження/i,
+    );
+
+    act(() =>
+      useOnboardingStore.getState().setAnswer({ dateOfBirth: '2099-01-01' }),
+    );
+    expect(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    ).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /реальну дату народження/i,
+    );
+
+    act(() =>
+      useOnboardingStore.getState().setAnswer({ dateOfBirth: '1994-05-10' }),
+    );
+    expect(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    ).toBeEnabled();
+    view.unmount();
   });
 });

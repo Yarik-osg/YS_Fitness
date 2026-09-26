@@ -1,12 +1,15 @@
-import type { MeResponse } from '@repo/shared-types';
 import {
   persistSelectedPlanId,
   readPlanIdFromQuery,
   readSelectedPlanId,
 } from '@/lib/subscriptions/selected-plan';
 
+export type OnboardingStatusUser = {
+  profile?: { onboardingCompletedAt?: string | null } | null;
+};
+
 export function getPostAuthPath(
-  user: MeResponse,
+  user: OnboardingStatusUser,
   selectedPlanId: string | null = readSelectedPlanId() ?? readPlanIdFromQuery(),
 ) {
   if (selectedPlanId) {

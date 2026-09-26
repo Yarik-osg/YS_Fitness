@@ -10,20 +10,23 @@ import { usePathname, useRouter } from '@/i18n/navigation';
 import { refresh } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/users';
 import { persistGuestOnboardingIfReady } from '@/lib/hooks/use-auth';
+import { isSessionLostError } from '@/lib/api/errors';
+import { isAccessTokenFresh } from '@/lib/auth/access-token';
 import {
   getPostAuthPath,
   getPostRegisterPath,
   resolveIncompleteGuestDestination,
+  type OnboardingStatusUser,
 } from '@/lib/auth/routing';
-import { writeSessionHint } from '@/lib/auth/session-cookie';
+import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 
-async function restoreSession(options: { claimGuest?: boolean } = {}) {
-  const response = await refresh();
-  const user = await getMe();
-  useAuthStore
-    .getState()
-    .setSession(response.tokens.accessToken, normalizeSessionUser(user));
+function applyMe(
+  accessToken: string,
+  user: Awaited<ReturnType<typeof getMe>>,
+  options: { claimGuest?: boolean } = {},
+) {
+  useAuthStore.getState().setSession(accessToken, normalizeSessionUser(user));
   writeSessionHint(
     user.profile?.onboardingCompletedAt ? 'complete' : 'onboarding',
   );
@@ -33,6 +36,44 @@ async function restoreSession(options: { claimGuest?: boolean } = {}) {
     bindOnboardingDraftToUser(user.id, { claimGuest: options.claimGuest });
   }
   return user;
+}
+
+function storeOnboardingUser(): OnboardingStatusUser | null {
+  const user = useAuthStore.getState().user;
+  if (!user) return null;
+  return { profile: { onboardingCompletedAt: user.onboardingCompletedAt } };
+}
+
+async function loadMe(
+  fallbackToken: string,
+  options: { claimGuest?: boolean } = {},
+) {
+  try {
+    const me = await getMe();
+    return applyMe(
+      useAuthStore.getState().accessToken ?? fallbackToken,
+      me,
+      options,
+    );
+  } catch (error) {
+    if (isSessionLostError(error)) throw error;
+    const stored = storeOnboardingUser();
+    if (!stored) throw error;
+    return stored;
+  }
+}
+
+async function currentSessionUser(): Promise<OnboardingStatusUser> {
+  const { accessToken, user } = useAuthStore.getState();
+  if (user && accessToken && isAccessTokenFresh(accessToken)) {
+    return loadMe(accessToken, { claimGuest: true });
+  }
+  return restoreSession({ claimGuest: true });
+}
+
+async function restoreSession(options: { claimGuest?: boolean } = {}) {
+  const response = await refresh();
+  return loadMe(response.tokens.accessToken, options);
 }
 
 function LoadingScreen() {
@@ -54,45 +95,50 @@ function LoadingScreen() {
 export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
+  const [readyPath, setReadyPath] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
     async function validate() {
-      useAuthStore.getState().setChecking();
+      let sessionUser: OnboardingStatusUser;
       try {
-        const restoredUser = await restoreSession({ claimGuest: true });
-        if (!active) return;
-        if (
-          pathname.startsWith('/checkout') &&
-          !restoredUser.profile?.onboardingCompletedAt
-        ) {
-          try {
-            await persistGuestOnboardingIfReady();
-          } catch {
-            // Stay on checkout so registration is not sent back through the quiz.
-          }
-          if (active) setReady(true);
-          return;
-        }
-        const destination = getPostAuthPath(restoredUser);
-        if (
-          pathname.startsWith('/dashboard') &&
-          destination.startsWith('/onboarding')
-        ) {
-          router.replace(destination);
-          return;
-        }
-        setReady(true);
+        sessionUser = await currentSessionUser();
       } catch {
         if (!active) return;
         useAuthStore.getState().clearSession();
+        clearSessionHint();
         if (!pathname.startsWith('/checkout')) {
           resetOnboardingDraft();
         }
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        return;
       }
+      if (!active) return;
+
+      if (
+        pathname.startsWith('/checkout') &&
+        !sessionUser.profile?.onboardingCompletedAt
+      ) {
+        const saved = await persistGuestOnboardingIfReady().catch(() => null);
+        if (!active) return;
+        if (saved?.kind === 'saved') {
+          setReadyPath(pathname);
+        } else {
+          router.replace('/onboarding');
+        }
+        return;
+      }
+
+      const destination = getPostAuthPath(sessionUser);
+      if (
+        pathname.startsWith('/dashboard') &&
+        destination.startsWith('/onboarding')
+      ) {
+        router.replace(destination);
+        return;
+      }
+      setReadyPath(pathname);
     }
 
     void validate();
@@ -101,17 +147,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
     };
   }, [pathname, router]);
 
-  return ready ? children : <LoadingScreen />;
+  return readyPath === pathname ? children : <LoadingScreen />;
 }
 
 export function GuestGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
+  const [readyPath, setReadyPath] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    restoreSession({ claimGuest: true })
+    currentSessionUser()
       .then(async (user) => {
         if (!active) return;
         if (user.profile?.onboardingCompletedAt) {
@@ -122,18 +168,12 @@ export function GuestGate({ children }: { children: ReactNode }) {
           );
           return;
         }
-        let saved = false;
-        try {
-          saved = Boolean(await persistGuestOnboardingIfReady());
-        } catch {
-          // Leave the register form in place when the quiz cannot be saved.
-        }
-        if (pathname.startsWith('/register') && saved) {
-          router.replace(getPostRegisterPath());
-          return;
-        }
+        const saved = await persistGuestOnboardingIfReady().catch(() => null);
+        if (!active) return;
         if (pathname.startsWith('/register')) {
-          if (active) setReady(true);
+          router.replace(
+            saved?.kind === 'saved' ? getPostRegisterPath() : '/onboarding',
+          );
           return;
         }
         const destination = resolveIncompleteGuestDestination(pathname);
@@ -141,10 +181,10 @@ export function GuestGate({ children }: { children: ReactNode }) {
           router.replace(destination);
           return;
         }
-        if (active) setReady(true);
+        if (active) setReadyPath(pathname);
       })
       .catch(() => {
-        if (active) setReady(true);
+        if (active) setReadyPath(pathname);
       });
 
     return () => {
@@ -152,5 +192,5 @@ export function GuestGate({ children }: { children: ReactNode }) {
     };
   }, [pathname, router]);
 
-  return ready ? children : <LoadingScreen />;
+  return readyPath === pathname ? children : <LoadingScreen />;
 }

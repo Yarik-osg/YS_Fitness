@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { OnboardingResponsesResponse } from '@repo/shared-types';
-import type { OnboardingInput } from '@repo/validation';
+import { isPlausibleDateOfBirth, type OnboardingInput } from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   sameOnboardingResponses,
@@ -139,25 +139,14 @@ export class UsersService {
   }
 
   private validateDateOfBirth(value: string): Date {
-    const date = new Date(`${value}T00:00:00.000Z`);
-    const now = new Date();
-    const oldest = new Date(
-      Date.UTC(now.getUTCFullYear() - 120, now.getUTCMonth(), now.getUTCDate()),
-    );
-
-    if (
-      Number.isNaN(date.getTime()) ||
-      date > now ||
-      date < oldest ||
-      date.toISOString().slice(0, 10) !== value
-    ) {
+    if (!isPlausibleDateOfBirth(value)) {
       throw new BadRequestException({
         code: 'INVALID_DATE_OF_BIRTH',
         message: 'dateOfBirth must be a real date within the last 120 years',
       });
     }
 
-    return date;
+    return new Date(`${value}T00:00:00.000Z`);
   }
 
   private validateTimezone(value: string): void {

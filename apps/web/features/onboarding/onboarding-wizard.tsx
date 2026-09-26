@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ActivityLevel } from '@repo/shared-types';
-import { onboardingProfileSchema } from '@repo/validation';
+import {
+  isPlausibleDateOfBirth,
+  onboardingProfileSchema,
+} from '@repo/validation';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
+import { ApiClientError } from '@/lib/api/client';
 import { getUserFacingError } from '@/lib/api/errors';
 import { cn } from '@/lib/utils';
 import { clearSessionHint } from '@/lib/auth/session-cookie';
@@ -28,8 +32,14 @@ import {
 } from './body-figure';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
 import { previewProgramId } from './preview-program';
-import { useOnboardingStore, type OnboardingState } from './onboarding-store';
-import { tryBuildOnboardingPayload } from './payload';
+import {
+  reportOnboardingSubmitError,
+  useOnboardingHydrated,
+  useOnboardingStore,
+  type OnboardingState,
+  type OnboardingSubmitError,
+} from './onboarding-store';
+import { validateOnboardingDraft } from './payload';
 import {
   biologicalSexFromProgramTrack,
   ONBOARDING_WIZARD_STEPS,
@@ -40,6 +50,14 @@ const CURRENT_BODY_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 const DESIRED_BODY_STEPS = [0, 1, 2, 3] as const;
 
 const TOTAL_STEPS = ONBOARDING_WIZARD_STEPS;
+
+const TRACK_BOUND_RESET = {
+  currentBody: undefined,
+  physiqueLevel: undefined,
+  focusAreas: [],
+  mealsPerDay: undefined,
+  eatingHabits: [],
+} satisfies Partial<OnboardingState>;
 
 function MetricField({
   id,
@@ -80,6 +98,7 @@ function accent(chunks: ReactNode) {
 export function OnboardingWizard() {
   const router = useRouter();
   const draft = useOnboardingStore();
+  const hydrated = useOnboardingHydrated();
   const saveOnboarding = useSaveOnboarding();
   const t = useTranslations('onboarding');
   const tAuth = useTranslations('auth');
@@ -313,10 +332,10 @@ export function OnboardingWizard() {
 
   useEffect(() => {
     if (step === 1 && !draft.currentBody && currentBodyChoices[0]) {
-      draft.setAnswer({ currentBody: currentBodyChoices[0].value });
+      useOnboardingStore.setState({ currentBody: currentBodyChoices[0].value });
     }
     if (step === 6 && !draft.activityLevel) {
-      draft.setAnswer({ activityLevel: 'MODERATELY_ACTIVE' });
+      useOnboardingStore.setState({ activityLevel: 'MODERATELY_ACTIVE' });
     }
   }, [currentBodyChoices, draft, step]);
 
@@ -330,6 +349,8 @@ export function OnboardingWizard() {
 
   async function next() {
     if (!isCurrentStepValid()) return;
+    if (draft.submitError)
+      useOnboardingStore.setState({ submitError: undefined });
     if (step < TOTAL_STEPS - 1) {
       draft.setStep(step + 1);
       return;
@@ -340,18 +361,31 @@ export function OnboardingWizard() {
       return;
     }
 
-    const payload = tryBuildOnboardingPayload(draft);
-    if (!payload) {
-      setPhase('analysis');
+    const validation = validateOnboardingDraft(draft);
+    if (!validation.ok) {
+      reportOnboardingSubmitError(validation.step, {
+        code: 'ONBOARDING_INCOMPLETE',
+      });
       return;
     }
 
     try {
-      await saveOnboarding.mutateAsync(payload);
+      await saveOnboarding.mutateAsync(validation.payload);
       setPhase('analysis');
     } catch {
       // The mutation error is rendered without clearing the persisted draft.
     }
+  }
+
+  function submitErrorMessage(error: OnboardingSubmitError) {
+    if (error.code === 'ONBOARDING_INCOMPLETE') return t('errors.incomplete');
+    if (error.code === 'INVALID_DATE_OF_BIRTH') return t('errors.dateOfBirth');
+    return getUserFacingError(
+      error.status === undefined
+        ? error
+        : new ApiClientError(error.status, error.code, error.message ?? ''),
+      tAuth,
+    );
   }
 
   function isCurrentStepValid() {
@@ -379,22 +413,29 @@ export function OnboardingWizard() {
       case 10:
         return draft.eatingHabits.length > 0;
       case 11:
-        return onboardingProfileSchema
-          .pick({ dateOfBirth: true, heightCm: true, weightKg: true })
-          .safeParse({
-            dateOfBirth: draft.dateOfBirth,
-            heightCm: draft.heightCm,
-            weightKg: draft.weightKg,
-          }).success;
+        return (
+          onboardingProfileSchema
+            .pick({ dateOfBirth: true, heightCm: true, weightKg: true })
+            .safeParse({
+              dateOfBirth: draft.dateOfBirth,
+              heightCm: draft.heightCm,
+              weightKg: draft.weightKg,
+            }).success && isPlausibleDateOfBirth(draft.dateOfBirth ?? '')
+        );
       default:
         return false;
     }
   }
 
+  const dateWellFormed = /^\d{4}-\d{2}-\d{2}$/.test(draft.dateOfBirth ?? '');
+  const dateImplausible =
+    dateWellFormed && !isPlausibleDateOfBirth(draft.dateOfBirth ?? '');
+
   const trackClass =
     step === 0 ? undefined : male ? 'track-male' : 'track-female';
   const shellClass = trackClass;
 
+  if (!hydrated) return <DraftLoading />;
   if (phase === 'analysis') return <Analysis className={shellClass} />;
   if (phase === 'plan') {
     return (
@@ -425,9 +466,11 @@ export function OnboardingWizard() {
     onContinue: () => void next(),
     canContinue: isCurrentStepValid(),
     pending: saveOnboarding.isPending,
-    error: saveOnboarding.error
-      ? getUserFacingError(saveOnboarding.error, tAuth)
-      : null,
+    error: draft.submitError
+      ? submitErrorMessage(draft.submitError)
+      : saveOnboarding.error
+        ? getUserFacingError(saveOnboarding.error, tAuth)
+        : null,
     className: trackClass,
     continueLabel: step === 1 ? t('chooseForm') : undefined,
     continueClassName:
@@ -449,14 +492,17 @@ export function OnboardingWizard() {
         >
           <ChoiceList
             value={draft.programTrack}
-            onChange={(value) =>
+            onChange={(value) => {
+              const programTrack = value as 'female' | 'male';
               draft.setAnswer({
-                programTrack: value as 'female' | 'male',
-                biologicalSexForCalculation: biologicalSexFromProgramTrack(
-                  value as 'female' | 'male',
-                ),
-              })
-            }
+                programTrack,
+                biologicalSexForCalculation:
+                  biologicalSexFromProgramTrack(programTrack),
+                ...(draft.programTrack && draft.programTrack !== programTrack
+                  ? TRACK_BOUND_RESET
+                  : {}),
+              });
+            }}
             choices={[
               {
                 value: 'female',
@@ -654,21 +700,28 @@ export function OnboardingWizard() {
           continueLabel={t('steps.metrics.build')}
         >
           <div className="space-y-4">
-            <MetricField
-              id="dateOfBirth"
-              label={t('steps.metrics.dateOfBirth')}
-            >
-              <input
+            <div>
+              <MetricField
                 id="dateOfBirth"
-                type="date"
-                max={new Date().toISOString().slice(0, 10)}
-                value={draft.dateOfBirth ?? ''}
-                className={`${metricInputClass} [color-scheme:dark]`}
-                onChange={(event) =>
-                  draft.setAnswer({ dateOfBirth: event.target.value })
-                }
-              />
-            </MetricField>
+                label={t('steps.metrics.dateOfBirth')}
+              >
+                <input
+                  id="dateOfBirth"
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={draft.dateOfBirth ?? ''}
+                  className={`${metricInputClass} [color-scheme:dark]`}
+                  onChange={(event) =>
+                    draft.setAnswer({ dateOfBirth: event.target.value })
+                  }
+                />
+              </MetricField>
+              {dateImplausible ? (
+                <p role="alert" className="mt-2 text-xs text-red-300">
+                  {t('errors.dateOfBirth')}
+                </p>
+              ) : null}
+            </div>
             <MetricField
               id="heightCm"
               label={t('steps.metrics.height')}
@@ -725,6 +778,17 @@ export function OnboardingWizard() {
     default:
       return null;
   }
+}
+
+function DraftLoading() {
+  return (
+    <main
+      aria-busy="true"
+      className="grid min-h-screen place-items-center px-6"
+    >
+      <div className="h-0.5 w-24 animate-pulse bg-white/30" />
+    </main>
+  );
 }
 
 function Analysis({ className }: { className?: string }) {

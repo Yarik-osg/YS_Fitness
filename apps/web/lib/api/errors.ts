@@ -34,6 +34,18 @@ export function getUserFacingErrorKey(error: unknown): AuthErrorMessageKey {
   return 'errors.UNKNOWN';
 }
 
+export function isSessionLostError(error: unknown): boolean {
+  if (!(error instanceof ApiClientError)) return false;
+  if (error.status === 401) return true;
+  return (
+    error.code === 'REFRESH_TOKEN_REQUIRED' ||
+    error.code === 'REFRESH_TOKEN_INVALID' ||
+    error.code === 'INVALID_REFRESH_TOKEN' ||
+    error.code === 'REFRESH_TOKEN_REUSED' ||
+    error.code === 'SESSION_REVOKED'
+  );
+}
+
 export function getUserFacingError(
   error: unknown,
   t: (key: AuthErrorMessageKey) => string,
