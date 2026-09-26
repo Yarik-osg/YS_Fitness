@@ -24,7 +24,7 @@ function LocaleSwitcherLabel({ onClick }: { onClick?: () => void }) {
       type="button"
       aria-label={t('nav.switchLocale')}
       onClick={onClick}
-      className="font-label text-[6px] tracking-[0.1em] text-white"
+      className="font-label text-[10px] font-semibold tracking-[0.1em] text-white uppercase"
     >
       {locale === 'uk' ? t('nav.localeUk') : t('nav.localeEn')}
     </button>

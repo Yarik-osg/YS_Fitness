@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import type { PlanResponse, SubscriptionResponse } from '@repo/shared-types';
 import { Check } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
@@ -109,7 +109,7 @@ function CheckoutFlow() {
   }
 
   if (subscription) {
-    return <CheckoutSuccess subscription={subscription} />;
+    return <CheckoutSuccess />;
   }
 
   if (plansQuery.isPending || plansQuery.isLoading) {
@@ -498,38 +498,63 @@ function PaymentStep({
   );
 }
 
-function CheckoutSuccess({
-  subscription,
-}: {
-  subscription: SubscriptionResponse;
-}) {
+function CheckoutSuccess() {
   const t = useTranslations('checkout');
-  const locale = useLocale();
-  const periodEnd = formatPeriodEnd(subscription.currentPeriodEnd, locale);
 
   return (
-    <CheckoutFrame>
+    <CheckoutFrame hideIntro>
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="mb-8 grid size-20 place-items-center rounded-full border-2 border-accent bg-accent/8 shadow-[0_0_40px_color-mix(in_srgb,var(--accent)_20%,transparent)]">
-          <Check size={32} strokeWidth={2.4} className="text-accent" />
+        <div className="mb-8 grid size-28 place-items-center rounded-full border-2 border-accent bg-accent/8 shadow-[0_0_56px_color-mix(in_srgb,var(--accent)_28%,transparent)]">
+          <Check size={44} strokeWidth={2.2} className="text-accent" />
         </div>
-        <p className="font-label text-[9px] font-semibold uppercase tracking-[0.2em] text-[#00c7c8]">
+        <p className="font-label text-[10px] font-semibold uppercase tracking-[0.22em] text-[#00c7c8]">
           {t('eyebrow')}
         </p>
-        <h1 className="mt-3.5 font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em]">
+        <h1 className="mt-4 font-heading text-[34px] font-normal uppercase leading-10 tracking-[-0.02em]">
           {t.rich('successTitle', {
             accent: (chunks) => <span className="text-accent">{chunks}</span>,
           })}
         </h1>
         <div className="mx-auto my-5 h-px w-15 bg-accent" />
-        <p className="max-w-[17.5rem] text-[13px] leading-[1.65] text-white/60">
-          {t('successBody', { plan: subscription.plan.name, periodEnd })}
+        <p className="max-w-[18rem] text-[13px] leading-[1.65] text-white/60">
+          {t('successBody')}
         </p>
+        <div className="mt-10 grid w-full grid-cols-3 gap-3 border-t border-white/8 pt-6">
+          <SuccessStat
+            value={t('successStatWeeks')}
+            label={t('successStatWeeksLabel')}
+          />
+          <SuccessStat
+            value={t('successStatAccess')}
+            label={t('successStatAccessLabel')}
+          />
+          <SuccessStat
+            value={t('successStatReady')}
+            label={t('successStatReadyLabel')}
+          />
+        </div>
         <Link href="/dashboard" className="mt-12 inline-block w-full">
           <Button className="w-full">{t('dashboardCta')}</Button>
         </Link>
+        <p className="mt-8 font-label text-[8px] font-medium tracking-[0.12em] text-white/35">
+          TRAIN.&nbsp;&nbsp;DISCIPLINE.&nbsp;&nbsp;
+          <span className="text-[#c8ff2e]">EVOLVE</span>
+        </p>
       </div>
     </CheckoutFrame>
+  );
+}
+
+function SuccessStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="font-heading text-[26px] leading-none tracking-tight text-white">
+        {value}
+      </p>
+      <p className="mt-2 font-label text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+        {label}
+      </p>
+    </div>
   );
 }
 
@@ -538,11 +563,13 @@ function CheckoutFrame({
   eyebrow,
   title,
   onBack,
+  hideIntro = false,
 }: {
   children: React.ReactNode;
   eyebrow?: string;
   title?: React.ReactNode;
   onBack?: () => void;
+  hideIntro?: boolean;
 }) {
   const t = useTranslations('checkout');
   const tOnboarding = useTranslations('onboarding');
@@ -571,18 +598,29 @@ function CheckoutFrame({
         <LocaleSwitcher />
       </header>
       <div className="h-px bg-white/8" />
-      <p className="relative mt-7 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
-        {eyebrow ?? t('title')}
-      </p>
-      {title ? (
+      {hideIntro ? null : (
         <>
-          <h1 className="relative mt-2.5 font-heading text-[28px] font-normal uppercase leading-8 tracking-[-0.02em]">
-            {title}
-          </h1>
-          <div className="relative my-2.5 h-px w-15 bg-accent" />
+          <p className="relative mt-7 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
+            {eyebrow ?? t('title')}
+          </p>
+          {title ? (
+            <>
+              <h1 className="relative mt-2.5 font-heading text-[28px] font-normal uppercase leading-8 tracking-[-0.02em]">
+                {title}
+              </h1>
+              <div className="relative my-2.5 h-px w-15 bg-accent" />
+            </>
+          ) : null}
         </>
-      ) : null}
-      <div className="relative mt-5 flex-1">{children}</div>
+      )}
+      <div
+        className={cn(
+          'relative flex-1',
+          hideIntro ? 'mt-8 flex flex-col' : 'mt-5',
+        )}
+      >
+        {children}
+      </div>
     </main>
   );
 }
@@ -621,11 +659,4 @@ function planCopy(
         features: t.raw('pricing.plans.FULL_ACCESS.features') as string[],
       };
   }
-}
-
-function formatPeriodEnd(value: string | null, locale: string) {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-  }).format(new Date(value));
 }

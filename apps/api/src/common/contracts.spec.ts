@@ -7,6 +7,7 @@ import {
 } from '@repo/validation';
 
 const femaleOnboarding = {
+  name: 'Olena',
   dateOfBirth: '1990-01-01',
   biologicalSexForCalculation: 'FEMALE',
   heightCm: 168,
@@ -28,6 +29,7 @@ const femaleOnboarding = {
 } as const;
 
 const maleOnboarding = {
+  name: 'Andrii',
   dateOfBirth: '1990-01-15',
   biologicalSexForCalculation: 'MALE',
   heightCm: 180,
@@ -71,6 +73,7 @@ describe('shared API contracts', () => {
 
   it('accepts a full female onboarding payload', () => {
     const result = onboardingSchema.safeParse({
+      name: 'Olena',
       dateOfBirth: '1990-01-01',
       biologicalSexForCalculation: 'FEMALE',
       heightCm: 168,
@@ -97,6 +100,7 @@ describe('shared API contracts', () => {
 
   it('accepts a full male onboarding payload', () => {
     const result = onboardingSchema.safeParse({
+      name: 'Andrii',
       dateOfBirth: '1990-01-15',
       biologicalSexForCalculation: 'MALE',
       heightCm: 180,
@@ -173,6 +177,38 @@ describe('shared API contracts', () => {
         }),
       ),
     ).toContainEqual(['physiqueLevel']);
+  });
+
+  it('rejects a name that is not letters only', () => {
+    expect(
+      issuePaths(
+        onboardingSchema.safeParse({ ...femaleOnboarding, name: 'Anna2' }),
+      ),
+    ).toContainEqual(['name']);
+    expect(
+      issuePaths(
+        onboardingSchema.safeParse({ ...femaleOnboarding, name: 'A' }),
+      ),
+    ).toContainEqual(['name']);
+  });
+
+  it('accepts Ukrainian and English names that use an apostrophe', () => {
+    expect(
+      onboardingSchema.safeParse({
+        ...femaleOnboarding,
+        name: 'Мар\u02BCяна',
+      }).success,
+    ).toBe(true);
+    expect(
+      onboardingSchema.safeParse({
+        ...femaleOnboarding,
+        name: 'Мар\u2019яна',
+      }).success,
+    ).toBe(true);
+    expect(
+      onboardingSchema.safeParse({ ...maleOnboarding, name: "O'Brien" })
+        .success,
+    ).toBe(true);
   });
 
   it('requires uuid plan and user identifiers for subscription writes', () => {

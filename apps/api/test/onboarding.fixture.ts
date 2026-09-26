@@ -1,6 +1,7 @@
 import type { OnboardingInput } from '@repo/validation';
 
 export const FEMALE_ONBOARDING = {
+  name: 'Olena',
   dateOfBirth: '1990-05-10',
   biologicalSexForCalculation: 'FEMALE',
   heightCm: 168,

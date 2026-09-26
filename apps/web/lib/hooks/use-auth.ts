@@ -80,6 +80,7 @@ export async function persistGuestOnboardingIfReady(): Promise<GuestOnboardingRe
     useAuthStore.setState({
       user: {
         ...currentUser,
+        name: response.profile.name,
         onboardingCompletedAt: response.profile.onboardingCompletedAt,
       },
     });

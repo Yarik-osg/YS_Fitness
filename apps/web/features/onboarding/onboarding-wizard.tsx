@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ActivityLevel } from '@repo/shared-types';
 import {
+  HEIGHT_CM,
+  WEIGHT_KG,
   isPlausibleDateOfBirth,
+  isValidPersonName,
   onboardingProfileSchema,
 } from '@repo/validation';
-import { Check } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
@@ -63,11 +66,13 @@ function MetricField({
   id,
   label,
   unit,
+  invalid,
   children,
 }: {
   id: string;
   label: string;
   unit?: string;
+  invalid?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -78,7 +83,12 @@ function MetricField({
       >
         {label}
       </label>
-      <div className="flex items-center gap-2 border border-white/12 bg-white/4 px-4 py-3.5 focus-within:border-accent">
+      <div
+        className={cn(
+          'flex items-center gap-2 border bg-white/4 px-4 py-3 focus-within:border-accent',
+          invalid ? 'border-red-400' : 'border-white/12',
+        )}
+      >
         <div className="min-w-0 flex-1">{children}</div>
         {unit ? (
           <span className="shrink-0 text-xs text-white/40">{unit}</span>
@@ -88,8 +98,96 @@ function MetricField({
   );
 }
 
+const DEFAULT_HEIGHT_CM = 170;
+const DEFAULT_WEIGHT_KG = 60;
+
+function StepperMetricField({
+  id,
+  label,
+  unit,
+  value,
+  min,
+  max,
+  step,
+  emptyValue,
+  placeholder,
+  decreaseLabel,
+  increaseLabel,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  unit: string;
+  value?: number;
+  min: number;
+  max: number;
+  step: number;
+  emptyValue: number;
+  placeholder: string;
+  decreaseLabel: string;
+  increaseLabel: string;
+  error: string;
+  onChange: (value: number | undefined) => void;
+}) {
+  const invalid = value !== undefined && (value < min || value > max);
+
+  function bump(direction: 1 | -1) {
+    const base =
+      value === undefined || Number.isNaN(value) ? emptyValue : value;
+    const next = Math.round((base + direction * step) / step) * step;
+    onChange(Math.min(max, Math.max(min, next)));
+  }
+
+  return (
+    <div>
+      <MetricField id={id} label={label} unit={unit} invalid={invalid}>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={decreaseLabel}
+            onClick={() => bump(-1)}
+            className="grid size-7 shrink-0 place-items-center text-white/45 transition hover:text-accent"
+          >
+            <ChevronLeft size={18} strokeWidth={1.8} />
+          </button>
+          <input
+            id={id}
+            type="number"
+            inputMode="decimal"
+            min={min}
+            max={max}
+            step={step}
+            placeholder={placeholder}
+            value={value ?? ''}
+            className={`${metricInputClass} appearance-none text-center`}
+            onChange={(event) =>
+              onChange(
+                event.target.value ? event.target.valueAsNumber : undefined,
+              )
+            }
+          />
+          <button
+            type="button"
+            aria-label={increaseLabel}
+            onClick={() => bump(1)}
+            className="grid size-7 shrink-0 place-items-center text-white/45 transition hover:text-accent"
+          >
+            <ChevronRight size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+      </MetricField>
+      {invalid ? (
+        <p role="alert" className="mt-2 text-xs text-red-300">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 const metricInputClass =
-  'w-full border-0 bg-transparent p-0 font-heading text-[32px] text-white shadow-none outline-none ring-0 placeholder:text-white/25 focus:bg-transparent focus:outline-none focus:ring-0';
+  'w-full border-0 bg-transparent p-0 font-heading text-[18px] text-white shadow-none outline-none ring-0 placeholder:text-white/25 focus:bg-transparent focus:outline-none focus:ring-0';
 
 function accent(chunks: ReactNode) {
   return <span className="text-accent">{chunks}</span>;
@@ -337,6 +435,15 @@ export function OnboardingWizard() {
     if (step === 6 && !draft.activityLevel) {
       useOnboardingStore.setState({ activityLevel: 'MODERATELY_ACTIVE' });
     }
+    if (
+      step === 11 &&
+      (draft.heightCm === undefined || draft.weightKg === undefined)
+    ) {
+      useOnboardingStore.setState({
+        heightCm: draft.heightCm ?? DEFAULT_HEIGHT_CM,
+        weightKg: draft.weightKg ?? DEFAULT_WEIGHT_KG,
+      });
+    }
   }, [currentBodyChoices, draft, step]);
 
   function previous() {
@@ -414,13 +521,15 @@ export function OnboardingWizard() {
         return draft.eatingHabits.length > 0;
       case 11:
         return (
+          isValidPersonName(draft.name ?? '') &&
           onboardingProfileSchema
             .pick({ dateOfBirth: true, heightCm: true, weightKg: true })
             .safeParse({
               dateOfBirth: draft.dateOfBirth,
               heightCm: draft.heightCm,
               weightKg: draft.weightKg,
-            }).success && isPlausibleDateOfBirth(draft.dateOfBirth ?? '')
+            }).success &&
+          isPlausibleDateOfBirth(draft.dateOfBirth ?? '')
         );
       default:
         return false;
@@ -430,6 +539,8 @@ export function OnboardingWizard() {
   const dateWellFormed = /^\d{4}-\d{2}-\d{2}$/.test(draft.dateOfBirth ?? '');
   const dateImplausible =
     dateWellFormed && !isPlausibleDateOfBirth(draft.dateOfBirth ?? '');
+  const nameTyped = Boolean(draft.name?.trim());
+  const nameInvalid = nameTyped && !isValidPersonName(draft.name ?? '');
 
   const trackClass =
     step === 0 ? undefined : male ? 'track-male' : 'track-female';
@@ -702,6 +813,31 @@ export function OnboardingWizard() {
           <div className="space-y-4">
             <div>
               <MetricField
+                id="name"
+                label={t('steps.metrics.name')}
+                invalid={nameInvalid}
+              >
+                <input
+                  id="name"
+                  type="text"
+                  autoComplete="given-name"
+                  inputMode="text"
+                  placeholder={t('steps.metrics.namePlaceholder')}
+                  value={draft.name ?? ''}
+                  className={metricInputClass}
+                  onChange={(event) =>
+                    draft.setAnswer({ name: event.target.value })
+                  }
+                />
+              </MetricField>
+              {nameInvalid ? (
+                <p role="alert" className="mt-2 text-xs text-red-300">
+                  {t('errors.name')}
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <MetricField
                 id="dateOfBirth"
                 label={t('steps.metrics.dateOfBirth')}
               >
@@ -722,53 +858,50 @@ export function OnboardingWizard() {
                 </p>
               ) : null}
             </div>
-            <MetricField
+            <StepperMetricField
               id="heightCm"
               label={t('steps.metrics.height')}
               unit={t('steps.metrics.heightUnit')}
-            >
-              <input
-                id="heightCm"
-                type="number"
-                inputMode="decimal"
-                min={80}
-                max={250}
-                placeholder="180"
-                value={draft.heightCm ?? ''}
-                className={`${metricInputClass} appearance-none`}
-                onChange={(event) =>
-                  draft.setAnswer({
-                    heightCm: event.target.value
-                      ? event.target.valueAsNumber
-                      : undefined,
-                  })
-                }
-              />
-            </MetricField>
-            <MetricField
+              value={draft.heightCm}
+              min={HEIGHT_CM.min}
+              max={HEIGHT_CM.max}
+              step={1}
+              emptyValue={DEFAULT_HEIGHT_CM}
+              placeholder="170"
+              decreaseLabel={t('steps.metrics.decrease', {
+                field: t('steps.metrics.height'),
+              })}
+              increaseLabel={t('steps.metrics.increase', {
+                field: t('steps.metrics.height'),
+              })}
+              error={t('errors.height', {
+                min: HEIGHT_CM.min,
+                max: HEIGHT_CM.max,
+              })}
+              onChange={(heightCm) => draft.setAnswer({ heightCm })}
+            />
+            <StepperMetricField
               id="weightKg"
               label={t('steps.metrics.weight')}
               unit={t('steps.metrics.weightUnit')}
-            >
-              <input
-                id="weightKg"
-                type="number"
-                inputMode="decimal"
-                min={25}
-                max={500}
-                step="0.1"
-                placeholder="80"
-                value={draft.weightKg ?? ''}
-                className={`${metricInputClass} appearance-none`}
-                onChange={(event) =>
-                  draft.setAnswer({
-                    weightKg: event.target.value
-                      ? event.target.valueAsNumber
-                      : undefined,
-                  })
-                }
-              />
-            </MetricField>
+              value={draft.weightKg}
+              min={WEIGHT_KG.min}
+              max={WEIGHT_KG.max}
+              step={0.5}
+              emptyValue={DEFAULT_WEIGHT_KG}
+              placeholder="60"
+              decreaseLabel={t('steps.metrics.decrease', {
+                field: t('steps.metrics.weight'),
+              })}
+              increaseLabel={t('steps.metrics.increase', {
+                field: t('steps.metrics.weight'),
+              })}
+              error={t('errors.weight', {
+                min: WEIGHT_KG.min,
+                max: WEIGHT_KG.max,
+              })}
+              onChange={(weightKg) => draft.setAnswer({ weightKg })}
+            />
             <p className="border border-accent/18 bg-accent/5 px-4 py-3.5 text-[11px] leading-relaxed text-white/55">
               {t('steps.metrics.privacy')}
             </p>

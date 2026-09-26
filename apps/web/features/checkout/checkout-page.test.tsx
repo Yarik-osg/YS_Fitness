@@ -143,6 +143,7 @@ describe('CheckoutPage', () => {
     expect(
       screen.getByRole('heading', { name: /останній крок/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText('Твоя програма')).toBeInTheDocument();
     expect(screen.getByText(/•••• •••• •••• ••••/)).toBeInTheDocument();
 
     const pay = screen.getByRole('button', { name: /оплатити 3490/i });
@@ -160,11 +161,15 @@ describe('CheckoutPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/ти в грі/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/FULL ACCESS/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /кабінет/i })).toHaveAttribute(
-      'href',
-      '/dashboard',
-    );
+    expect(
+      screen.getByText(/вже доступна в особистому кабінеті/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('24/7')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /перейти до програми/i }),
+    ).toHaveAttribute('href', '/dashboard');
   });
 
   it('shows a retry when the plan catalog cannot be loaded', async () => {

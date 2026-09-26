@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { PlanResponse } from '@repo/shared-types';
-import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { usePlans } from '@/lib/hooks/use-subscriptions';
 import {
@@ -146,7 +145,7 @@ function PlanCard({
   return (
     <article
       className={cn(
-        'relative overflow-hidden border',
+        'relative overflow-hidden border-[1.5px]',
         isProgress && 'border-[#c8ff2e]/27 bg-[#c8ff2e]/[0.025]',
         isFull && 'border-accent/30 bg-accent/[0.02]',
         !isProgress && !isFull && 'border-white/9 bg-white/[0.01]',
@@ -172,7 +171,7 @@ function PlanCard({
               {copy.name}
             </span>
             <span className="inline-block h-2.5 w-px bg-white/15" />
-            <span className="text-[10px] uppercase text-white/35">
+            <span className="text-[10px] font-medium uppercase text-white/35">
               {copy.period}
             </span>
             {isProgress ? (
@@ -185,53 +184,58 @@ function PlanCard({
             ) : null}
           </div>
           {isProgress ? (
-            <span className="shrink-0 bg-[#c8ff2e] px-2.5 py-0.5 font-label text-[7px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
+            <span className="shrink-0 bg-[#c8ff2e] px-[9px] py-[3px] font-label text-[7px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
               {t('pricing.featuredBadge')}
             </span>
           ) : null}
         </div>
         <p
           className={cn(
-            'flex items-baseline gap-1 font-heading font-normal leading-none tracking-tight',
+            'mb-2.5 flex items-baseline gap-1 font-heading font-normal leading-none tracking-[-0.02em]',
             isProgress ? 'text-[44px]' : 'text-[34px]',
           )}
         >
           {price}
-          <span className="text-[20px] text-white/40">₴</span>
+          <span className="font-heading text-[20px] font-normal text-white/40">
+            ₴
+          </span>
           {saved ? (
             <span className="ml-2 border border-[#c8ff2e]/30 bg-[#c8ff2e]/15 px-2 py-0.5 font-label text-[7.5px] font-bold tracking-[0.1em] text-[#c8ff2e]">
               {t('pricing.savings', { amount: saved })}
             </span>
           ) : null}
         </p>
-        <p className="mt-2.5 text-xs leading-[1.55] text-white/45">
+        <p className="mb-4 text-xs font-medium leading-[1.55] text-white/45">
           {copy.description}
         </p>
-        <div className="mt-4 mb-[18px] flex gap-2">
-          <Button
-            variant={isProgress ? 'primary' : 'outline'}
-            className={cn(
-              'h-auto min-h-0 flex-1 px-2.5 py-3 text-[10px] tracking-[0.13em]',
-              isProgress &&
-                'border-[#c8ff2e] bg-[#c8ff2e] text-[#0b0b0b] shadow-none',
-              isFull && 'border-accent text-accent',
-              !isProgress && !isFull && 'border-white/55 text-white/55',
-            )}
+        <div className="mb-[18px] flex gap-2">
+          <button
+            type="button"
             disabled={disabled}
             onClick={onChoose}
+            className={cn(
+              'flex-1 whitespace-nowrap px-2.5 py-3 font-label text-xs font-bold tracking-[0.14em] uppercase disabled:cursor-not-allowed disabled:opacity-45',
+              isProgress &&
+                'border-[1.5px] border-[#c8ff2e] bg-[#c8ff2e] text-[#0b0b0b]',
+              isFull &&
+                'border-[1.5px] border-accent bg-transparent text-accent',
+              !isProgress &&
+                !isFull &&
+                'border-[1.5px] border-white/55 bg-transparent text-white/55',
+            )}
           >
             {pending ? t('pricing.choosing') : copy.choose}
-          </Button>
+          </button>
           <button
             type="button"
             aria-expanded={expanded}
             onClick={onToggleIncludes}
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap border border-white/10 px-3.5 py-3 font-label text-[9px] font-semibold tracking-[0.1em] text-white/40 uppercase"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap border border-white/10 bg-transparent px-3.5 py-3 font-label text-xs font-semibold tracking-[0.1em] text-white/40 uppercase"
           >
             {expanded ? t('pricing.collapse') : t('pricing.includes')}
             <ChevronDown
               size={10}
-              strokeWidth={1.8}
+              strokeWidth={1.4}
               className={cn('transition-transform', expanded && 'rotate-180')}
             />
           </button>

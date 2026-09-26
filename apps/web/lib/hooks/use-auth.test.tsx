@@ -37,6 +37,7 @@ const completeDraft = {
   mealsPerDay: '3',
   eatingHabits: ['snacking'],
   goal: 'LOSE_WEIGHT' as const,
+  name: 'Olena',
   dateOfBirth: '1994-05-10',
   heightCm: 168,
   weightKg: 64.5,

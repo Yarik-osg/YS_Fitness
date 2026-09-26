@@ -81,6 +81,12 @@ describe('UsersService.saveOnboarding', () => {
 
     await service.saveOnboarding(userId, FEMALE_ONBOARDING);
 
+    expect(userProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ name: 'Olena' }),
+        update: expect.objectContaining({ name: 'Olena' }),
+      }),
+    );
     expect(onboardingResponses.upsert).not.toHaveBeenCalled();
     expect(bodyMeasurement.create).not.toHaveBeenCalled();
   });

@@ -13,6 +13,7 @@ const femaleDraft = {
   nutritionCurrent: 'balanced',
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
+  name: 'Olena',
   dateOfBirth: '1994-05-10',
   biologicalSexForCalculation: 'FEMALE' as const,
   heightCm: 168,
@@ -26,6 +27,7 @@ describe('buildOnboardingPayload', () => {
     const payload = buildOnboardingPayload(femaleDraft, 'Europe/Kyiv');
 
     expect(payload).toEqual({
+      name: 'Olena',
       dateOfBirth: '1994-05-10',
       biologicalSexForCalculation: 'FEMALE',
       heightCm: 168,
@@ -61,6 +63,7 @@ describe('buildOnboardingPayload', () => {
         nutritionCurrent: 'structured',
         mealsPerDay: '4-5',
         eatingHabits: ['late_eating'],
+        name: 'Andrii',
         dateOfBirth: '1990-01-15',
         biologicalSexForCalculation: 'MALE',
         heightCm: 180,

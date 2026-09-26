@@ -165,6 +165,8 @@
   },
   "auth": {
     "back": "← Back",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "login": {
       "eyebrow": "Personal cabinet",
       "title": "Glad to see",
@@ -217,7 +219,10 @@
     "chooseForm": "Choose this shape →",
     "errors": {
       "incomplete": "Some answers need updating. Check this step and continue.",
-      "dateOfBirth": "Enter a real date of birth: not in the future and no more than 120 years ago."
+      "dateOfBirth": "Enter a real date of birth: not in the future and no more than 120 years ago.",
+      "name": "Use letters only.",
+      "height": "Height must be between {min} and {max} cm.",
+      "weight": "Weight must be between {min} and {max} kg."
     },
     "saving": "Saving…",
     "variant": "Option {index}",
@@ -414,11 +419,15 @@
         "description": "These details let us match the training load and nutrition to you",
         "privacy": "Your personal data is protected and used only to personalize the program",
         "build": "Build my plan →",
+        "name": "Name",
+        "namePlaceholder": "Your name",
         "dateOfBirth": "Date of birth",
         "height": "Height",
         "heightUnit": "cm",
         "weight": "Weight",
-        "weightUnit": "kg"
+        "weightUnit": "kg",
+        "decrease": "Decrease {field}",
+        "increase": "Increase {field}"
       }
     },
     "analysis": {
@@ -569,8 +578,14 @@
     "pay": "Pay {amount} ₴ →",
     "paying": "Processing…",
     "successTitle": "Welcome. <accent>You're in.</accent>",
-    "successBody": "The {plan} plan is active until {periodEnd}.",
-    "dashboardCta": "Go to cabinet →",
+    "successBody": "Your program is already available in the personal cabinet. Time to start.",
+    "successStatWeeks": "12",
+    "successStatWeeksLabel": "weeks",
+    "successStatAccess": "24/7",
+    "successStatAccessLabel": "access",
+    "successStatReady": "100%",
+    "successStatReadyLabel": "for you",
+    "dashboardCta": "Go to the program →",
     "missingPlan": "Plans are unavailable right now. Try again from the home page.",
     "choosePlanCta": "Choose a plan",
     "error": "We could not confirm the subscription. Try again.",

@@ -3,6 +3,7 @@ import { onboardingSchema, type OnboardingInput } from '@repo/validation';
 export class OnboardingDto implements OnboardingInput {
   static readonly schema = onboardingSchema;
 
+  name!: string;
   dateOfBirth!: string;
   biologicalSexForCalculation!: 'MALE' | 'FEMALE';
   heightCm!: number;

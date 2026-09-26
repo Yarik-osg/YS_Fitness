@@ -15,6 +15,7 @@ function user(onboardingCompletedAt: string | null): MeResponse {
     createdAt: '2026-01-01T00:00:00.000Z',
     profile: onboardingCompletedAt
       ? {
+          name: 'Olena',
           dateOfBirth: '1990-01-01T00:00:00.000Z',
           biologicalSexForCalculation: 'FEMALE',
           heightCm: 168,

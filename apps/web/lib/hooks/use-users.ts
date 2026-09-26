@@ -25,6 +25,7 @@ export function useSaveOnboarding() {
         useAuthStore.setState({
           user: {
             ...currentUser,
+            name: response.profile.name,
             onboardingCompletedAt: response.profile.onboardingCompletedAt,
           },
         });
