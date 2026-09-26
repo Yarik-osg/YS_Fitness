@@ -49,7 +49,10 @@ export function Dashboard() {
         <h1 className="mt-3 max-w-lg font-heading text-5xl uppercase leading-none">
           {t('title')} <span className="text-accent">{t('titleAccent')}</span>
         </h1>
-        <p className="mt-5 text-sm text-muted">{user?.email}</p>
+        <p className="mt-5 text-sm text-muted">{user?.name ?? user?.email}</p>
+        {user?.name ? (
+          <p className="mt-1 text-xs text-muted">{user.email}</p>
+        ) : null}
         {subscription.data ? (
           <p className="mt-3 text-sm text-muted">
             {t('subscription.active', {

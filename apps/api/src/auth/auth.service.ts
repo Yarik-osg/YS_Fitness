@@ -36,7 +36,7 @@ export interface IssuedAuthResponse extends AuthResponse {
 export const REFRESH_REUSE_GRACE_MS = 10_000;
 
 type SessionUserRecord = User & {
-  profile: { onboardingCompletedAt: Date | null } | null;
+  profile: { name: string | null; onboardingCompletedAt: Date | null } | null;
 };
 
 type RotationResult =
@@ -341,9 +341,7 @@ export class AuthService {
   }
 
   private async createSessionResponse(
-    user: User & {
-      profile: { onboardingCompletedAt: Date | null } | null;
-    },
+    user: SessionUserRecord,
     metadata: SessionMetadata,
   ): Promise<IssuedAuthResponse> {
     const sessionExpiresAt = this.refreshExpiry();
@@ -383,9 +381,7 @@ export class AuthService {
   }
 
   private async buildResponse(
-    user: User & {
-      profile: { onboardingCompletedAt: Date | null } | null;
-    },
+    user: SessionUserRecord,
     sessionId: string,
     refreshToken: string | null,
   ): Promise<IssuedAuthResponse> {
@@ -412,16 +408,13 @@ export class AuthService {
     };
   }
 
-  private safeUser(
-    user: User & {
-      profile: { onboardingCompletedAt: Date | null } | null;
-    },
-  ): SafeUser {
+  private safeUser(user: SessionUserRecord): SafeUser {
     return {
       id: user.id,
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      name: user.profile?.name ?? null,
       onboardingCompletedAt:
         user.profile?.onboardingCompletedAt?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),

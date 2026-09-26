@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Link, useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
@@ -84,12 +85,13 @@ export function RegisterForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password">{t('register.passwordLabel')}</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             placeholder={t('register.passwordPlaceholder')}
             aria-invalid={Boolean(errors.password)}
+            revealLabel={t('showPassword')}
+            hideLabel={t('hidePassword')}
             {...register('password')}
           />
           {errors.password && (
@@ -101,12 +103,13 @@ export function RegisterForm() {
 
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">{t('register.confirmLabel')}</Label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             placeholder={t('register.confirmPlaceholder')}
             aria-invalid={Boolean(errors.confirmPassword)}
+            revealLabel={t('showPassword')}
+            hideLabel={t('hidePassword')}
             {...register('confirmPassword')}
           />
           {errors.confirmPassword && (

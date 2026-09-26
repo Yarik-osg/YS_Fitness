@@ -24,6 +24,7 @@ export class UsersService {
         createdAt: true,
         profile: {
           select: {
+            name: true,
             dateOfBirth: true,
             biologicalSexForCalculation: true,
             heightCm: true,
@@ -72,6 +73,7 @@ export class UsersService {
           where: { userId },
           create: {
             userId,
+            name: input.name,
             dateOfBirth,
             biologicalSexForCalculation: input.biologicalSexForCalculation,
             heightCm: input.heightCm,
@@ -82,6 +84,7 @@ export class UsersService {
             onboardingCompletedAt: completedAt,
           },
           update: {
+            name: input.name,
             dateOfBirth,
             biologicalSexForCalculation: input.biologicalSexForCalculation,
             heightCm: input.heightCm,

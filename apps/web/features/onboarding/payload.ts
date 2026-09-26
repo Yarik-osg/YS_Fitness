@@ -25,6 +25,7 @@ const STEP_BY_FIELD: Record<string, number> = {
   mealsPerDay: 9,
   eatingHabits: 10,
   dateOfBirth: PROFILE_STEP,
+  name: PROFILE_STEP,
   heightCm: PROFILE_STEP,
   weightKg: PROFILE_STEP,
   timezone: PROFILE_STEP,
@@ -39,6 +40,7 @@ function defaultTimezone() {
 
 function payloadCandidate(draft: OnboardingDraft, timezone: string) {
   return {
+    name: draft.name?.trim(),
     dateOfBirth: draft.dateOfBirth,
     biologicalSexForCalculation:
       draft.biologicalSexForCalculation ??

@@ -23,6 +23,7 @@ describe('saveOnboarding', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const payload = {
+      name: 'Olena',
       dateOfBirth: '1994-05-10',
       biologicalSexForCalculation: 'FEMALE',
       heightCm: 168,

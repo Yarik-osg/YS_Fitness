@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Link, useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
@@ -73,12 +74,13 @@ export function LoginForm() {
 
         <div className="space-y-2">
           <Label htmlFor="password">{t('login.passwordLabel')}</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             placeholder={t('login.passwordPlaceholder')}
             aria-invalid={Boolean(errors.password)}
+            revealLabel={t('showPassword')}
+            hideLabel={t('hidePassword')}
             {...register('password')}
           />
           {errors.password && (

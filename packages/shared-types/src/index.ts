@@ -17,6 +17,7 @@ export interface SafeUser {
   email: string;
   role: UserRole;
   isActive: boolean;
+  name: string | null;
   onboardingCompletedAt: string | null;
   createdAt: string;
 }
@@ -33,6 +34,7 @@ export interface AuthResponse {
 }
 
 export interface UserProfileResponse {
+  name: string | null;
   dateOfBirth: string;
   biologicalSexForCalculation: BiologicalSexForCalculation;
   heightCm: number;

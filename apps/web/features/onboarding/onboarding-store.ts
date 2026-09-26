@@ -34,6 +34,7 @@ export interface OnboardingDraft {
   goal?: WeightGoal;
   activityLevel?: ActivityLevel;
   dateOfBirth?: string;
+  name?: string;
   heightCm?: number;
   weightKg?: number;
   biologicalSexForCalculation?: BiologicalSexForCalculation;
@@ -89,6 +90,7 @@ const initialState: OnboardingDraft & {
   goal: undefined,
   activityLevel: undefined,
   dateOfBirth: undefined,
+  name: undefined,
   heightCm: undefined,
   weightKg: undefined,
   biologicalSexForCalculation: undefined,
@@ -122,6 +124,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         goal: state.goal,
         activityLevel: state.activityLevel,
         dateOfBirth: state.dateOfBirth,
+        name: state.name,
         heightCm: state.heightCm,
         weightKg: state.weightKg,
         biologicalSexForCalculation: state.biologicalSexForCalculation,

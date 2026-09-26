@@ -258,6 +258,7 @@ describe('OnboardingWizard', () => {
       mealsPerDay: '3',
       eatingHabits: ['snacking'],
       dateOfBirth: '1994-05-10',
+      name: 'Олена',
       heightCm: 168,
       weightKg: 64.5,
       step: 11,
@@ -297,6 +298,7 @@ describe('OnboardingWizard', () => {
       mealsPerDay: '4',
       eatingHabits: ['none'],
       dateOfBirth: '1990-01-15',
+      name: 'Andrii',
       heightCm: 180,
       weightKg: 82,
       step: 11,
@@ -313,7 +315,9 @@ describe('OnboardingWizard', () => {
     expect(screen.getByLabelText(/Дата народження/i)).not.toHaveClass(
       'appearance-none',
     );
-    expect(screen.getByLabelText(/Зріст/i)).toHaveClass('appearance-none');
+    expect(screen.getByRole('spinbutton', { name: 'Зріст' })).toHaveClass(
+      'appearance-none',
+    );
 
     await user.click(
       screen.getByRole('button', { name: /Побудувати мій план/i }),
@@ -348,11 +352,13 @@ describe('OnboardingWizard', () => {
       id: 'user-1',
       email: 'client@example.com',
       role: 'CLIENT',
+      name: null,
       onboardingCompletedAt: null,
     });
     useOnboardingStore.setState({
       programTrack: 'male',
       dateOfBirth: '2004-06-25',
+      name: 'Andrii',
       heightCm: 180,
       weightKg: 80,
       step: 11,
@@ -441,6 +447,7 @@ describe('OnboardingWizard', () => {
     useOnboardingStore.setState({
       programTrack: 'female',
       dateOfBirth: '1890-01-01',
+      name: 'Олена',
       heightCm: 168,
       weightKg: 64,
       step: 11,
@@ -478,5 +485,59 @@ describe('OnboardingWizard', () => {
       screen.getByRole('button', { name: /Побудувати мій план/i }),
     ).toBeEnabled();
     view.unmount();
+  });
+
+  it('blocks step 11 for a name with digits or a height below 80 cm', () => {
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      dateOfBirth: '1994-05-10',
+      name: 'Anna2',
+      heightCm: 20,
+      weightKg: 64,
+      step: 11,
+    });
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Побудувати мій план/i }),
+    ).toBeDisabled();
+    expect(screen.getByText(/лише літери/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/зріст має бути від 80 до 250 см/i),
+    ).toBeInTheDocument();
+  });
+
+  it('uses height arrows to move an out-of-range value onto the allowed minimum', async () => {
+    const user = userEvent.setup();
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      dateOfBirth: '1994-05-10',
+      name: 'Олена',
+      heightCm: 20,
+      weightKg: 64,
+      step: 11,
+    });
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /збільшити зріст/i }));
+
+    expect(useOnboardingStore.getState().heightCm).toBe(80);
+    expect(
+      screen.queryByText(/зріст має бути від 80 до 250 см/i),
+    ).not.toBeInTheDocument();
   });
 });

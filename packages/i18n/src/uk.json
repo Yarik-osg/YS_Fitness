@@ -165,6 +165,8 @@
   },
   "auth": {
     "back": "← Назад",
+    "showPassword": "Показати пароль",
+    "hidePassword": "Сховати пароль",
     "login": {
       "eyebrow": "Особистий кабінет",
       "title": "Раді бачити",
@@ -219,7 +221,10 @@
     "variant": "Варіант {index}",
     "errors": {
       "incomplete": "Деякі відповіді потрібно оновити. Перевір цей крок і продовж.",
-      "dateOfBirth": "Вкажи реальну дату народження: не в майбутньому і не більше ніж 120 років тому."
+      "dateOfBirth": "Вкажи реальну дату народження: не в майбутньому і не більше ніж 120 років тому.",
+      "name": "Лише літери.",
+      "height": "Зріст має бути від {min} до {max} см.",
+      "weight": "Вага має бути від {min} до {max} кг."
     },
     "physiqueSlider": {
       "label": "Статура"
@@ -411,11 +416,15 @@
         "description": "Ці дані дозволять нам підібрати точне навантаження та харчування для тебе",
         "privacy": "Твої персональні дані захищені та використовуються виключно для персоналізації програми",
         "build": "Побудувати мій план →",
+        "name": "Ім'я",
+        "namePlaceholder": "Твоє ім'я",
         "dateOfBirth": "Дата народження",
         "height": "Зріст",
         "heightUnit": "см",
         "weight": "Вага",
-        "weightUnit": "кг"
+        "weightUnit": "кг",
+        "decrease": "Зменшити {field}",
+        "increase": "Збільшити {field}"
       }
     },
     "analysis": {
@@ -566,8 +575,14 @@
     "pay": "Оплатити {amount} ₴ →",
     "paying": "Обробляємо…",
     "successTitle": "Вітаємо. <accent>Ти в грі.</accent>",
-    "successBody": "План {plan} активний до {periodEnd}.",
-    "dashboardCta": "Перейти в кабінет →",
+    "successBody": "Твоя програма вже доступна в особистому кабінеті. Час починати.",
+    "successStatWeeks": "12",
+    "successStatWeeksLabel": "тижнів",
+    "successStatAccess": "24/7",
+    "successStatAccessLabel": "доступ",
+    "successStatReady": "100%",
+    "successStatReadyLabel": "для тебе",
+    "dashboardCta": "Перейти до програми →",
     "missingPlan": "Плани зараз недоступні. Спробуй ще раз з головної.",
     "choosePlanCta": "Обрати план",
     "error": "Не вдалося підтвердити підписку. Спробуй ще раз.",

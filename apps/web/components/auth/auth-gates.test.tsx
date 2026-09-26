@@ -38,6 +38,7 @@ const completedUser = {
   id: 'user-1',
   email: 'client@example.com',
   role: 'CLIENT' as const,
+  name: 'Olena',
   onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
 };
 

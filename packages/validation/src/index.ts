@@ -157,13 +157,29 @@ export function isPlausibleDateOfBirth(
   );
 }
 
+export const HEIGHT_CM = { min: 80, max: 250 } as const;
+export const WEIGHT_KG = { min: 25, max: 500 } as const;
+
+export function isValidPersonName(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    trimmed.length >= 2 &&
+    trimmed.length <= 40 &&
+    /^[\p{L}]+(?:[ '\u2019\u02BC-][\p{L}]+)*$/u.test(trimmed)
+  );
+}
+
 export const onboardingProfileSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .refine(isValidPersonName, { message: 'Name must contain letters only' }),
   dateOfBirth: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use ISO date format YYYY-MM-DD'),
   biologicalSexForCalculation: z.enum(['MALE', 'FEMALE']),
-  heightCm: z.number().positive().min(80).max(250),
-  weightKg: z.number().positive().min(25).max(500),
+  heightCm: z.number().positive().min(HEIGHT_CM.min).max(HEIGHT_CM.max),
+  weightKg: z.number().positive().min(WEIGHT_KG.min).max(WEIGHT_KG.max),
   bodyFatPercent: z.number().min(1).max(75).optional(),
   activityLevel: z.enum([
     'SEDENTARY',

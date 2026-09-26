@@ -65,6 +65,7 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
       .expect(201);
 
     expect(registration.body.user.email).toBe('client@example.com');
+    expect(registration.body.user.name).toBeNull();
     expect(registration.body.tokens.refreshToken).toBeTypeOf('string');
 
     await request(app.getHttpServer())
@@ -176,6 +177,22 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
       .expect(200);
 
     expect(saved.body.responses).toMatchObject(FEMALE_ONBOARDING_ANSWERS);
+
+    const me = await request(app.getHttpServer())
+      .get('/api/v1/users/me')
+      .set('Authorization', authorization)
+      .expect(200);
+    expect(me.body.profile.name).toBe('Olena');
+
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'onboarding@example.com',
+        password: 'strong-password',
+        clientType: 'MOBILE',
+      })
+      .expect(200);
+    expect(login.body.user.name).toBe('Olena');
 
     await request(app.getHttpServer())
       .put('/api/v1/users/me/onboarding')

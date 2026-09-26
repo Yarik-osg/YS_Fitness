@@ -7,6 +7,7 @@ export interface SessionUser {
   id: string;
   email: string;
   role: UserRole;
+  name: string | null;
   onboardingCompletedAt: string | null;
 }
 
@@ -28,6 +29,7 @@ export function normalizeSessionUser(user: MeResponse): SessionUser {
     id: user.id,
     email: user.email,
     role: user.role,
+    name: user.profile?.name ?? null,
     onboardingCompletedAt: user.profile?.onboardingCompletedAt ?? null,
   };
 }
