@@ -1,0 +1,128 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import type {
+  AssignedProgramResponse,
+  CurrentProgramResponse,
+  ExerciseResponse,
+  ProgramAccent,
+  TrainingExperience,
+} from '@repo/shared-types';
+import type { ListExercisesQuery } from '@repo/validation';
+import type { MuscleGroup, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { matchProgramTemplate } from './match-template.js';
+
+const PROGRAM_NOT_AVAILABLE = {
+  code: 'PROGRAM_NOT_AVAILABLE',
+  message: 'No program is available for this track yet',
+};
+
+const programInclude = {
+  template: {
+    include: {
+      days: {
+        orderBy: { dayNumber: 'asc' as const },
+        include: {
+          exercises: {
+            orderBy: { order: 'asc' as const },
+            include: { exercise: true },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.WorkoutProgramInclude;
+
+type ProgramRecord = Prisma.WorkoutProgramGetPayload<{
+  include: typeof programInclude;
+}>;
+
+@Injectable()
+export class ProgramsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async assign(userId: string): Promise<AssignedProgramResponse> {
+    const responses = await this.prisma.onboardingResponses.findUnique({
+      where: { userId },
+    });
+    if (!responses) {
+      throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+    }
+
+    const match = matchProgramTemplate({
+      programTrack: responses.programTrack === 'MALE' ? 'male' : 'female',
+      experience: responses.experience.toLowerCase(),
+      trainingFrequency: responses.trainingFrequency,
+      focusArea: responses.focusAreas[0],
+    });
+    if (!match) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+
+    const template = await this.prisma.programTemplate.findFirst({
+      where: { ...match, active: true },
+    });
+    if (!template) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+
+    const program = await this.prisma.workoutProgram.upsert({
+      where: { userId },
+      create: { userId, templateId: template.id },
+      update: { templateId: template.id, assignedAt: new Date() },
+      include: programInclude,
+    });
+
+    return toAssignedProgram(program);
+  }
+
+  async getMine(userId: string): Promise<CurrentProgramResponse> {
+    const program = await this.prisma.workoutProgram.findUnique({
+      where: { userId },
+      include: programInclude,
+    });
+    return { program: program ? toAssignedProgram(program) : null };
+  }
+
+  async listExercises(query: ListExercisesQuery): Promise<ExerciseResponse[]> {
+    const exercises = await this.prisma.exercise.findMany({
+      where: query.muscleGroup
+        ? { muscleGroups: { has: query.muscleGroup as MuscleGroup } }
+        : undefined,
+      orderBy: { code: 'asc' },
+    });
+
+    return exercises.map((exercise) => ({
+      id: exercise.id,
+      code: exercise.code,
+      name: exercise.name,
+      muscleGroups: exercise.muscleGroups,
+      repsMin: exercise.repsMin,
+      repsMax: exercise.repsMax,
+    }));
+  }
+}
+
+function toAssignedProgram(program: ProgramRecord): AssignedProgramResponse {
+  const { template } = program;
+  return {
+    id: program.id,
+    templateCode: template.code,
+    gender: template.gender === 'MALE' ? 'male' : 'female',
+    level: template.level.toLowerCase() as TrainingExperience,
+    frequencyPerWeek: template.frequencyPerWeek,
+    accent: template.accent as ProgramAccent,
+    assignedAt: program.assignedAt.toISOString(),
+    days: template.days.map((day) => ({
+      dayNumber: day.dayNumber,
+      exercises: day.exercises.map((row) => ({
+        order: row.order,
+        sets: row.sets,
+        allowsAbsAddon: row.allowsAbsAddon,
+        exercise: {
+          id: row.exercise.id,
+          code: row.exercise.code,
+          name: row.exercise.name,
+          muscleGroups: row.exercise.muscleGroups,
+          repsMin: row.exercise.repsMin,
+          repsMax: row.exercise.repsMax,
+        },
+      })),
+    })),
+  };
+}

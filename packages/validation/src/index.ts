@@ -59,6 +59,24 @@ export const MAIN_GOALS = [
   'maintain',
   'get_stronger',
 ] as const;
+export const MUSCLE_GROUPS = [
+  'GLUTES',
+  'QUADRICEPS',
+  'HAMSTRINGS',
+  'BACK',
+  'BICEPS',
+  'TRICEPS',
+  'CHEST',
+  'SHOULDERS',
+  'ABS',
+] as const;
+
+export const listExercisesQuerySchema = z.object({
+  muscleGroup: z.enum(MUSCLE_GROUPS).optional(),
+});
+
+export type ListExercisesQuery = z.infer<typeof listExercisesQuerySchema>;
+
 export const EXPERIENCE_LEVELS = [
   'beginner',
   'intermediate',

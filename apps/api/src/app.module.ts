@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
+import { ProgramsModule } from './programs/programs.module.js';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -18,6 +19,7 @@ import { ApiExceptionFilter } from './common/api-exception.filter.js';
     AuthModule,
     UsersModule,
     SubscriptionsModule,
+    ProgramsModule,
     HealthModule,
   ],
   providers: [
