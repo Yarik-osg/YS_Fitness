@@ -138,3 +138,52 @@ export interface CheckoutResponse {
 export interface CurrentSubscriptionResponse {
   subscription: SubscriptionResponse | null;
 }
+
+export type MuscleGroup =
+  | 'GLUTES'
+  | 'QUADRICEPS'
+  | 'HAMSTRINGS'
+  | 'BACK'
+  | 'BICEPS'
+  | 'TRICEPS'
+  | 'CHEST'
+  | 'SHOULDERS'
+  | 'ABS';
+
+export type ProgramAccent = 'NONE' | 'UPPER' | 'LOWER';
+
+export interface ExerciseResponse {
+  id: string;
+  code: string;
+  name: string;
+  muscleGroups: MuscleGroup[];
+  repsMin: number;
+  repsMax: number;
+}
+
+export interface ProgramExerciseResponse {
+  order: number;
+  sets: number;
+  allowsAbsAddon: boolean;
+  exercise: ExerciseResponse;
+}
+
+export interface ProgramDayResponse {
+  dayNumber: number;
+  exercises: ProgramExerciseResponse[];
+}
+
+export interface AssignedProgramResponse {
+  id: string;
+  templateCode: string;
+  gender: ProgramTrack;
+  level: TrainingExperience;
+  frequencyPerWeek: number;
+  accent: ProgramAccent;
+  assignedAt: string;
+  days: ProgramDayResponse[];
+}
+
+export interface CurrentProgramResponse {
+  program: AssignedProgramResponse | null;
+}

@@ -32,6 +32,8 @@ The web app runs at `http://localhost:3000`; the API runs at `http://localhost:3
 
 Set real random values for all secret variables and change the trainer seed password before running the seed. `pnpm db:seed` is explicit and idempotent; it also upserts the catalog plans (`1_MONTH` at 990 ₴, `3_MONTHS` at 2490 ₴, and `FULL_ACCESS` at 3490 ₴, stored in kopiykas). Application startup never seeds data.
 
+`pnpm db:migrate` and `pnpm db:seed` are one deployment step. A fresh migration has no exercise or template rows, and the reps migration fills any existing exercises with 12/12 until the seed writes the trainer CSV. `ExerciseSeedCheck` runs once when the API starts. It refuses to boot when there are no exercises or no active templates, and when an exercise still at 12/12 is used by an active template. Abs add-on flags are not part of this check.
+
 ### Local containers
 
 The root `.env` owns local container settings. `apps/api/.env` owns the API connection string and must use matching PostgreSQL credentials.
