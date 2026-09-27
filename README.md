@@ -94,7 +94,7 @@ pnpm test
 pnpm build
 ```
 
-End-to-end tests require a separate migrated PostgreSQL database:
+End-to-end tests require a separate migrated PostgreSQL database. The e2e run seeds that database before the API boots, because startup refuses an empty exercise catalog:
 
 ```bash
 DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter api exec prisma migrate deploy
