@@ -537,7 +537,6 @@
       "prompt": "Assign the program that matches your quiz.",
       "assign": "Assign my program",
       "assigning": "Assigning…",
-      "loading": "Loading your program…",
       "loadError": "The program could not be loaded.",
       "assignError": "The program could not be assigned.",
       "retry": "Try again",

@@ -10,6 +10,7 @@ import {
   User,
 } from 'lucide-react';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
+import { useState } from 'react';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
@@ -23,11 +24,26 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 export function Dashboard() {
   const program = useMyProgram();
 
+  if (program.isPending && !program.isFetched) {
+    return <HomeLoading />;
+  }
+
   if (program.data) {
     return <AssignedHome program={program.data} />;
   }
 
-  return <UnassignedDashboard />;
+  return <UnassignedDashboard program={program} />;
+}
+
+function HomeLoading() {
+  return (
+    <main
+      aria-busy="true"
+      className="mx-auto grid min-h-screen w-full max-w-[430px] place-items-center bg-[#0b0b0b] px-6"
+    >
+      <div className="h-0.5 w-24 animate-pulse bg-white/30" />
+    </main>
+  );
 }
 
 function AssignedHome({ program }: { program: AssignedProgramResponse }) {
@@ -141,7 +157,11 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
   );
 }
 
-function UnassignedDashboard() {
+function UnassignedDashboard({
+  program,
+}: {
+  program: ReturnType<typeof useMyProgram>;
+}) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
@@ -199,20 +219,31 @@ function UnassignedDashboard() {
         )}
       </header>
 
-      <TrainingCard />
+      <TrainingCard program={program} />
     </main>
   );
 }
 
-function TrainingCard() {
+function TrainingCard({
+  program,
+}: {
+  program: ReturnType<typeof useMyProgram>;
+}) {
   const t = useTranslations('dashboard');
-  const program = useMyProgram();
   const assign = useAssignProgram();
+  const [heldError, setHeldError] = useState<unknown>(null);
+  if (program.status === 'success') {
+    if (heldError !== null) setHeldError(null);
+  } else if (program.error != null && heldError !== program.error) {
+    setHeldError(program.error);
+  }
+  const displayedError =
+    program.error ?? (program.fetchStatus !== 'idle' ? heldError : null);
   const unavailable = isProgramUnavailable(assign.error);
   const subscriptionRequired = isSubscriptionRequired(
-    program.error ?? assign.error,
+    displayedError ?? assign.error,
   );
-  const loadFailed = program.isError && !subscriptionRequired;
+  const loadFailed = displayedError != null && !subscriptionRequired;
   const assignFailed =
     assign.isError && !unavailable && !isSubscriptionRequired(assign.error);
 
@@ -222,44 +253,36 @@ function TrainingCard() {
         <Dumbbell />
       </div>
       <h2 className="font-heading text-xl uppercase">{t('workouts.title')}</h2>
-      {program.isPending ? (
-        <p className="mt-2 text-xs leading-5 text-muted">
-          {t('workouts.loading')}
+      <div className="mt-2 space-y-3">
+        <p className="text-xs leading-5 text-muted">
+          {unavailable
+            ? t('workouts.unavailable')
+            : subscriptionRequired
+              ? t('subscription.none')
+              : loadFailed
+                ? t('workouts.loadError')
+                : assignFailed
+                  ? t('workouts.assignError')
+                  : t('workouts.prompt')}
         </p>
-      ) : (
-        <div className="mt-2 space-y-3">
-          <p className="text-xs leading-5 text-muted">
-            {unavailable
-              ? t('workouts.unavailable')
-              : subscriptionRequired
-                ? t('subscription.none')
-                : loadFailed
-                  ? t('workouts.loadError')
-                  : assignFailed
-                    ? t('workouts.assignError')
-                    : t('workouts.prompt')}
-          </p>
-          {unavailable || subscriptionRequired ? null : loadFailed ? (
-            <Button
-              size="sm"
-              disabled={program.isFetching}
-              onClick={() => void program.refetch()}
-            >
-              {t('workouts.retry')}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              disabled={assign.isPending}
-              onClick={() => void assign.mutate()}
-            >
-              {assign.isPending
-                ? t('workouts.assigning')
-                : t('workouts.assign')}
-            </Button>
-          )}
-        </div>
-      )}
+        {unavailable || subscriptionRequired ? null : loadFailed ? (
+          <Button
+            size="sm"
+            disabled={program.isFetching}
+            onClick={() => void program.refetch()}
+          >
+            {t('workouts.retry')}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            disabled={assign.isPending}
+            onClick={() => void assign.mutate()}
+          >
+            {assign.isPending ? t('workouts.assigning') : t('workouts.assign')}
+          </Button>
+        )}
+      </div>
     </article>
   );
 }
