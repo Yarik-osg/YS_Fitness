@@ -1,13 +1,8 @@
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { I18nTestProvider } from '@/test/i18n';
 import { Dashboard } from './dashboard';
 
@@ -210,23 +205,21 @@ function renderDashboard() {
   );
 }
 
-function itemsUnder(heading: string) {
-  const section = screen
-    .getByRole('heading', { name: heading })
-    .closest('section');
-  if (!(section instanceof HTMLElement)) {
-    throw new Error(`Missing section for ${heading}`);
-  }
-  return within(section).getAllByRole('listitem');
-}
+const QUOTES = [
+  'Кожне тренування — крок до кращої версії себе.',
+  'Результат приходить до тих, хто не зупиняється.',
+  'Дисципліна сильніша за мотивацію.',
+  'Твоє тіло може все. Переконай свій розум.',
+];
 
 describe('Dashboard program', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    useAuthStore.getState().clearSession();
   });
 
-  it('assigns a program and shows the day, exercise, and 3×12', async () => {
+  it('shows the assigned home from the program, profile, and subscription', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       'fetch',
@@ -246,43 +239,64 @@ describe('Dashboard program', () => {
       }),
     );
 
+    useAuthStore.setState({
+      status: 'authenticated',
+      accessToken: 'token',
+      user: {
+        id: 'user-1',
+        email: 'alina@example.com',
+        role: 'CLIENT',
+        name: 'Аліна К.',
+        onboardingCompletedAt: '2026-09-01T00:00:00.000Z',
+      },
+    });
     renderDashboard();
+
+    expect(
+      screen.queryByText('Калорії та макроси будуть розраховані окремо.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Виміри, фото й історія результатів — скоро.'),
+    ).not.toBeInTheDocument();
 
     await user.click(
       await screen.findByRole('button', { name: 'Призначити мою програму' }),
     );
 
-    const day = await screen.findByText('День 1');
     expect(
-      screen.getByRole('heading', { name: 'Тренування' }).closest('article'),
-    ).toContainElement(day);
+      await screen.findByRole('heading', { name: 'Головна' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('WB2U')).toHaveLength(2);
+    expect(screen.getAllByText('Тренування 01')).toHaveLength(2);
+    expect(screen.getByText('2 рази', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('2 рази/тиж.')).toBeInTheDocument();
+    expect(screen.getByText('6 вправ · 17 підходів')).toBeInTheDocument();
+    expect(screen.getByText('Початківець')).toBeInTheDocument();
+    expect(screen.getByText('Аліна К.')).toBeInTheDocument();
+    expect(
+      screen.getByText(`“${QUOTES[new Date().getDay() % QUOTES.length]}”`),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Поточний тиждень')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Тиждень/)).not.toBeInTheDocument();
 
-    const day1 = itemsUnder('День 1');
-    expect(day1).toHaveLength(7);
-    for (const [index, name] of [
-      '1. Тяга вертикального блоку',
-      '2. Жим гантелей вгору сидячи',
-      '3. Тяга горизонтального блоку',
-      '4. Згинання рук з гантелями',
-      '5. Сідничний міст у тренажері',
-      '6. Румунська тяга з гантелями',
-    ].entries()) {
-      expect(day1[index]).toHaveTextContent(name);
-      expect(day1[index]).not.toHaveTextContent('Вправа на прес');
-      expect(day1[index]).not.toHaveTextContent('Опціонально');
-    }
-    expect(day1[5]).toHaveTextContent('3 × 10–12');
-    expect(day1[6]).toHaveTextContent('7. Вправа на прес');
-    expect(day1[6]).toHaveTextContent('Опціонально');
-    expect(within(day1[6]!).queryByRole('button')).not.toBeInTheDocument();
+    const start = screen.getByRole('button', { name: 'Почати тренування →' });
+    expect(start).toBeDisabled();
+    expect(start.closest('a')).toBeNull();
 
-    const day2 = itemsUnder('День 2');
-    expect(day2).toHaveLength(6);
-    for (const item of day2) {
-      expect(item).not.toHaveTextContent('Вправа на прес');
-      expect(item).not.toHaveTextContent('Опціонально');
+    const home = screen.getByRole('button', { name: 'Головна' });
+    expect(home).toBeEnabled();
+    expect(home).toHaveAttribute('aria-current', 'page');
+    for (const name of [
+      'Тренування',
+      'Харчування',
+      'Прогрес',
+      'Профіль',
+      'Бібліотека',
+    ]) {
+      const tab = screen.getByRole('button', { name });
+      expect(tab).toBeDisabled();
+      expect(tab.closest('a')).toBeNull();
     }
-    expect(day2[5]).toHaveTextContent('6. Випади назад з гантелями');
   });
 
   it('does not offer assign while the program is still loading', async () => {
