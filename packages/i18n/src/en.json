@@ -537,7 +537,6 @@
       "prompt": "Assign the program that matches your quiz.",
       "assign": "Assign my program",
       "assigning": "Assigning…",
-      "loading": "Loading your program…",
       "loadError": "The program could not be loaded.",
       "assignError": "The program could not be assigned.",
       "retry": "Try again",
@@ -569,6 +568,38 @@
     "subscription": {
       "active": "{plan} · until {periodEnd}",
       "none": "No subscription is active yet."
+    },
+    "home": {
+      "screenTitle": "Home",
+      "today": "Today",
+      "nextWorkout": "Next workout",
+      "firstDay": "Workout {number}",
+      "perWeek": "Workouts per week",
+      "times": "{count} times",
+      "timesShort": "{count} times/week",
+      "start": "Start workout →",
+      "training": "Training",
+      "summary": "{exercises, plural, one {# exercise} other {# exercises}} · {sets, plural, one {# set} other {# sets}}",
+      "profile": "Profile",
+      "levels": {
+        "beginner": "Beginner",
+        "intermediate": "Intermediate",
+        "advanced": "Advanced"
+      },
+      "quotes": [
+        "Every workout is a step toward a better version of yourself.",
+        "Results come to those who do not stop.",
+        "Discipline is stronger than motivation.",
+        "Your body can do anything. Convince your mind."
+      ],
+      "nav": {
+        "home": "Home",
+        "training": "Training",
+        "nutrition": "Nutrition",
+        "progress": "Progress",
+        "profile": "Profile",
+        "library": "Library"
+      }
     }
   },
   "checkout": {

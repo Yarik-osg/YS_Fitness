@@ -1,15 +1,19 @@
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import type {
+  AssignedProgramResponse,
+  MuscleGroup,
+  ProgramExerciseResponse,
+  TrainingExperience,
+} from '@repo/shared-types';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { I18nTestProvider } from '@/test/i18n';
 import { Dashboard } from './dashboard';
+
+const routerReplace = vi.hoisted(() => vi.fn());
+const MONDAY = new Date(2026, 8, 28, 12, 0, 0);
 
 function programExercise(
   order: number,
@@ -17,10 +21,10 @@ function programExercise(
   allowsAbsAddon: boolean,
   code: string,
   name: string,
-  muscleGroups: string[],
+  muscleGroups: MuscleGroup[],
   repsMin: number,
   repsMax: number,
-) {
+): ProgramExerciseResponse {
   return {
     order,
     sets,
@@ -176,7 +180,7 @@ const ASSIGNED_PROGRAM = {
       ],
     },
   ],
-};
+} satisfies AssignedProgramResponse;
 
 vi.mock('@/i18n/navigation', () => ({
   Link: ({
@@ -193,40 +197,71 @@ vi.mock('@/i18n/navigation', () => ({
     </a>
   ),
   usePathname: () => '/dashboard',
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: routerReplace, push: vi.fn() }),
 }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-function renderDashboard() {
+function renderDashboard(locale: 'uk' | 'en' = 'uk') {
   return render(
     <Providers>
-      <I18nTestProvider locale="uk">
+      <I18nTestProvider locale={locale}>
         <Dashboard />
       </I18nTestProvider>
     </Providers>,
   );
 }
 
-function itemsUnder(heading: string) {
-  const section = screen
-    .getByRole('heading', { name: heading })
-    .closest('section');
-  if (!(section instanceof HTMLElement)) {
-    throw new Error(`Missing section for ${heading}`);
-  }
-  return within(section).getAllByRole('listitem');
+function signInAsAlina() {
+  useAuthStore.setState({
+    status: 'authenticated',
+    accessToken: 'token',
+    user: {
+      id: 'user-1',
+      email: 'alina@example.com',
+      role: 'CLIENT',
+      name: 'Аліна К.',
+      onboardingCompletedAt: '2026-09-01T00:00:00.000Z',
+    },
+  });
+}
+
+function expectNoPlaceholderCards() {
+  expect(
+    screen.queryByText('Калорії та макроси будуть розраховані окремо.'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('Виміри, фото й історія результатів — скоро.'),
+  ).not.toBeInTheDocument();
+}
+
+function expectHomeCards() {
+  expect(screen.getAllByText('WB2U')).toHaveLength(2);
+  expect(screen.getAllByText('Тренування 01')).toHaveLength(2);
+  expect(screen.getByText('2 рази', { exact: true })).toBeInTheDocument();
+  expect(screen.getByText('2 рази/тиж.')).toBeInTheDocument();
+  expect(screen.getByText('6 вправ · 17 підходів')).toBeInTheDocument();
+  expect(screen.getByText('Початківець')).toBeInTheDocument();
+  expect(screen.getByText('Аліна К.')).toBeInTheDocument();
 }
 
 describe('Dashboard program', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(MONDAY);
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
+    useAuthStore.getState().clearSession();
+    routerReplace.mockClear();
   });
 
-  it('assigns a program and shows the day, exercise, and 3×12', async () => {
+  it('assigns a program and shows the home cards', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       'fetch',
@@ -246,46 +281,75 @@ describe('Dashboard program', () => {
       }),
     );
 
+    signInAsAlina();
     renderDashboard();
 
-    await user.click(
+    expect(
       await screen.findByRole('button', { name: 'Призначити мою програму' }),
+    ).toBeInTheDocument();
+    expectNoPlaceholderCards();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Призначити мою програму' }),
     );
 
-    const day = await screen.findByText('День 1');
     expect(
-      screen.getByRole('heading', { name: 'Тренування' }).closest('article'),
-    ).toContainElement(day);
+      await screen.findByRole('heading', { name: 'Головна' }),
+    ).toBeInTheDocument();
+    expectHomeCards();
+    expectNoPlaceholderCards();
+    expect(screen.queryByText('Поточний тиждень')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Тиждень/)).not.toBeInTheDocument();
 
-    const day1 = itemsUnder('День 1');
-    expect(day1).toHaveLength(7);
-    for (const [index, name] of [
-      '1. Тяга вертикального блоку',
-      '2. Жим гантелей вгору сидячи',
-      '3. Тяга горизонтального блоку',
-      '4. Згинання рук з гантелями',
-      '5. Сідничний міст у тренажері',
-      '6. Румунська тяга з гантелями',
-    ].entries()) {
-      expect(day1[index]).toHaveTextContent(name);
-      expect(day1[index]).not.toHaveTextContent('Вправа на прес');
-      expect(day1[index]).not.toHaveTextContent('Опціонально');
-    }
-    expect(day1[5]).toHaveTextContent('3 × 10–12');
-    expect(day1[6]).toHaveTextContent('7. Вправа на прес');
-    expect(day1[6]).toHaveTextContent('Опціонально');
-    expect(within(day1[6]!).queryByRole('button')).not.toBeInTheDocument();
+    const start = screen.getByRole('button', { name: 'Почати тренування →' });
+    expect(start).toBeDisabled();
+    expect(start.closest('a')).toBeNull();
 
-    const day2 = itemsUnder('День 2');
-    expect(day2).toHaveLength(6);
-    for (const item of day2) {
-      expect(item).not.toHaveTextContent('Вправа на прес');
-      expect(item).not.toHaveTextContent('Опціонально');
+    const home = screen.getByRole('button', { name: 'Головна' });
+    expect(home).toBeEnabled();
+    expect(home).toHaveAttribute('aria-current', 'page');
+    expect(home.closest('a')).toBeNull();
+    for (const name of [
+      'Тренування',
+      'Харчування',
+      'Прогрес',
+      'Профіль',
+      'Бібліотека',
+    ]) {
+      const tab = screen.getByRole('button', { name });
+      expect(tab).toBeDisabled();
+      expect(tab.closest('a')).toBeNull();
     }
-    expect(day2[5]).toHaveTextContent('6. Випади назад з гантелями');
   });
 
-  it('does not offer assign while the program is still loading', async () => {
+  it('shows the home for a returning member without assigning again', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/me')) {
+          return json({ program: ASSIGNED_PROGRAM });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Головна' }),
+    ).toBeInTheDocument();
+    expectHomeCards();
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a neutral loader while the program is still loading', async () => {
     let release: (response: Response) => void = () => undefined;
     const pending = new Promise<Response>((resolve) => {
       release = resolve;
@@ -294,9 +358,6 @@ describe('Dashboard program', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes('/subscriptions/me')) {
-          return json({ subscription: null });
-        }
         if (url.includes('/programs/me')) return pending;
         return json({}, 404);
       }),
@@ -304,20 +365,117 @@ describe('Dashboard program', () => {
 
     renderDashboard();
 
-    expect(
-      await screen.findByText('Завантажуємо програму…'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
     expect(
       screen.queryByRole('button', { name: 'Призначити мою програму' }),
     ).not.toBeInTheDocument();
-
-    release(json({ program: null }));
+    expect(screen.queryByText('Особистий кабінет')).not.toBeInTheDocument();
+    expect(screen.queryByText('Твоя система')).not.toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: 'Призначити мою програму' }),
+      screen.queryByText('Завантажуємо програму…'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Головна' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('WB2U')).not.toBeInTheDocument();
+
+    release(json({ program: ASSIGNED_PROGRAM }));
+    expect(
+      await screen.findByRole('heading', { name: 'Головна' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
+  });
+
+  it('shows Monday’s date and quote in Ukrainian and English', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/me')) {
+          return json({ program: ASSIGNED_PROGRAM });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    renderDashboard('uk');
+    expect(
+      await screen.findByText('понеділок, 28 вересня'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('“Результат приходить до тих, хто не зупиняється.”'),
+    ).toBeInTheDocument();
+
+    cleanup();
+    renderDashboard('en');
+    expect(await screen.findByText('Monday, September 28')).toBeInTheDocument();
+    expect(
+      screen.getByText('“Results come to those who do not stop.”'),
     ).toBeInTheDocument();
   });
 
+  it('shows the Ukrainian label for every template level', async () => {
+    const labels: Record<TrainingExperience, string> = {
+      beginner: 'Початківець',
+      intermediate: 'Середній рівень',
+      advanced: 'Просунутий',
+    };
+
+    for (const level of Object.keys(labels) as TrainingExperience[]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes('/programs/me')) {
+            return json({ program: { ...ASSIGNED_PROGRAM, level } });
+          }
+          return json({}, 404);
+        }),
+      );
+      renderDashboard();
+      expect(await screen.findByText(labels[level])).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it('logs out from the home header and returns to login', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/auth/logout')) {
+          expect(init?.method).toBe('POST');
+          return new Response(null, { status: 204 });
+        }
+        if (url.includes('/programs/me')) {
+          return json({ program: ASSIGNED_PROGRAM });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'Вийти' }));
+
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith('/login');
+    });
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/logout'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('shows a load failure without offering to assign', async () => {
+    const user = userEvent.setup();
+    let programRequests = 0;
+    let releaseExtra: (response: Response) => void = () => undefined;
+    const extra = new Promise<Response>((resolve) => {
+      releaseExtra = resolve;
+    });
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
@@ -326,10 +484,14 @@ describe('Dashboard program', () => {
           return json({ subscription: null });
         }
         if (url.includes('/programs/me')) {
-          return json(
-            { code: 'INTERNAL_SERVER_ERROR', message: 'failed' },
-            500,
-          );
+          programRequests += 1;
+          if (programRequests === 1) {
+            return json(
+              { code: 'INTERNAL_SERVER_ERROR', message: 'failed' },
+              500,
+            );
+          }
+          return extra;
         }
         return json({}, 404);
       }),
@@ -346,6 +508,41 @@ describe('Dashboard program', () => {
     expect(
       screen.getByRole('button', { name: 'Спробувати ще раз' }),
     ).toBeInTheDocument();
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(programRequests).toBe(1);
+    expect(
+      screen.getByText('Програму не вдалося завантажити.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Спробувати ще раз' }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Спробувати ще раз' }),
+      ).toBeDisabled();
+    });
+    expect(programRequests).toBe(2);
+    expect(
+      screen.getByText('Програму не вдалося завантажити.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
+
+    releaseExtra(
+      json({ code: 'INTERNAL_SERVER_ERROR', message: 'failed' }, 500),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Спробувати ще раз' }),
+      ).toBeEnabled();
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an assign failure that is not a missing program', async () => {
