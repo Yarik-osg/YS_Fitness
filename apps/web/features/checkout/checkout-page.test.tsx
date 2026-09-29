@@ -87,10 +87,13 @@ describe('CheckoutPage', () => {
           );
         }
         if (url.includes('/subscriptions/me') && !init?.method) {
-          return new Response(JSON.stringify({ subscription: null }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
+          return new Response(
+            JSON.stringify({ subscription: null, checkoutUrl: null }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
         }
         if (url.includes('/subscriptions/checkout')) {
           expect(JSON.parse(String(init?.body))).toEqual({
@@ -196,5 +199,201 @@ describe('CheckoutPage', () => {
     expect(
       screen.queryByRole('heading', { name: /обери абонемент/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('sends the member to the delayed-provider checkout url', async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    vi.stubGlobal('location', { assign });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/subscriptions/plans') && !init?.method) {
+          return new Response(
+            JSON.stringify([MONTHLY_PLAN, PROGRESS_PLAN, FULL_ACCESS_PLAN]),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        if (url.includes('/subscriptions/me') && !init?.method) {
+          return new Response(
+            JSON.stringify({ subscription: null, checkoutUrl: null }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        if (url.includes('/subscriptions/checkout')) {
+          return new Response(
+            JSON.stringify({
+              subscription: {
+                ...FULL_ACCESS_SUBSCRIPTION,
+                status: 'PENDING',
+              },
+              checkoutUrl: 'https://pay.example/first',
+            }),
+            {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        return new Response(null, { status: 404 });
+      }),
+    );
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <CheckoutPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'FULL ACCESS' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: /перейти до оплати/i }),
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: /погоджуюсь з умовами надання послуг/i,
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: /додати картку/i }));
+    await user.click(screen.getByRole('button', { name: /оплатити 3490/i }));
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith('https://pay.example/first');
+    });
+    expect(screen.queryByText(/ти в грі/i)).not.toBeInTheDocument();
+  });
+
+  it('does not treat an unpaid pending checkout as success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/subscriptions/plans')) {
+          return new Response(
+            JSON.stringify([MONTHLY_PLAN, PROGRESS_PLAN, FULL_ACCESS_PLAN]),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        if (url.includes('/subscriptions/me')) {
+          return new Response(
+            JSON.stringify({
+              subscription: {
+                ...FULL_ACCESS_SUBSCRIPTION,
+                status: 'PENDING',
+              },
+              checkoutUrl: 'https://pay.example/resume',
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        return new Response(null, { status: 404 });
+      }),
+    );
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <CheckoutPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /продовжити оплату/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/ти в грі/i)).not.toBeInTheDocument();
+  });
+
+  it('remints checkout on continue instead of opening the stored /me url', async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    const expiredUrl =
+      'http://localhost:3000/checkout/return?providerReference=mock_sub&expiresAt=1&signature=old';
+    const remintedUrl =
+      'http://localhost:3000/checkout/return?providerReference=mock_sub&expiresAt=999&signature=new';
+    vi.stubGlobal('location', { assign });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/subscriptions/plans') && !init?.method) {
+          return new Response(
+            JSON.stringify([MONTHLY_PLAN, PROGRESS_PLAN, FULL_ACCESS_PLAN]),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        if (url.includes('/subscriptions/me') && !init?.method) {
+          return new Response(
+            JSON.stringify({
+              subscription: {
+                ...FULL_ACCESS_SUBSCRIPTION,
+                status: 'PENDING',
+              },
+              checkoutUrl: expiredUrl,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        if (url.includes('/subscriptions/checkout')) {
+          expect(JSON.parse(String(init?.body))).toEqual({
+            planId: FULL_ACCESS_PLAN.id,
+          });
+          return new Response(
+            JSON.stringify({
+              subscription: {
+                ...FULL_ACCESS_SUBSCRIPTION,
+                status: 'PENDING',
+              },
+              checkoutUrl: remintedUrl,
+            }),
+            {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        return new Response(null, { status: 404 });
+      }),
+    );
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <CheckoutPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: /продовжити оплату/i }),
+    );
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith(remintedUrl);
+    });
+    expect(assign).not.toHaveBeenCalledWith(expiredUrl);
   });
 });

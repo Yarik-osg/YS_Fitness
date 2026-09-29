@@ -5,24 +5,25 @@ import { ProgramsController } from './programs.controller.js';
 
 const GUARDS_METADATA = '__guards__';
 
-function guardsOn(target: object) {
-  return (Reflect.getMetadata(GUARDS_METADATA, target) ?? []) as unknown[];
-}
-
-describe('ProgramsController guards', () => {
-  it('requires an active subscription to assign and read the current program', () => {
-    expect(guardsOn(ProgramsController)).toContain(JwtAuthGuard);
-    expect(guardsOn(ProgramsController.prototype.assign)).toContain(
-      SubscriptionGuard,
-    );
-    expect(guardsOn(ProgramsController.prototype.getMine)).toContain(
-      SubscriptionGuard,
-    );
+describe('ProgramsController', () => {
+  it('keeps GET /programs/me behind SubscriptionGuard', () => {
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        ProgramsController.prototype.getMine,
+      ),
+    ).toEqual([SubscriptionGuard]);
   });
 
-  it('leaves the exercise list available without a subscription', () => {
-    expect(guardsOn(ProgramsController.prototype.listExercises)).not.toContain(
-      SubscriptionGuard,
-    );
+  it('keeps GET /programs/assigned behind SubscriptionGuard', () => {
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        ProgramsController.prototype.getAssigned,
+      ),
+    ).toEqual([SubscriptionGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, ProgramsController)).toEqual([
+      JwtAuthGuard,
+    ]);
   });
 });

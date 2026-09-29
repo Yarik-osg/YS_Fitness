@@ -1,17 +1,47 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { OnboardingResponsesResponse } from '@repo/shared-types';
-import { isPlausibleDateOfBirth, type OnboardingInput } from '@repo/validation';
+import type {
+  OnboardingResponsesResponse,
+  ProfileUpdateResponse,
+  TrainingFrequency,
+} from '@repo/shared-types';
+import {
+  isPlausibleDateOfBirth,
+  type OnboardingInput,
+  type ProfileUpdateInput,
+} from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
+  ProgramsService,
+  toProgramSummary,
+} from '../programs/programs.service.js';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service.js';
+import {
+  EXPERIENCE_FROM_PRISMA,
+  EXPERIENCE_TO_PRISMA,
+  MAIN_GOAL_FROM_PRISMA,
+  MAIN_GOAL_TO_PRISMA,
   sameOnboardingResponses,
   toOnboardingResponsesRecord,
   toPrismaOnboardingResponses,
 } from './onboarding-responses.mapper.js';
 
+const PROFILE_INCOMPLETE = {
+  code: 'PROFILE_INCOMPLETE',
+  message: 'Complete onboarding before editing this profile',
+};
+
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly programs: ProgramsService,
+    private readonly subscriptions: SubscriptionsService,
+  ) {}
 
   async getMe(userId: string) {
     return this.prisma.user.findUniqueOrThrow({
@@ -130,6 +160,142 @@ export class UsersService {
     );
   }
 
+  async updateProfile(
+    userId: string,
+    input: ProfileUpdateInput,
+  ): Promise<ProfileUpdateResponse> {
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const [profile, latestMeasurement, responses] = await Promise.all([
+          transaction.userProfile.findUnique({ where: { userId } }),
+          transaction.bodyMeasurement.findFirst({
+            where: { userId },
+            orderBy: { measuredAt: 'desc' },
+          }),
+          transaction.onboardingResponses.findUnique({ where: { userId } }),
+        ]);
+
+        if (!profile) {
+          throw new NotFoundException(PROFILE_INCOMPLETE);
+        }
+
+        if (input.heightCm !== undefined) {
+          await transaction.userProfile.update({
+            where: { userId },
+            data: { heightCm: input.heightCm },
+          });
+        }
+
+        const weightChanged =
+          input.weightKg !== undefined &&
+          (!latestMeasurement ||
+            latestMeasurement.weightKg.toNumber() !== input.weightKg);
+
+        if (weightChanged && input.weightKg !== undefined) {
+          await transaction.bodyMeasurement.create({
+            data: {
+              userId,
+              weightKg: input.weightKg,
+              bodyFatPercent: latestMeasurement?.bodyFatPercent,
+            },
+          });
+        }
+
+        let storedResponses = responses;
+        const responseUpdate: {
+          experience?: (typeof EXPERIENCE_TO_PRISMA)[keyof typeof EXPERIENCE_TO_PRISMA];
+          mainGoal?: (typeof MAIN_GOAL_TO_PRISMA)[keyof typeof MAIN_GOAL_TO_PRISMA];
+          trainingFrequency?: TrainingFrequency;
+        } = {};
+        if (input.experience) {
+          responseUpdate.experience = EXPERIENCE_TO_PRISMA[input.experience];
+        }
+        if (input.mainGoal) {
+          responseUpdate.mainGoal = MAIN_GOAL_TO_PRISMA[input.mainGoal];
+        }
+        if (input.trainingFrequency) {
+          responseUpdate.trainingFrequency = input.trainingFrequency;
+        }
+
+        if (!storedResponses) {
+          if (
+            input.experience !== undefined &&
+            input.mainGoal !== undefined &&
+            input.trainingFrequency !== undefined
+          ) {
+            storedResponses = await transaction.onboardingResponses.create({
+              data: {
+                userId,
+                programTrack:
+                  profile.biologicalSexForCalculation === 'MALE'
+                    ? 'MALE'
+                    : 'FEMALE',
+                currentBody: '',
+                desiredBody: '',
+                mainGoal: MAIN_GOAL_TO_PRISMA[input.mainGoal],
+                experience: EXPERIENCE_TO_PRISMA[input.experience],
+                trainingFrequency: input.trainingFrequency,
+                focusAreas: [],
+                nutritionCurrent: 'BALANCED',
+                mealsPerDay: '',
+                eatingHabits: [],
+              },
+            });
+          } else if (
+            input.experience !== undefined ||
+            input.mainGoal !== undefined ||
+            input.trainingFrequency !== undefined
+          ) {
+            throw new NotFoundException(PROFILE_INCOMPLETE);
+          }
+        } else if (
+          responseUpdate.experience ||
+          responseUpdate.mainGoal ||
+          responseUpdate.trainingFrequency
+        ) {
+          await transaction.onboardingResponses.update({
+            where: { userId },
+            data: responseUpdate,
+          });
+        }
+
+        const weightKg =
+          input.weightKg ?? latestMeasurement?.weightKg.toNumber();
+        if (weightKg === undefined) {
+          throw new NotFoundException(PROFILE_INCOMPLETE);
+        }
+
+        const program = await this.resolveAssignedProgram(userId, transaction, {
+          reassign:
+            hasMatchableFocus(storedResponses) &&
+            matchFieldsChanged(responses, input),
+        });
+
+        return {
+          heightCm: input.heightCm ?? profile.heightCm.toNumber(),
+          weightKg,
+          experience:
+            input.experience ??
+            (storedResponses
+              ? EXPERIENCE_FROM_PRISMA[storedResponses.experience]
+              : null),
+          mainGoal:
+            input.mainGoal ??
+            (storedResponses
+              ? MAIN_GOAL_FROM_PRISMA[storedResponses.mainGoal]
+              : null),
+          trainingFrequency:
+            input.trainingFrequency ??
+            (storedResponses
+              ? (storedResponses.trainingFrequency as TrainingFrequency)
+              : null),
+          program,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
   async getOnboardingResponses(
     userId: string,
   ): Promise<OnboardingResponsesResponse> {
@@ -139,6 +305,34 @@ export class UsersService {
     return {
       responses: row ? toOnboardingResponsesRecord(row) : null,
     };
+  }
+
+  private async resolveAssignedProgram(
+    userId: string,
+    transaction: Prisma.TransactionClient,
+    options: { reassign: boolean },
+  ) {
+    if (!(await this.subscriptions.hasActiveAccess(userId))) {
+      return null;
+    }
+    const current = await this.programs.getAssigned(userId, transaction);
+    if (!options.reassign) {
+      return current.program;
+    }
+
+    try {
+      return toProgramSummary(
+        await this.programs.assign(userId, transaction, {
+          preserveAssignedAt: true,
+        }),
+      );
+    } catch (error) {
+      if (isProgramNotAvailable(error)) {
+        await this.programs.unassign(userId, transaction);
+        return null;
+      }
+      throw error;
+    }
   }
 
   private validateDateOfBirth(value: string): Date {
@@ -166,4 +360,46 @@ export class UsersService {
   private optionalDecimal(value: Prisma.Decimal | null): number | null {
     return value?.toNumber() ?? null;
   }
+}
+
+function isProgramNotAvailable(error: unknown): boolean {
+  if (!(error instanceof NotFoundException)) {
+    return false;
+  }
+  const response = error.getResponse();
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'code' in response &&
+    response.code === 'PROGRAM_NOT_AVAILABLE'
+  );
+}
+
+function hasMatchableFocus(stored: { focusAreas: string[] } | null): boolean {
+  return Boolean(stored?.focusAreas[0]);
+}
+
+function matchFieldsChanged(
+  stored: {
+    experience: string;
+    mainGoal: string;
+    trainingFrequency: string;
+  } | null,
+  input: ProfileUpdateInput,
+): boolean {
+  if (!stored) return false;
+  return (
+    (input.experience !== undefined &&
+      input.experience !==
+        EXPERIENCE_FROM_PRISMA[
+          stored.experience as keyof typeof EXPERIENCE_FROM_PRISMA
+        ]) ||
+    (input.mainGoal !== undefined &&
+      input.mainGoal !==
+        MAIN_GOAL_FROM_PRISMA[
+          stored.mainGoal as keyof typeof MAIN_GOAL_FROM_PRISMA
+        ]) ||
+    (input.trainingFrequency !== undefined &&
+      input.trainingFrequency !== stored.trainingFrequency)
+  );
 }

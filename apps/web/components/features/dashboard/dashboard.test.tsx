@@ -40,9 +40,13 @@ function programExercise(
   };
 }
 
+const TEMPLATE_NAME =
+  'WB2U — Жінки · Початковий рівень · 2 тренування на тиждень · Акцент на верх';
+
 const ASSIGNED_PROGRAM = {
   id: 'program-1',
   templateCode: 'WB2U',
+  templateName: TEMPLATE_NAME,
   gender: 'female',
   level: 'beginner',
   frequencyPerWeek: 2,
@@ -238,7 +242,7 @@ function expectNoPlaceholderCards() {
 }
 
 function expectHomeCards() {
-  expect(screen.getAllByText('WB2U')).toHaveLength(2);
+  expect(screen.getAllByText(TEMPLATE_NAME)).toHaveLength(2);
   expect(screen.getAllByText('Тренування 01')).toHaveLength(2);
   expect(screen.getByText('2 рази', { exact: true })).toBeInTheDocument();
   expect(screen.getByText('2 рази/тиж.')).toBeInTheDocument();
@@ -287,6 +291,10 @@ describe('Dashboard program', () => {
     expect(
       await screen.findByRole('button', { name: 'Призначити мою програму' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Профіль' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
     expectNoPlaceholderCards();
 
     await user.click(
@@ -305,17 +313,19 @@ describe('Dashboard program', () => {
     expect(start).toBeDisabled();
     expect(start.closest('a')).toBeNull();
 
+    const profileCard = screen.getByRole('link', { name: /Аліна/ });
+    expect(profileCard).toHaveAttribute('href', '/profile');
+    expect(screen.getByText('6 вправ · 17 підходів').closest('a')).toBeNull();
+
     const home = screen.getByRole('button', { name: 'Головна' });
     expect(home).toBeEnabled();
     expect(home).toHaveAttribute('aria-current', 'page');
     expect(home.closest('a')).toBeNull();
-    for (const name of [
-      'Тренування',
-      'Харчування',
-      'Прогрес',
-      'Профіль',
-      'Бібліотека',
-    ]) {
+    expect(screen.getByRole('link', { name: 'Профіль' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+    for (const name of ['Тренування', 'Харчування', 'Прогрес', 'Бібліотека']) {
       const tab = screen.getByRole('button', { name });
       expect(tab).toBeDisabled();
       expect(tab.closest('a')).toBeNull();

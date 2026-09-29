@@ -24,6 +24,7 @@ function assignedProgram() {
     template: {
       id: 'template-1',
       code: 'WB2U',
+      name: 'WB2U — Жінки · Початковий рівень · 2 тренування на тиждень · Акцент на верх',
       gender: 'FEMALE',
       level: 'BEGINNER',
       frequencyPerWeek: 2,
@@ -59,6 +60,7 @@ function createService() {
     workoutProgram: {
       upsert: vi.fn(),
       findUnique: vi.fn(),
+      deleteMany: vi.fn(),
     },
     exercise: { findMany: vi.fn() },
   };
@@ -100,6 +102,8 @@ describe('ProgramsService', () => {
     );
     expect(result).toMatchObject({
       templateCode: 'WB2U',
+      templateName:
+        'WB2U — Жінки · Початковий рівень · 2 тренування на тиждень · Акцент на верх',
       days: [
         {
           exercises: [
@@ -139,5 +143,52 @@ describe('ProgramsService', () => {
       NotFoundException,
     );
     expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps the start date when the matched template is unchanged', async () => {
+    const { prisma, service } = createService();
+    prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
+    prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
+    prisma.workoutProgram.findUnique.mockImplementation(
+      async (args: { select?: unknown }) =>
+        args.select ? { templateId: 'template-1' } : assignedProgram(),
+    );
+
+    const result = await service.assign(userId, undefined, {
+      preserveAssignedAt: true,
+    });
+
+    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(result.assignedAt).toBe('2026-09-27T00:00:00.000Z');
+  });
+
+  it('returns assigned metadata without workout days', async () => {
+    const { prisma, service } = createService();
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
+
+    const result = await service.getAssigned(userId);
+
+    expect(result.program).toMatchObject({
+      templateCode: 'WB2U',
+      templateName:
+        'WB2U — Жінки · Початковий рівень · 2 тренування на тиждень · Акцент на верх',
+      frequencyPerWeek: 2,
+      level: 'beginner',
+    });
+    expect(result.program).not.toHaveProperty('days');
+    expect(prisma.workoutProgram.findUnique).toHaveBeenCalledWith({
+      where: { userId },
+      include: { template: true },
+    });
+  });
+
+  it('removes the assigned program', async () => {
+    const { prisma, service } = createService();
+
+    await service.unassign(userId);
+
+    expect(prisma.workoutProgram.deleteMany).toHaveBeenCalledWith({
+      where: { userId },
+    });
   });
 });

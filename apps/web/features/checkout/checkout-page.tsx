@@ -10,7 +10,7 @@ import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
-import { getMySubscription } from '@/lib/api/subscriptions';
+import { getMyCheckout } from '@/lib/api/subscriptions';
 import { useCheckout, usePlans } from '@/lib/hooks/use-subscriptions';
 import {
   formatHryvniaAmount,
@@ -60,6 +60,7 @@ function CheckoutFlow() {
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(
     null,
   );
+  const [inFlightPlanId, setInFlightPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const plans = useMemo(() => {
@@ -79,13 +80,14 @@ function CheckoutFlow() {
 
   useEffect(() => {
     let active = true;
-    void getMySubscription()
-      .then((existing) => {
-        if (
-          active &&
-          existing &&
-          (existing.status === 'ACTIVE' || existing.status === 'PENDING')
-        ) {
+    void getMyCheckout()
+      .then(({ subscription: existing, checkoutUrl }) => {
+        if (!active) return;
+        if (checkoutUrl && existing) {
+          setInFlightPlanId(existing.planId);
+          return;
+        }
+        if (existing?.status === 'ACTIVE') {
           setSubscription(existing);
         }
       })
@@ -95,21 +97,60 @@ function CheckoutFlow() {
     };
   }, []);
 
-  async function pay() {
-    if (!selected || !agreed || !cardAdded) return;
+  async function followCheckout(planId: string) {
     setError(null);
-    persistSelectedPlanId(selected.id);
     try {
-      const result = await checkout.mutateAsync(selected.id);
+      const result = await checkout.mutateAsync(planId);
       clearSelectedPlanId();
+      if (result.checkoutUrl) {
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
       setSubscription(result.subscription);
     } catch (cause) {
       setError(getUserFacingError(cause, tAuth) || t('error'));
     }
   }
 
+  async function pay() {
+    if (!selected || !agreed || !cardAdded) return;
+    persistSelectedPlanId(selected.id);
+    await followCheckout(selected.id);
+  }
+
+  async function continuePayment() {
+    if (!inFlightPlanId) return;
+    await followCheckout(inFlightPlanId);
+  }
+
   if (subscription) {
     return <CheckoutSuccess />;
+  }
+
+  if (inFlightPlanId) {
+    return (
+      <CheckoutFrame>
+        <p className="font-label text-[10px] uppercase tracking-[0.2em] text-accent">
+          {t('payEyebrow')}
+        </p>
+        <p className="mt-4 text-sm text-muted">{t('continuePaymentBody')}</p>
+        {error ? (
+          <p
+            role="alert"
+            className="mt-5 border-l-2 border-red-400 bg-red-400/8 px-4 py-3 text-xs text-red-300"
+          >
+            {error}
+          </p>
+        ) : null}
+        <Button
+          className="mt-8 w-full"
+          disabled={checkout.isPending}
+          onClick={() => void continuePayment()}
+        >
+          {checkout.isPending ? t('paying') : t('continuePayment')}
+        </Button>
+      </CheckoutFrame>
+    );
   }
 
   if (plansQuery.isPending || plansQuery.isLoading) {

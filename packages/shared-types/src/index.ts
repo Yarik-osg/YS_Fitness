@@ -137,6 +137,7 @@ export interface CheckoutResponse {
 
 export interface CurrentSubscriptionResponse {
   subscription: SubscriptionResponse | null;
+  checkoutUrl: string | null;
 }
 
 export type MuscleGroup =
@@ -173,17 +174,34 @@ export interface ProgramDayResponse {
   exercises: ProgramExerciseResponse[];
 }
 
-export interface AssignedProgramResponse {
+export interface AssignedProgramSummary {
   id: string;
   templateCode: string;
+  templateName: string;
   gender: ProgramTrack;
   level: TrainingExperience;
   frequencyPerWeek: number;
   accent: ProgramAccent;
   assignedAt: string;
+}
+
+export interface AssignedProgramResponse extends AssignedProgramSummary {
   days: ProgramDayResponse[];
 }
 
 export interface CurrentProgramResponse {
   program: AssignedProgramResponse | null;
+}
+
+export interface AssignedProgramLookupResponse {
+  program: AssignedProgramSummary | null;
+}
+
+export interface ProfileUpdateResponse {
+  heightCm: number;
+  weightKg: number;
+  experience: TrainingExperience | null;
+  mainGoal: OnboardingMainGoal | null;
+  trainingFrequency: TrainingFrequency | null;
+  program: AssignedProgramSummary | null;
 }

@@ -62,6 +62,7 @@ function renderGate() {
 describe('AuthGate', () => {
   beforeEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     navigation.pathname = '/dashboard';
     navigation.replace.mockReset();
     api.refresh.mockReset();
@@ -175,6 +176,29 @@ describe('AuthGate', () => {
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(useAuthStore.getState().accessToken).toBe(token);
     expect(readSessionHint()).toBe('complete');
+  });
+
+  it('keeps checkout return query params on the login next path', async () => {
+    navigation.pathname = '/checkout/return';
+    vi.stubGlobal('location', {
+      search: '?providerReference=pay&expiresAt=1&signature=sig',
+    });
+    writeSessionHint('complete');
+    api.refresh.mockRejectedValue(
+      new ApiClientError(
+        401,
+        'INVALID_REFRESH_TOKEN',
+        'Refresh token is invalid',
+      ),
+    );
+
+    renderGate();
+
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalled());
+    expect(navigation.replace).toHaveBeenCalledWith(
+      '/login?next=%2Fcheckout%2Freturn%3FproviderReference%3Dpay%26expiresAt%3D1%26signature%3Dsig',
+    );
+    vi.unstubAllGlobals();
   });
 
   it('clears the session hint and redirects to login once when the session is lost', async () => {

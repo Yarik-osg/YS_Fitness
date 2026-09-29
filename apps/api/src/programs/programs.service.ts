@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type {
+  AssignedProgramLookupResponse,
   AssignedProgramResponse,
+  AssignedProgramSummary,
   CurrentProgramResponse,
   ExerciseResponse,
   ProgramAccent,
@@ -36,12 +38,21 @@ type ProgramRecord = Prisma.WorkoutProgramGetPayload<{
   include: typeof programInclude;
 }>;
 
+type ProgramStore = Pick<
+  Prisma.TransactionClient,
+  'onboardingResponses' | 'programTemplate' | 'workoutProgram'
+>;
+
 @Injectable()
 export class ProgramsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async assign(userId: string): Promise<AssignedProgramResponse> {
-    const responses = await this.prisma.onboardingResponses.findUnique({
+  async assign(
+    userId: string,
+    db: ProgramStore = this.prisma,
+    options?: { preserveAssignedAt?: boolean },
+  ): Promise<AssignedProgramResponse> {
+    const responses = await db.onboardingResponses.findUnique({
       where: { userId },
     });
     if (!responses) {
@@ -56,12 +67,27 @@ export class ProgramsService {
     });
     if (!match) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
 
-    const template = await this.prisma.programTemplate.findFirst({
+    const template = await db.programTemplate.findFirst({
       where: { ...match, active: true },
     });
     if (!template) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
 
-    const program = await this.prisma.workoutProgram.upsert({
+    if (options?.preserveAssignedAt) {
+      const existing = await db.workoutProgram.findUnique({
+        where: { userId },
+        select: { templateId: true },
+      });
+      if (existing?.templateId === template.id) {
+        const current = await db.workoutProgram.findUnique({
+          where: { userId },
+          include: programInclude,
+        });
+        if (!current) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+        return toAssignedProgram(current);
+      }
+    }
+
+    const program = await db.workoutProgram.upsert({
       where: { userId },
       create: { userId, templateId: template.id },
       update: { templateId: template.id, assignedAt: new Date() },
@@ -71,12 +97,33 @@ export class ProgramsService {
     return toAssignedProgram(program);
   }
 
-  async getMine(userId: string): Promise<CurrentProgramResponse> {
-    const program = await this.prisma.workoutProgram.findUnique({
+  async getMine(
+    userId: string,
+    db: ProgramStore = this.prisma,
+  ): Promise<CurrentProgramResponse> {
+    const program = await db.workoutProgram.findUnique({
       where: { userId },
       include: programInclude,
     });
     return { program: program ? toAssignedProgram(program) : null };
+  }
+
+  async getAssigned(
+    userId: string,
+    db: ProgramStore = this.prisma,
+  ): Promise<AssignedProgramLookupResponse> {
+    const program = await db.workoutProgram.findUnique({
+      where: { userId },
+      include: { template: true },
+    });
+    return { program: program ? toAssignedSummary(program) : null };
+  }
+
+  async unassign(
+    userId: string,
+    db: ProgramStore = this.prisma,
+  ): Promise<void> {
+    await db.workoutProgram.deleteMany({ where: { userId } });
   }
 
   async listExercises(query: ListExercisesQuery): Promise<ExerciseResponse[]> {
@@ -98,17 +145,49 @@ export class ProgramsService {
   }
 }
 
-function toAssignedProgram(program: ProgramRecord): AssignedProgramResponse {
-  const { template } = program;
+export function toProgramSummary(
+  program: AssignedProgramResponse,
+): AssignedProgramSummary {
   return {
     id: program.id,
-    templateCode: template.code,
-    gender: template.gender === 'MALE' ? 'male' : 'female',
-    level: template.level.toLowerCase() as TrainingExperience,
-    frequencyPerWeek: template.frequencyPerWeek,
-    accent: template.accent as ProgramAccent,
+    templateCode: program.templateCode,
+    templateName: program.templateName,
+    gender: program.gender,
+    level: program.level,
+    frequencyPerWeek: program.frequencyPerWeek,
+    accent: program.accent,
+    assignedAt: program.assignedAt,
+  };
+}
+
+function toAssignedSummary(program: {
+  id: string;
+  assignedAt: Date;
+  template: {
+    code: string;
+    name: string;
+    gender: string;
+    level: string;
+    frequencyPerWeek: number;
+    accent: string;
+  };
+}): AssignedProgramSummary {
+  return {
+    id: program.id,
+    templateCode: program.template.code,
+    templateName: program.template.name,
+    gender: program.template.gender === 'MALE' ? 'male' : 'female',
+    level: program.template.level.toLowerCase() as TrainingExperience,
+    frequencyPerWeek: program.template.frequencyPerWeek,
+    accent: program.template.accent as ProgramAccent,
     assignedAt: program.assignedAt.toISOString(),
-    days: template.days.map((day) => ({
+  };
+}
+
+function toAssignedProgram(program: ProgramRecord): AssignedProgramResponse {
+  return {
+    ...toAssignedSummary(program),
+    days: program.template.days.map((day) => ({
       dayNumber: day.dayNumber,
       exercises: day.exercises.map((row) => ({
         order: row.order,

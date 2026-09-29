@@ -73,6 +73,20 @@ describe('applyAuthRedirect', () => {
     ).toBe('/en/login?next=%2Fen%2Fcheckout');
   });
 
+  it('protects the checkout return page like checkout', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/checkout/return',
+        locale: 'uk',
+        fullPathname:
+          '/uk/checkout/return?providerReference=pay_first&signature=signed',
+        hint: null,
+      }),
+    ).toBe(
+      '/uk/login?next=%2Fuk%2Fcheckout%2Freturn%3FproviderReference%3Dpay_first%26signature%3Dsigned',
+    );
+  });
+
   it('lets guests open onboarding without an account', () => {
     expect(
       applyAuthRedirect({
@@ -113,6 +127,28 @@ describe('applyAuthRedirect', () => {
         pathnameWithoutLocale: '/dashboard',
         locale: 'uk',
         fullPathname: '/uk/dashboard',
+        hint: 'onboarding',
+      }),
+    ).toBe('/uk/onboarding');
+  });
+
+  it('protects profile like other client routes', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/profile',
+        locale: 'en',
+        fullPathname: '/en/profile',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Fprofile');
+  });
+
+  it('keeps an incomplete session away from profile', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/profile',
+        locale: 'uk',
+        fullPathname: '/uk/profile',
         hint: 'onboarding',
       }),
     ).toBe('/uk/onboarding');

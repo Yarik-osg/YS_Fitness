@@ -1,4 +1,9 @@
-import { onboardingSchema, type OnboardingInput } from '@repo/validation';
+import {
+  onboardingSchema,
+  profileUpdateSchema,
+  type OnboardingInput,
+  type ProfileUpdateInput,
+} from '@repo/validation';
 
 export class OnboardingDto implements OnboardingInput {
   static readonly schema = onboardingSchema;
@@ -29,4 +34,14 @@ export class OnboardingDto implements OnboardingInput {
   mealsPerDay!: OnboardingInput['mealsPerDay'];
   eatingHabits!: OnboardingInput['eatingHabits'];
   physiqueLevel!: OnboardingInput['physiqueLevel'];
+}
+
+export class ProfileUpdateDto implements ProfileUpdateInput {
+  static readonly schema = profileUpdateSchema;
+
+  heightCm?: number;
+  weightKg?: number;
+  experience?: OnboardingInput['experience'];
+  mainGoal?: OnboardingInput['mainGoal'];
+  trainingFrequency?: OnboardingInput['trainingFrequency'];
 }

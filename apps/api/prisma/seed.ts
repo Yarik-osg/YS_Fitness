@@ -117,6 +117,7 @@ async function seedPrograms(): Promise<void> {
         where: { code: template.code },
         create: {
           code: template.code,
+          name: template.name,
           gender: template.gender,
           level: template.level,
           frequencyPerWeek: template.frequencyPerWeek,
@@ -124,6 +125,7 @@ async function seedPrograms(): Promise<void> {
           active: true,
         },
         update: {
+          name: template.name,
           gender: template.gender,
           level: template.level,
           frequencyPerWeek: template.frequencyPerWeek,

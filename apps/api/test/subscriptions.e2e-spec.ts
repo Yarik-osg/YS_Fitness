@@ -167,7 +167,10 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .get('/api/v1/subscriptions/me')
       .set('Authorization', authorization)
       .expect(200);
-    expect(mineBefore.body).toEqual({ subscription: null });
+    expect(mineBefore.body).toEqual({
+      subscription: null,
+      checkoutUrl: null,
+    });
 
     const checkout = await request(app.getHttpServer())
       .post('/api/v1/subscriptions/checkout')
@@ -366,7 +369,10 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .get('/api/v1/subscriptions/me')
       .set('Authorization', authorization)
       .expect(200);
-    expect(mine.body).toEqual({ subscription: null });
+    expect(mine.body).toEqual({
+      subscription: null,
+      checkoutUrl: null,
+    });
 
     const renewed = await request(app.getHttpServer())
       .post('/api/v1/subscriptions/checkout')

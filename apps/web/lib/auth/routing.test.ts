@@ -4,6 +4,8 @@ import {
   getPostAuthPath,
   getPostRegisterPath,
   resolveIncompleteGuestDestination,
+  resolvePostLoginPath,
+  safeInternalPath,
 } from './routing';
 
 function user(onboardingCompletedAt: string | null): MeResponse {
@@ -58,6 +60,46 @@ describe('resolveIncompleteGuestDestination', () => {
 
   it('still sends an incomplete login to onboarding', () => {
     expect(resolveIncompleteGuestDestination('/login')).toBe('/onboarding');
+  });
+});
+
+describe('resolvePostLoginPath', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  it('keeps an onboarded member on a safe checkout return next path', () => {
+    expect(
+      resolvePostLoginPath(
+        user('2026-09-19T10:00:00.000Z'),
+        '/uk/checkout/return?providerReference=pay&expiresAt=1&signature=sig',
+      ),
+    ).toBe('/checkout/return?providerReference=pay&expiresAt=1&signature=sig');
+  });
+
+  it('ignores an external next path', () => {
+    expect(
+      resolvePostLoginPath(
+        user('2026-09-19T10:00:00.000Z'),
+        'https://evil.example/phish',
+      ),
+    ).toBe('/dashboard');
+  });
+
+  it('still sends an incomplete profile to onboarding', () => {
+    expect(
+      resolvePostLoginPath(user(null), '/checkout/return?signature=sig'),
+    ).toBe('/onboarding');
+  });
+});
+
+describe('safeInternalPath', () => {
+  it('rejects protocol-relative and absolute urls', () => {
+    expect(safeInternalPath('//evil.example')).toBeNull();
+    expect(safeInternalPath('https://evil.example')).toBeNull();
+    expect(safeInternalPath('/checkout/return?signature=sig')).toBe(
+      '/checkout/return?signature=sig',
+    );
   });
 });
 

@@ -21,7 +21,7 @@ export function proxy(request: NextRequest) {
   const authTarget = applyAuthRedirect({
     pathnameWithoutLocale,
     locale,
-    fullPathname: pathname,
+    fullPathname: `${pathname}${request.nextUrl.search}`,
     hint,
     planId: request.nextUrl.searchParams.get('planId'),
   });

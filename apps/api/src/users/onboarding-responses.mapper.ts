@@ -25,7 +25,7 @@ const PROGRAM_TRACK_FROM_PRISMA = {
   MALE: 'male',
 } as const satisfies Record<PrismaProgramTrack, ProgramTrack>;
 
-const MAIN_GOAL_TO_PRISMA = {
+export const MAIN_GOAL_TO_PRISMA = {
   lose_weight: 'LOSE_WEIGHT',
   build_muscle: 'BUILD_MUSCLE',
   improve_body: 'IMPROVE_BODY',
@@ -33,7 +33,7 @@ const MAIN_GOAL_TO_PRISMA = {
   get_stronger: 'GET_STRONGER',
 } as const satisfies Record<OnboardingInput['mainGoal'], PrismaMainGoal>;
 
-const MAIN_GOAL_FROM_PRISMA = {
+export const MAIN_GOAL_FROM_PRISMA = {
   LOSE_WEIGHT: 'lose_weight',
   BUILD_MUSCLE: 'build_muscle',
   IMPROVE_BODY: 'improve_body',
@@ -41,13 +41,13 @@ const MAIN_GOAL_FROM_PRISMA = {
   GET_STRONGER: 'get_stronger',
 } as const satisfies Record<PrismaMainGoal, OnboardingMainGoal>;
 
-const EXPERIENCE_TO_PRISMA = {
+export const EXPERIENCE_TO_PRISMA = {
   beginner: 'BEGINNER',
   intermediate: 'INTERMEDIATE',
   advanced: 'ADVANCED',
 } as const satisfies Record<OnboardingInput['experience'], PrismaExperience>;
 
-const EXPERIENCE_FROM_PRISMA = {
+export const EXPERIENCE_FROM_PRISMA = {
   BEGINNER: 'beginner',
   INTERMEDIATE: 'intermediate',
   ADVANCED: 'advanced',
