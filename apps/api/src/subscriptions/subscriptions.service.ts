@@ -1,21 +1,35 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, SubscriptionStatus, type Plan } from '@prisma/client';
-import type { CheckoutInput, GrantSubscriptionInput } from '@repo/validation';
+import type {
+  CheckoutInput,
+  GrantSubscriptionInput,
+  MockPaymentWebhookInput,
+} from '@repo/validation';
 import type {
   CheckoutResponse,
+  CurrentSubscriptionResponse,
   PlanResponse,
   SubscriptionResponse,
 } from '@repo/shared-types';
+import { AppConfigService } from '../config/app-config.service.js';
 import { addCalendarMonths } from './period.js';
 import {
   PAYMENT_PROVIDER,
+  type CheckoutResult,
   type PaymentProvider,
 } from './providers/payment-provider.interface.js';
+import {
+  isMockWebhookExpired,
+  mockWebhookExpiresAt,
+  signMockWebhook,
+  verifyMockWebhook,
+} from './providers/mock-webhook-signature.js';
 import {
   SubscriptionsRepository,
   type SubscriptionWithPlan,
@@ -27,6 +41,7 @@ export class SubscriptionsService {
     private readonly subscriptions: SubscriptionsRepository,
     @Inject(PAYMENT_PROVIDER)
     private readonly paymentProvider: PaymentProvider,
+    private readonly config: AppConfigService,
   ) {}
 
   listPlans(): Promise<PlanResponse[]> {
@@ -35,9 +50,12 @@ export class SubscriptionsService {
       .then((plans) => plans.map(toPlanResponse));
   }
 
-  async getMine(userId: string): Promise<SubscriptionResponse | null> {
+  async getMine(userId: string): Promise<CurrentSubscriptionResponse> {
     const subscription = await this.findCurrent(userId);
-    return subscription ? toSubscriptionResponse(subscription) : null;
+    return {
+      subscription: subscription ? toSubscriptionResponse(subscription) : null,
+      checkoutUrl: this.storedCheckoutUrl(subscription),
+    };
   }
 
   async hasActiveAccess(userId: string): Promise<boolean> {
@@ -138,6 +156,131 @@ export class SubscriptionsService {
     }
   }
 
+  async completeMockPayment(
+    input: MockPaymentWebhookInput,
+  ): Promise<SubscriptionResponse> {
+    if (this.config.get('NODE_ENV') === 'production') {
+      throw new NotFoundException({
+        code: 'NOT_FOUND',
+        message: 'Not found',
+      });
+    }
+    if (
+      !verifyMockWebhook(
+        this.config.get('CSRF_SECRET'),
+        input.providerReference,
+        input.expiresAt,
+        input.signature,
+      )
+    ) {
+      throw new ForbiddenException({
+        code: 'PAYMENT_SIGNATURE_INVALID',
+        message: 'Payment signature is invalid',
+      });
+    }
+    if (isMockWebhookExpired(input.expiresAt)) {
+      throw new ForbiddenException({
+        code: 'PAYMENT_SIGNATURE_EXPIRED',
+        message: 'Payment signature has expired',
+      });
+    }
+    return this.activateByProviderReference(input.providerReference);
+  }
+
+  async activateByProviderReference(
+    providerReference: string,
+  ): Promise<SubscriptionResponse> {
+    return this.subscriptions.transaction(async (transaction) => {
+      const subscription = await this.subscriptions.findByProviderReference(
+        providerReference,
+        transaction,
+      );
+      if (!subscription) {
+        throw new NotFoundException({
+          code: 'SUBSCRIPTION_NOT_FOUND',
+          message: 'No subscription matches this provider reference',
+        });
+      }
+
+      if (subscription.status === SubscriptionStatus.ACTIVE) {
+        if (!subscription.pendingPlanId) {
+          return toSubscriptionResponse(subscription);
+        }
+        if (!subscription.currentPeriodEnd) {
+          throw new ConflictException({
+            code: 'SUBSCRIPTION_PERIOD_MISSING',
+            message: 'Active subscription has no period end to extend',
+          });
+        }
+        const plan = await this.subscriptions.findPlanById(
+          subscription.pendingPlanId,
+          transaction,
+        );
+        if (!plan) {
+          throw new NotFoundException({
+            code: 'PLAN_NOT_FOUND',
+            message: 'The requested plan does not exist',
+          });
+        }
+        const extended = await this.subscriptions.claimPendingRenewal(
+          {
+            id: subscription.id,
+            planId: plan.id,
+            pendingPlanId: plan.id,
+            currentPeriodEnd: addCalendarMonths(
+              subscription.currentPeriodEnd,
+              plan.intervalMonths,
+            ),
+          },
+          transaction,
+        );
+        if (!extended) {
+          const current = await this.subscriptions.findByProviderReference(
+            providerReference,
+            transaction,
+          );
+          if (!current) {
+            throw new NotFoundException({
+              code: 'SUBSCRIPTION_NOT_FOUND',
+              message: 'No subscription matches this provider reference',
+            });
+          }
+          return toSubscriptionResponse(current);
+        }
+        return toSubscriptionResponse(extended);
+      }
+
+      if (subscription.status !== SubscriptionStatus.PENDING) {
+        throw new ConflictException({
+          code: 'SUBSCRIPTION_NOT_CONFIRMABLE',
+          message: 'This payment cannot be completed',
+        });
+      }
+
+      const planId = subscription.pendingPlanId ?? subscription.planId;
+      const plan = await this.subscriptions.findPlanById(planId, transaction);
+      if (!plan) {
+        throw new NotFoundException({
+          code: 'PLAN_NOT_FOUND',
+          message: 'The requested plan does not exist',
+        });
+      }
+
+      const activated = await this.subscriptions.activate(
+        {
+          id: subscription.id,
+          providerReference,
+          currentPeriodEnd:
+            subscription.currentPeriodEnd ??
+            addCalendarMonths(new Date(), plan.intervalMonths),
+          planId,
+        },
+        transaction,
+      );
+      return toSubscriptionResponse(activated);
+    });
+  }
+
   private async requireActivePlan(planId: string): Promise<Plan> {
     const plan = await this.subscriptions.findActivePlanById(planId);
     if (!plan) {
@@ -153,6 +296,9 @@ export class SubscriptionsService {
     current: SubscriptionWithPlan,
     plan: Plan,
   ): Promise<CheckoutResponse> {
+    if (current.pendingPlanId && current.providerReference) {
+      return this.resumeStoredCheckout(current);
+    }
     if (current.pendingPlanId) {
       return this.finishReservedCheckout(current, plan);
     }
@@ -199,57 +345,72 @@ export class SubscriptionsService {
       planIntervalMonths: plan.intervalMonths,
     });
 
-    if (!checkout.immediateConfirmation) {
-      throw new ConflictException({
-        code: 'CHECKOUT_NOT_CONFIRMED',
-        message: 'Payment was not confirmed',
-      });
-    }
-
     return this.subscriptions.transaction(async (transaction) => {
-      if (options.extendFrom) {
-        const subscription = await this.subscriptions.extendActive(
+      if (checkout.immediateConfirmation) {
+        if (options.extendFrom) {
+          const subscription = await this.subscriptions.extendActive(
+            {
+              id: reserved.id,
+              planId: plan.id,
+              currentPeriodEnd: addCalendarMonths(
+                options.extendFrom,
+                plan.intervalMonths,
+              ),
+              providerReference: checkout.providerReference,
+              pendingPlanId: null,
+            },
+            transaction,
+          );
+          return {
+            subscription: toSubscriptionResponse(subscription),
+            checkoutUrl: this.resolveCheckoutUrl(checkout),
+          };
+        }
+
+        let pending = reserved;
+        if (
+          reserved.status === SubscriptionStatus.PENDING &&
+          pending.planId !== plan.id
+        ) {
+          pending = await this.subscriptions.setPlan(
+            { id: pending.id, planId: plan.id },
+            transaction,
+          );
+        }
+
+        const subscription = await this.subscriptions.activate(
           {
-            id: reserved.id,
-            planId: plan.id,
+            id: pending.id,
+            providerReference: checkout.providerReference,
             currentPeriodEnd: addCalendarMonths(
-              options.extendFrom,
+              new Date(),
               plan.intervalMonths,
             ),
-            providerReference: checkout.providerReference,
-            pendingPlanId: null,
+            planId: plan.id,
           },
           transaction,
         );
         return {
           subscription: toSubscriptionResponse(subscription),
-          checkoutUrl: checkout.checkoutUrl,
+          checkoutUrl: this.resolveCheckoutUrl(checkout),
         };
       }
 
-      let pending = reserved;
-      if (
-        reserved.status === SubscriptionStatus.PENDING &&
-        pending.planId !== plan.id
-      ) {
-        pending = await this.subscriptions.setPlan(
-          { id: pending.id, planId: plan.id },
-          transaction,
-        );
-      }
-
-      const subscription = await this.subscriptions.activate(
+      const attached = await this.subscriptions.attachCheckoutProvider(
         {
-          id: pending.id,
+          id: reserved.id,
+          pendingPlanId: reserved.pendingPlanId ?? plan.id,
           providerReference: checkout.providerReference,
-          currentPeriodEnd: addCalendarMonths(new Date(), plan.intervalMonths),
-          planId: plan.id,
+          checkoutUrl: this.resolveCheckoutUrl(checkout),
         },
         transaction,
       );
+      if (!attached) {
+        throw checkoutPendingConflict();
+      }
       return {
-        subscription: toSubscriptionResponse(subscription),
-        checkoutUrl: checkout.checkoutUrl,
+        subscription: toSubscriptionResponse(attached),
+        checkoutUrl: this.resolveCheckoutUrl(checkout),
       };
     });
   }
@@ -266,6 +427,108 @@ export class SubscriptionsService {
       throw checkoutPendingConflict();
     }
     return reserved;
+  }
+
+  private storedCheckoutUrl(
+    subscription: SubscriptionWithPlan | null,
+  ): string | null {
+    if (!subscription?.pendingPlanId) {
+      return null;
+    }
+    return subscription.checkoutUrl;
+  }
+
+  private async resumeStoredCheckout(
+    current: SubscriptionWithPlan,
+  ): Promise<CheckoutResponse> {
+    const stored = current.checkoutUrl;
+    if (!stored || this.isHostedCheckoutUrl(stored)) {
+      return {
+        subscription: toSubscriptionResponse(current),
+        checkoutUrl: stored,
+      };
+    }
+
+    const expiresAt = this.signedReturnExpiresAt(stored);
+    if (expiresAt === null || !isMockWebhookExpired(expiresAt)) {
+      return {
+        subscription: toSubscriptionResponse(current),
+        checkoutUrl: stored,
+      };
+    }
+
+    const refreshed = current.providerReference
+      ? this.signedReturnUrl(current.providerReference)
+      : null;
+    if (!refreshed) {
+      return {
+        subscription: toSubscriptionResponse(current),
+        checkoutUrl: stored,
+      };
+    }
+    const updated = await this.subscriptions.setCheckoutUrl({
+      id: current.id,
+      checkoutUrl: refreshed,
+    });
+    return {
+      subscription: toSubscriptionResponse(updated),
+      checkoutUrl: refreshed,
+    };
+  }
+
+  private isHostedCheckoutUrl(checkoutUrl: string | null): boolean {
+    if (!checkoutUrl) {
+      return false;
+    }
+    try {
+      return new URL(checkoutUrl).pathname !== '/checkout/return';
+    } catch {
+      return true;
+    }
+  }
+
+  private signedReturnExpiresAt(checkoutUrl: string): number | null {
+    try {
+      const expiresAt = Number(
+        new URL(checkoutUrl).searchParams.get('expiresAt'),
+      );
+      return Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveCheckoutUrl(checkout: CheckoutResult): string | null {
+    if (checkout.immediateConfirmation || checkout.checkoutUrl) {
+      return checkout.checkoutUrl;
+    }
+    return this.signedReturnUrl(checkout.providerReference);
+  }
+
+  private signedReturnUrl(providerReference: string): string | null {
+    // First listed WEB_ORIGINS entry, not the request Host. Fine while there is
+    // one origin; a staging+prod list would send staging users to prod.
+    const origin = this.config
+      .get('WEB_ORIGINS')
+      .split(',')
+      .map((value) => value.trim())
+      .find(Boolean);
+    if (!origin) {
+      return null;
+    }
+    const expiresAt = mockWebhookExpiresAt();
+    const returnUrl = new URL('/checkout/return', origin);
+    returnUrl.searchParams.set('providerReference', providerReference);
+    returnUrl.searchParams.set('expiresAt', String(expiresAt));
+    returnUrl.searchParams.set(
+      'signature',
+      signMockWebhook(
+        this.config.get('CSRF_SECRET'),
+        providerReference,
+        expiresAt,
+      ),
+    );
+    return returnUrl.toString();
   }
 
   private async findCurrent(
