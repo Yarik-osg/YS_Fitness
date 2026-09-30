@@ -73,18 +73,15 @@ describe('applyAuthRedirect', () => {
     ).toBe('/en/login?next=%2Fen%2Fcheckout');
   });
 
-  it('protects the checkout return page like checkout', () => {
+  it('protects checkout query strings on the login next path', () => {
     expect(
       applyAuthRedirect({
-        pathnameWithoutLocale: '/checkout/return',
+        pathnameWithoutLocale: '/checkout',
         locale: 'uk',
-        fullPathname:
-          '/uk/checkout/return?providerReference=pay_first&signature=signed',
+        fullPathname: '/uk/checkout?planId=plan-3',
         hint: null,
       }),
-    ).toBe(
-      '/uk/login?next=%2Fuk%2Fcheckout%2Freturn%3FproviderReference%3Dpay_first%26signature%3Dsigned',
-    );
+    ).toBe('/uk/login?next=%2Fuk%2Fcheckout%3FplanId%3Dplan-3');
   });
 
   it('lets guests open onboarding without an account', () => {

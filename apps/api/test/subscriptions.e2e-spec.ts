@@ -169,7 +169,6 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .expect(200);
     expect(mineBefore.body).toEqual({
       subscription: null,
-      checkoutUrl: null,
     });
 
     const checkout = await request(app.getHttpServer())
@@ -379,7 +378,6 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .expect(200);
     expect(mine.body).toEqual({
       subscription: null,
-      checkoutUrl: null,
     });
 
     const renewed = await request(app.getHttpServer())

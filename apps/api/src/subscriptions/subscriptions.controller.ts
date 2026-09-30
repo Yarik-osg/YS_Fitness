@@ -19,7 +19,6 @@ import { RolesGuard } from '../auth/roles.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import type { AuthenticatedUser } from '../common/authenticated-user.js';
 import { CheckoutDto } from './dto/checkout.dto.js';
-import { MockPaymentWebhookDto } from './dto/mock-payment-webhook.dto.js';
 import { GrantSubscriptionDto } from './dto/grant-subscription.dto.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 
@@ -50,20 +49,12 @@ export class SubscriptionsController {
     return this.subscriptions.renew(user.sub, input);
   }
 
-  @Post('webhooks/mock')
-  @HttpCode(HttpStatus.OK)
-  completeMockPayment(
-    @Body() input: MockPaymentWebhookDto,
-  ): Promise<SubscriptionResponse> {
-    return this.subscriptions.completeMockPayment(input);
-  }
-
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMine(
+  async getMine(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<CurrentSubscriptionResponse> {
-    return this.subscriptions.getMine(user.sub);
+    return { subscription: await this.subscriptions.getMine(user.sub) };
   }
 
   @Post('grant')

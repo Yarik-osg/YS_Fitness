@@ -137,7 +137,6 @@ export interface CheckoutResponse {
 
 export interface CurrentSubscriptionResponse {
   subscription: SubscriptionResponse | null;
-  checkoutUrl: string | null;
 }
 
 export type MuscleGroup =

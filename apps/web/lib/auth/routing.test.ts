@@ -68,13 +68,13 @@ describe('resolvePostLoginPath', () => {
     window.sessionStorage.clear();
   });
 
-  it('keeps an onboarded member on a safe checkout return next path', () => {
+  it('keeps an onboarded member on a safe checkout next path', () => {
     expect(
       resolvePostLoginPath(
         user('2026-09-19T10:00:00.000Z'),
-        '/uk/checkout/return?providerReference=pay&expiresAt=1&signature=sig',
+        '/uk/checkout?planId=plan-3',
       ),
-    ).toBe('/checkout/return?providerReference=pay&expiresAt=1&signature=sig');
+    ).toBe('/checkout?planId=plan-3');
   });
 
   it('ignores an external next path', () => {
@@ -87,9 +87,9 @@ describe('resolvePostLoginPath', () => {
   });
 
   it('still sends an incomplete profile to onboarding', () => {
-    expect(
-      resolvePostLoginPath(user(null), '/checkout/return?signature=sig'),
-    ).toBe('/onboarding');
+    expect(resolvePostLoginPath(user(null), '/checkout?planId=plan-3')).toBe(
+      '/onboarding',
+    );
   });
 });
 
@@ -97,8 +97,8 @@ describe('safeInternalPath', () => {
   it('rejects protocol-relative and absolute urls', () => {
     expect(safeInternalPath('//evil.example')).toBeNull();
     expect(safeInternalPath('https://evil.example')).toBeNull();
-    expect(safeInternalPath('/checkout/return?signature=sig')).toBe(
-      '/checkout/return?signature=sig',
+    expect(safeInternalPath('/checkout?planId=plan-3')).toBe(
+      '/checkout?planId=plan-3',
     );
   });
 });
