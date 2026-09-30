@@ -158,6 +158,9 @@ function inMemoryRepository(initial: SubscriptionWithPlan) {
       row = subscription({
         status: SubscriptionStatus.PENDING,
         currentPeriodEnd: null,
+        providerReference: null,
+        pendingPlanId: null,
+        checkoutUrl: null,
       });
       return row;
     }),
@@ -560,6 +563,41 @@ describe('SubscriptionsService checkout transaction', () => {
     );
     expect(repository.activate).not.toHaveBeenCalled();
     expect(transaction).toHaveBeenCalled();
+  });
+
+  it('retries checkout on the reserved slot after the provider fails', async () => {
+    const repository = inMemoryRepository(
+      subscription({
+        status: SubscriptionStatus.EXPIRED,
+        pendingPlanId: null,
+        providerReference: null,
+      }),
+    );
+    const createCheckout = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('provider unavailable'))
+      .mockResolvedValue({
+        checkoutUrl: null,
+        providerReference: 'pay_retry',
+        immediateConfirmation: true,
+      });
+    const service = createService(repository, { createCheckout });
+
+    await expect(
+      service.checkout(repository.current()!.userId, { planId: plan.id }),
+    ).rejects.toThrow('provider unavailable');
+    expect(repository.current()).toMatchObject({
+      status: SubscriptionStatus.PENDING,
+      pendingPlanId: plan.id,
+      providerReference: null,
+    });
+
+    const retry = await service.checkout(repository.current()!.userId, {
+      planId: plan.id,
+    });
+    expect(repository.createPending).toHaveBeenCalledTimes(1);
+    expect(createCheckout).toHaveBeenCalledTimes(2);
+    expect(retry.subscription.status).toBe(SubscriptionStatus.ACTIVE);
   });
 
   it('stores a provider reference on delayed first checkout', async () => {
