@@ -9,5 +9,6 @@ import { ProgramsService } from './programs.service.js';
   imports: [AuthModule, SubscriptionsModule],
   controllers: [ProgramsController],
   providers: [ProgramsService, ExerciseSeedCheck],
+  exports: [ProgramsService],
 })
 export class ProgramsModule {}

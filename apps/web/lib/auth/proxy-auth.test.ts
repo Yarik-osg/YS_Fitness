@@ -73,6 +73,17 @@ describe('applyAuthRedirect', () => {
     ).toBe('/en/login?next=%2Fen%2Fcheckout');
   });
 
+  it('protects checkout query strings on the login next path', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/checkout',
+        locale: 'uk',
+        fullPathname: '/uk/checkout?planId=plan-3',
+        hint: null,
+      }),
+    ).toBe('/uk/login?next=%2Fuk%2Fcheckout%3FplanId%3Dplan-3');
+  });
+
   it('lets guests open onboarding without an account', () => {
     expect(
       applyAuthRedirect({
@@ -113,6 +124,28 @@ describe('applyAuthRedirect', () => {
         pathnameWithoutLocale: '/dashboard',
         locale: 'uk',
         fullPathname: '/uk/dashboard',
+        hint: 'onboarding',
+      }),
+    ).toBe('/uk/onboarding');
+  });
+
+  it('protects profile like other client routes', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/profile',
+        locale: 'en',
+        fullPathname: '/en/profile',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Fprofile');
+  });
+
+  it('keeps an incomplete session away from profile', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/profile',
+        locale: 'uk',
+        fullPathname: '/uk/profile',
         hint: 'onboarding',
       }),
     ).toBe('/uk/onboarding');

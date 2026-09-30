@@ -112,8 +112,70 @@ export class SubscriptionsRepository {
     });
   }
 
+  extendActive(
+    input: {
+      id: string;
+      planId: string;
+      currentPeriodEnd: Date;
+      providerReference?: string;
+      pendingPlanId?: string | null;
+    },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan> {
+    return client.subscription.update({
+      where: { id: input.id },
+      data: {
+        planId: input.planId,
+        currentPeriodEnd: input.currentPeriodEnd,
+        pendingPlanId:
+          input.pendingPlanId === undefined ? undefined : input.pendingPlanId,
+        ...(input.providerReference
+          ? { providerReference: input.providerReference }
+          : {}),
+      },
+      ...subscriptionWithPlan,
+    });
+  }
+
+  async reserveCheckoutSlot(
+    input: { id: string; pendingPlanId: string },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan | null> {
+    const { count } = await client.subscription.updateMany({
+      where: {
+        id: input.id,
+        pendingPlanId: null,
+        status: {
+          in: [SubscriptionStatus.PENDING, SubscriptionStatus.ACTIVE],
+        },
+      },
+      data: { pendingPlanId: input.pendingPlanId },
+    });
+    if (count === 0) return null;
+    return client.subscription.findUniqueOrThrow({
+      where: { id: input.id },
+      ...subscriptionWithPlan,
+    });
+  }
+
+  setPlan(
+    input: { id: string; planId: string },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan> {
+    return client.subscription.update({
+      where: { id: input.id },
+      data: { planId: input.planId },
+      ...subscriptionWithPlan,
+    });
+  }
+
   activate(
-    input: { id: string; providerReference: string; currentPeriodEnd: Date },
+    input: {
+      id: string;
+      providerReference: string;
+      currentPeriodEnd: Date;
+      planId?: string;
+    },
     client: Client = this.prisma,
   ): Promise<SubscriptionWithPlan> {
     return client.subscription.update({
@@ -122,19 +184,15 @@ export class SubscriptionsRepository {
         status: SubscriptionStatus.ACTIVE,
         providerReference: input.providerReference,
         currentPeriodEnd: input.currentPeriodEnd,
+        pendingPlanId: null,
+        ...(input.planId ? { planId: input.planId } : {}),
       },
       ...subscriptionWithPlan,
     });
   }
 
-  findByProviderReference(
-    providerReference: string,
-    client: Client = this.prisma,
-  ): Promise<SubscriptionWithPlan | null> {
-    return client.subscription.findFirst({
-      where: { providerReference },
-      ...subscriptionWithPlan,
-    });
+  findPlanById(id: string, client: Client = this.prisma): Promise<Plan | null> {
+    return client.plan.findUnique({ where: { id } });
   }
 
   findUserId(

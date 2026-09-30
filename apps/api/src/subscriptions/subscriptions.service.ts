@@ -52,37 +52,50 @@ export class SubscriptionsService {
     const plan = await this.requireActivePlan(input.planId);
 
     try {
-      return await this.subscriptions.transaction(async (transaction) => {
-        await this.assertNoNonTerminal(userId, transaction);
+      const existing = await this.findCurrent(userId);
+      if (existing) {
+        return this.resumeOrContinueCheckout(existing, plan);
+      }
+      return await this.beginNewCheckout(userId, plan);
+    } catch (error) {
+      rethrowSubscriptionConflict(error);
+    }
+  }
 
-        let subscription = await this.subscriptions.createPending(
-          { userId, planId: plan.id },
-          transaction,
-        );
+  async renew(userId: string, input: CheckoutInput): Promise<CheckoutResponse> {
+    const plan = await this.requireActivePlan(input.planId);
 
-        const checkout = await this.paymentProvider.createCheckout({
-          subscriptionId: subscription.id,
-          planIntervalMonths: plan.intervalMonths,
+    try {
+      await this.subscriptions.expireLapsed(userId, new Date());
+      const current = await this.subscriptions.findNonTerminalByUserId(userId);
+      if (!current) {
+        return await this.beginNewCheckout(userId, plan);
+      }
+      if (current.status === SubscriptionStatus.PENDING) {
+        return this.resumeOrContinueCheckout(current, plan);
+      }
+      if (current.status !== SubscriptionStatus.ACTIVE) {
+        throw alreadyActiveConflict();
+      }
+      if (current.pendingPlanId) {
+        return this.resumeOrContinueCheckout(current, plan);
+      }
+      if (!current.currentPeriodEnd) {
+        throw new ConflictException({
+          code: 'SUBSCRIPTION_PERIOD_MISSING',
+          message: 'Active subscription has no period end to extend',
         });
+      }
 
-        if (checkout.immediateConfirmation) {
-          subscription = await this.subscriptions.activate(
-            {
-              id: subscription.id,
-              providerReference: checkout.providerReference,
-              currentPeriodEnd: addCalendarMonths(
-                new Date(),
-                plan.intervalMonths,
-              ),
-            },
+      const reserved = await this.subscriptions.transaction(
+        async (transaction) =>
+          this.reserveCheckoutSlot(
+            { id: current.id, pendingPlanId: plan.id },
             transaction,
-          );
-        }
-
-        return {
-          subscription: toSubscriptionResponse(subscription),
-          checkoutUrl: checkout.checkoutUrl,
-        };
+          ),
+      );
+      return await this.finishReservedCheckout(reserved, plan, {
+        extendFrom: current.currentPeriodEnd,
       });
     } catch (error) {
       rethrowSubscriptionConflict(error);
@@ -125,32 +138,6 @@ export class SubscriptionsService {
     }
   }
 
-  async activateByProviderReference(
-    providerReference: string,
-  ): Promise<SubscriptionResponse> {
-    const subscription =
-      await this.subscriptions.findByProviderReference(providerReference);
-    if (!subscription) {
-      throw new NotFoundException({
-        code: 'SUBSCRIPTION_NOT_FOUND',
-        message: 'No subscription matches this provider reference',
-      });
-    }
-
-    if (subscription.status === SubscriptionStatus.ACTIVE) {
-      return toSubscriptionResponse(subscription);
-    }
-
-    const activated = await this.subscriptions.activate({
-      id: subscription.id,
-      providerReference,
-      currentPeriodEnd:
-        subscription.currentPeriodEnd ??
-        addCalendarMonths(new Date(), subscription.plan.intervalMonths),
-    });
-    return toSubscriptionResponse(activated);
-  }
-
   private async requireActivePlan(planId: string): Promise<Plan> {
     const plan = await this.subscriptions.findActivePlanById(planId);
     if (!plan) {
@@ -160,6 +147,125 @@ export class SubscriptionsService {
       });
     }
     return plan;
+  }
+
+  private resumeOrContinueCheckout(
+    current: SubscriptionWithPlan,
+    plan: Plan,
+  ): Promise<CheckoutResponse> {
+    if (current.pendingPlanId) {
+      return this.finishReservedCheckout(current, plan);
+    }
+    if (current.status === SubscriptionStatus.PENDING) {
+      return this.subscriptions
+        .transaction(async (transaction) =>
+          this.reserveCheckoutSlot(
+            { id: current.id, pendingPlanId: plan.id },
+            transaction,
+          ),
+        )
+        .then((reserved) => this.finishReservedCheckout(reserved, plan));
+    }
+    throw alreadyActiveConflict();
+  }
+
+  private async beginNewCheckout(
+    userId: string,
+    plan: Plan,
+  ): Promise<CheckoutResponse> {
+    const reserved = await this.subscriptions.transaction(
+      async (transaction) => {
+        await this.assertNoNonTerminal(userId, transaction);
+        const created = await this.subscriptions.createPending(
+          { userId, planId: plan.id },
+          transaction,
+        );
+        return this.reserveCheckoutSlot(
+          { id: created.id, pendingPlanId: plan.id },
+          transaction,
+        );
+      },
+    );
+    return this.finishReservedCheckout(reserved, plan);
+  }
+
+  private async finishReservedCheckout(
+    reserved: SubscriptionWithPlan,
+    plan: Plan,
+    options: { extendFrom?: Date } = {},
+  ): Promise<CheckoutResponse> {
+    const checkout = await this.paymentProvider.createCheckout({
+      subscriptionId: reserved.id,
+      planIntervalMonths: plan.intervalMonths,
+    });
+
+    if (!checkout.immediateConfirmation) {
+      throw new ConflictException({
+        code: 'CHECKOUT_NOT_CONFIRMED',
+        message: 'Payment was not confirmed',
+      });
+    }
+
+    return this.subscriptions.transaction(async (transaction) => {
+      if (options.extendFrom) {
+        const subscription = await this.subscriptions.extendActive(
+          {
+            id: reserved.id,
+            planId: plan.id,
+            currentPeriodEnd: addCalendarMonths(
+              options.extendFrom,
+              plan.intervalMonths,
+            ),
+            providerReference: checkout.providerReference,
+            pendingPlanId: null,
+          },
+          transaction,
+        );
+        return {
+          subscription: toSubscriptionResponse(subscription),
+          checkoutUrl: checkout.checkoutUrl,
+        };
+      }
+
+      let pending = reserved;
+      if (
+        reserved.status === SubscriptionStatus.PENDING &&
+        pending.planId !== plan.id
+      ) {
+        pending = await this.subscriptions.setPlan(
+          { id: pending.id, planId: plan.id },
+          transaction,
+        );
+      }
+
+      const subscription = await this.subscriptions.activate(
+        {
+          id: pending.id,
+          providerReference: checkout.providerReference,
+          currentPeriodEnd: addCalendarMonths(new Date(), plan.intervalMonths),
+          planId: plan.id,
+        },
+        transaction,
+      );
+      return {
+        subscription: toSubscriptionResponse(subscription),
+        checkoutUrl: checkout.checkoutUrl,
+      };
+    });
+  }
+
+  private async reserveCheckoutSlot(
+    input: { id: string; pendingPlanId: string },
+    transaction: Prisma.TransactionClient,
+  ): Promise<SubscriptionWithPlan> {
+    const reserved = await this.subscriptions.reserveCheckoutSlot(
+      input,
+      transaction,
+    );
+    if (!reserved) {
+      throw checkoutPendingConflict();
+    }
+    return reserved;
   }
 
   private async findCurrent(
@@ -185,6 +291,13 @@ function alreadyActiveConflict(): ConflictException {
   return new ConflictException({
     code: 'SUBSCRIPTION_ALREADY_ACTIVE',
     message: 'An active or pending subscription already exists for this user',
+  });
+}
+
+function checkoutPendingConflict(): ConflictException {
+  return new ConflictException({
+    code: 'SUBSCRIPTION_CHECKOUT_PENDING',
+    message: 'A checkout is already waiting for payment',
   });
 }
 

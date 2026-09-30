@@ -96,8 +96,8 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
           <p className="mb-3 font-label text-[7px] font-semibold tracking-[0.18em] text-white/30 uppercase">
             {t('home.today')}
           </p>
-          <p className="mb-3.5 font-heading text-xl tracking-[0.04em] text-[#35f5e8]">
-            {program.templateCode}
+          <p className="mb-3.5 font-heading text-xl tracking-[0.04em] break-words text-[#35f5e8]">
+            {program.templateName}
           </p>
           <div className="mb-4 flex flex-col gap-1.5">
             <Stat label={t('home.nextWorkout')} value={dayLabel} />
@@ -126,7 +126,10 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             <Chevron className="absolute right-3.5 bottom-3.5 text-[#c8ff2e]" />
           </article>
 
-          <article className="relative min-h-[100px] overflow-hidden border-[1.5px] border-white/10 bg-white/[0.02] px-4 py-4">
+          <Link
+            href="/profile"
+            className="relative block min-h-[100px] overflow-hidden border-[1.5px] border-white/10 bg-white/[0.02] px-4 py-4"
+          >
             <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-white/20 to-transparent" />
             <p className="mb-2 font-label text-[7px] font-bold tracking-[0.16em] text-white/35 uppercase">
               {t('home.profile')}
@@ -140,11 +143,11 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             <p className="text-[8.5px] leading-snug font-medium text-white/40">
               {t('home.timesShort', { count: program.frequencyPerWeek })}
             </p>
-            <p className="mt-1 font-label text-[7.5px] font-bold tracking-[0.08em] text-white/25 uppercase">
-              {program.templateCode}
+            <p className="mt-1 line-clamp-2 font-label text-[7.5px] font-bold tracking-[0.08em] text-white/25">
+              {program.templateName}
             </p>
             <Chevron className="absolute right-3 bottom-3 text-white/40" />
-          </article>
+          </Link>
         </div>
 
         <p className="border-l-2 border-white/10 bg-white/[0.01] px-[18px] py-4 font-serif text-[15px] leading-relaxed text-white/40 italic">
@@ -175,7 +178,7 @@ function UnassignedDashboard({
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-6 pt-7 pb-12">
+    <main className="mx-auto min-h-screen w-full max-w-3xl px-6 pt-7 pb-24">
       <nav className="flex items-center justify-between border-b border-line pb-5">
         <Link href="/" className="inline-flex">
           <BrandMark />
@@ -220,6 +223,7 @@ function UnassignedDashboard({
       </header>
 
       <TrainingCard program={program} />
+      <BottomNav />
     </main>
   );
 }
@@ -303,36 +307,73 @@ function BottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-[430px] border-t border-white/10 bg-[#0b0b0b] pb-[env(safe-area-inset-bottom,0px)]">
       {NAV_ITEMS.map((item) => {
         const active = item.id === 'home';
-        const Icon = item.icon;
+        const toProfile = item.id === 'profile';
+        const className =
+          'relative flex flex-1 flex-col items-center gap-1 px-0.5 pt-2.5 pb-3';
+        const content = (
+          <NavTabContent
+            active={active}
+            available={toProfile}
+            icon={item.icon}
+            label={t(`home.nav.${item.id}`)}
+          />
+        );
+
+        if (toProfile) {
+          return (
+            <Link key={item.id} href="/profile" className={className}>
+              {content}
+            </Link>
+          );
+        }
+
         return (
           <button
             key={item.id}
             type="button"
             disabled={!active}
             aria-current={active ? 'page' : undefined}
-            className="relative flex flex-1 flex-col items-center gap-1 px-0.5 pt-2.5 pb-3 disabled:cursor-not-allowed"
+            className={`${className} disabled:cursor-not-allowed`}
           >
-            {active ? (
-              <span className="absolute top-0 left-1/2 h-px w-[22px] -translate-x-1/2 bg-[#35f5e8]" />
-            ) : null}
-            <Icon
-              size={20}
-              strokeWidth={1.6}
-              className={active ? 'text-[#35f5e8]' : 'text-white/30'}
-            />
-            <span
-              className={`text-[7px] whitespace-nowrap ${
-                active
-                  ? 'font-semibold text-[#35f5e8]'
-                  : 'font-medium text-white/30'
-              }`}
-            >
-              {t(`home.nav.${item.id}`)}
-            </span>
+            {content}
           </button>
         );
       })}
     </nav>
+  );
+}
+
+function NavTabContent({
+  active,
+  available,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  available: boolean;
+  icon: typeof Home;
+  label: string;
+}) {
+  const tone = active
+    ? 'text-[#35f5e8]'
+    : available
+      ? 'text-white/70'
+      : 'text-white/30';
+
+  return (
+    <>
+      {active ? (
+        <span className="absolute top-0 left-1/2 h-px w-[22px] -translate-x-1/2 bg-[#35f5e8]" />
+      ) : null}
+      <Icon size={20} strokeWidth={1.6} className={tone} />
+      <span
+        className={`text-[7px] whitespace-nowrap ${
+          active ? 'font-semibold' : 'font-medium'
+        } ${tone}`}
+      >
+        {label}
+      </span>
+    </>
   );
 }
 

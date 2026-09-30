@@ -167,7 +167,9 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .get('/api/v1/subscriptions/me')
       .set('Authorization', authorization)
       .expect(200);
-    expect(mineBefore.body).toEqual({ subscription: null });
+    expect(mineBefore.body).toEqual({
+      subscription: null,
+    });
 
     const checkout = await request(app.getHttpServer())
       .post('/api/v1/subscriptions/checkout')
@@ -322,7 +324,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
       });
   });
 
-  it('leaves no row when the provider fails and lets a retry succeed', async () => {
+  it('keeps a pending row when the provider fails and lets a retry succeed', async () => {
     const { userId, authorization } = await createUser(
       'provider-failure@example.com',
     );
@@ -336,7 +338,14 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .set('Authorization', authorization)
       .send({ planId: plan.id })
       .expect(500);
-    expect(await prisma.subscription.count({ where: { userId } })).toBe(0);
+    const leftover = await prisma.subscription.findMany({ where: { userId } });
+    expect(leftover).toEqual([
+      expect.objectContaining({
+        status: 'PENDING',
+        pendingPlanId: plan.id,
+        providerReference: null,
+      }),
+    ]);
 
     const retry = await request(app.getHttpServer())
       .post('/api/v1/subscriptions/checkout')
@@ -344,6 +353,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .send({ planId: plan.id })
       .expect(201);
     expect(retry.body.subscription.status).toBe('ACTIVE');
+    expect(retry.body.subscription.id).toBe(leftover[0]?.id);
   });
 
   it('expires a lapsed subscription on read and allows a new checkout', async () => {
@@ -366,7 +376,9 @@ describeWithDatabase('subscriptions (e2e)', () => {
       .get('/api/v1/subscriptions/me')
       .set('Authorization', authorization)
       .expect(200);
-    expect(mine.body).toEqual({ subscription: null });
+    expect(mine.body).toEqual({
+      subscription: null,
+    });
 
     const renewed = await request(app.getHttpServer())
       .post('/api/v1/subscriptions/checkout')

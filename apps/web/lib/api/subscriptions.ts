@@ -21,3 +21,10 @@ export function checkout(planId: string) {
     body: { planId },
   });
 }
+
+export function renewSubscription(planId: string) {
+  return apiRequest<CheckoutResponse>('/subscriptions/renew', {
+    method: 'POST',
+    body: { planId },
+  });
+}

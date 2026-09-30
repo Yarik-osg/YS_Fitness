@@ -40,6 +40,15 @@ export class SubscriptionsController {
     return this.subscriptions.checkout(user.sub, input);
   }
 
+  @Post('renew')
+  @UseGuards(JwtAuthGuard)
+  renew(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: CheckoutDto,
+  ): Promise<CheckoutResponse> {
+    return this.subscriptions.renew(user.sub, input);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getMine(

@@ -79,6 +79,7 @@ export interface ParsedTemplateDay {
 
 export interface ParsedTemplate {
   code: string;
+  name: string;
   gender: ParsedGender;
   level: ParsedLevel;
   frequencyPerWeek: number;
@@ -279,11 +280,10 @@ function parseIdentity(code: string, subtitle: string) {
   const level = parts[1] ? LEVEL_LABELS[parts[1]] : undefined;
   const frequencyMatch = parts[2]?.match(/(\d+)/);
   const frequency = frequencyMatch ? Number(frequencyMatch[1]) : undefined;
-  const accent = parts[3]
-    ? ACCENT_LABELS[parts[3].replace(/;+$/, '').trim()]
-    : undefined;
+  const accentLabel = parts[3]?.replace(/;+$/, '').trim() ?? '';
+  const accent = ACCENT_LABELS[accentLabel];
 
-  if (!gender || !level || !frequency || !accent) {
+  if (!gender || !level || !frequency || !accent || !parts[0]) {
     throw new Error(`Program ${code} has an unreadable subtitle: ${subtitle}`);
   }
   if (
@@ -296,6 +296,7 @@ function parseIdentity(code: string, subtitle: string) {
 
   return {
     code,
+    name: `${parts[0]} · ${parts[1] ?? ''} · ${parts[2] ?? ''} · ${accentLabel}`,
     gender,
     level,
     frequencyPerWeek: frequency,

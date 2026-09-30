@@ -284,6 +284,35 @@ export const checkoutSchema = z.object({
   planId: z.string().uuid(),
 });
 
+export const profileUpdateSchema = z
+  .object({
+    heightCm: z
+      .number()
+      .positive()
+      .min(HEIGHT_CM.min)
+      .max(HEIGHT_CM.max)
+      .optional(),
+    weightKg: z
+      .number()
+      .positive()
+      .min(WEIGHT_KG.min)
+      .max(WEIGHT_KG.max)
+      .optional(),
+    experience: z.enum(EXPERIENCE_LEVELS).optional(),
+    mainGoal: z.enum(MAIN_GOALS).optional(),
+    trainingFrequency: z.enum(TRAINING_FREQUENCIES).optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.heightCm !== undefined ||
+      value.weightKg !== undefined ||
+      value.experience !== undefined ||
+      value.mainGoal !== undefined ||
+      value.trainingFrequency !== undefined,
+    { message: 'At least one profile field is required' },
+  );
+
 export const grantSubscriptionSchema = z.object({
   userId: z.string().uuid(),
   planId: z.string().uuid(),
@@ -296,4 +325,5 @@ export const grantSubscriptionSchema = z.object({
 });
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;

@@ -27,6 +27,7 @@ describe('parseProgramCsv', () => {
 
     const template = parsed.templates.find((item) => item.code === 'WB2U');
     expect(template).toMatchObject({
+      name: 'WB2U — Жінки · Початковий рівень · 2 тренування на тиждень · Акцент на верх',
       gender: 'FEMALE',
       level: 'BEGINNER',
       frequencyPerWeek: 2,

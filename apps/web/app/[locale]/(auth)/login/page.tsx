@@ -7,8 +7,8 @@ export default function LoginPage() {
     <>
       <Suspense fallback={null}>
         <PersistPlanIdFromQuery />
+        <LoginForm />
       </Suspense>
-      <LoginForm />
     </>
   );
 }

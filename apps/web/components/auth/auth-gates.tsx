@@ -15,7 +15,9 @@ import { isAccessTokenFresh } from '@/lib/auth/access-token';
 import {
   getPostAuthPath,
   getPostRegisterPath,
+  loginPathWithNext,
   resolveIncompleteGuestDestination,
+  resolvePostLoginPath,
   type OnboardingStatusUser,
 } from '@/lib/auth/routing';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
@@ -111,7 +113,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         if (!pathname.startsWith('/checkout')) {
           resetOnboardingDraft();
         }
-        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        router.replace(loginPathWithNext(pathname, window.location.search));
         return;
       }
       if (!active) return;
@@ -132,7 +134,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
       const destination = getPostAuthPath(sessionUser);
       if (
-        pathname.startsWith('/dashboard') &&
+        (pathname.startsWith('/dashboard') ||
+          pathname.startsWith('/profile')) &&
         destination.startsWith('/onboarding')
       ) {
         router.replace(destination);
@@ -161,10 +164,11 @@ export function GuestGate({ children }: { children: ReactNode }) {
       .then(async (user) => {
         if (!active) return;
         if (user.profile?.onboardingCompletedAt) {
+          const next = new URLSearchParams(window.location.search).get('next');
           router.replace(
             pathname.startsWith('/register')
               ? getPostRegisterPath()
-              : getPostAuthPath(user),
+              : resolvePostLoginPath(user, next),
           );
           return;
         }

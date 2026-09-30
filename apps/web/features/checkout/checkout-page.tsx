@@ -81,11 +81,8 @@ function CheckoutFlow() {
     let active = true;
     void getMySubscription()
       .then((existing) => {
-        if (
-          active &&
-          existing &&
-          (existing.status === 'ACTIVE' || existing.status === 'PENDING')
-        ) {
+        if (!active) return;
+        if (existing?.status === 'ACTIVE') {
           setSubscription(existing);
         }
       })
@@ -102,6 +99,10 @@ function CheckoutFlow() {
     try {
       const result = await checkout.mutateAsync(selected.id);
       clearSelectedPlanId();
+      if (result.checkoutUrl) {
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
       setSubscription(result.subscription);
     } catch (cause) {
       setError(getUserFacingError(cause, tAuth) || t('error'));

@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import type {
+  AssignedProgramLookupResponse,
   AssignedProgramResponse,
   CurrentProgramResponse,
   ExerciseResponse,
@@ -30,6 +31,14 @@ export class ProgramsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<CurrentProgramResponse> {
     return this.programs.getMine(user.sub);
+  }
+
+  @Get('assigned')
+  @UseGuards(SubscriptionGuard)
+  getAssigned(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AssignedProgramLookupResponse> {
+    return this.programs.getAssigned(user.sub);
   }
 
   @Get('exercises')

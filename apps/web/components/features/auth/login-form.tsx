@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@repo/validation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { AuthShell } from '@/components/auth/auth-shell';
@@ -11,6 +12,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Link, useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
+import { resolvePostLoginPath } from '@/lib/auth/routing';
 import { useLogin } from '@/lib/hooks/use-auth';
 
 const loginFormSchema = loginSchema.pick({ email: true, password: true });
@@ -18,6 +20,7 @@ type LoginFormInput = Pick<LoginInput, 'email' | 'password'>;
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const login = useLogin();
   const t = useTranslations('auth');
   const {
@@ -32,7 +35,9 @@ export function LoginForm() {
   const onSubmit = handleSubmit(async (input) => {
     try {
       const result = await login.mutateAsync(input);
-      router.replace(result.destination);
+      router.replace(
+        resolvePostLoginPath(result.user, searchParams.get('next')),
+      );
     } catch {
       // The mutation error is mapped and rendered below.
     }
