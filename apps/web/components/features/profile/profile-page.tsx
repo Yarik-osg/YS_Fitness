@@ -840,11 +840,16 @@ function frequencyLabel(
   }
 }
 
-function ageYears(dateOfBirth: string, now = new Date()) {
-  const birth = new Date(`${dateOfBirth.slice(0, 10)}T00:00:00.000Z`);
-  let age = now.getFullYear() - birth.getUTCFullYear();
-  const month = now.getMonth() - birth.getUTCMonth();
-  if (month < 0 || (month === 0 && now.getDate() < birth.getUTCDate())) {
+export function ageYears(dateOfBirth: string, now = new Date()) {
+  const parts = dateOfBirth.slice(0, 10).split('-');
+  const birth = new Date(
+    Number(parts[0]),
+    Number(parts[1]) - 1,
+    Number(parts[2]),
+  );
+  let age = now.getFullYear() - birth.getFullYear();
+  const months = now.getMonth() - birth.getMonth();
+  if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
     age -= 1;
   }
   return age;

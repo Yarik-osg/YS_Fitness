@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
 import { I18nTestProvider } from '@/test/i18n';
-import { ProfilePage } from './profile-page';
+import { ageYears, ProfilePage } from './profile-page';
 
 const routerReplace = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
@@ -634,14 +634,15 @@ function formatDay(value: string) {
   }).format(new Date(value));
 }
 
+describe('ageYears', () => {
+  it('compares the birth calendar date to local today', () => {
+    expect(ageYears('1998-04-12', new Date(1999, 3, 12, 1, 0, 0))).toBe(1);
+    expect(ageYears('1998-04-12', new Date(1999, 3, 11, 23, 0, 0))).toBe(0);
+  });
+});
+
 function ageLabel(dateOfBirth: string) {
-  const birth = new Date(`${dateOfBirth}T00:00:00.000Z`);
-  const now = new Date();
-  let age = now.getFullYear() - birth.getUTCFullYear();
-  const month = now.getMonth() - birth.getUTCMonth();
-  if (month < 0 || (month === 0 && now.getDate() < birth.getUTCDate())) {
-    age -= 1;
-  }
+  const age = ageYears(dateOfBirth);
   const word =
     age % 10 === 1 && age % 100 !== 11
       ? 'рік'
