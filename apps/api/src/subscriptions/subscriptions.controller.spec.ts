@@ -21,3 +21,14 @@ describe('SubscriptionsController.renew', () => {
     expect(renewGuards).not.toContain(SubscriptionGuard);
   });
 });
+
+describe('SubscriptionsController.mockWebhook', () => {
+  it('is public so a payment provider can complete checkout', () => {
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        SubscriptionsController.prototype.completeMockPayment,
+      ),
+    ).toBeUndefined();
+  });
+});

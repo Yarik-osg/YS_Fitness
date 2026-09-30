@@ -178,10 +178,10 @@ describe('AuthGate', () => {
     expect(readSessionHint()).toBe('complete');
   });
 
-  it('keeps checkout query params on the login next path', async () => {
-    navigation.pathname = '/checkout';
+  it('keeps checkout return query params on the login next path', async () => {
+    navigation.pathname = '/checkout/return';
     vi.stubGlobal('location', {
-      search: '?planId=plan-3',
+      search: '?providerReference=pay&expiresAt=1&signature=sig',
     });
     writeSessionHint('complete');
     api.refresh.mockRejectedValue(
@@ -196,7 +196,7 @@ describe('AuthGate', () => {
 
     await waitFor(() => expect(navigation.replace).toHaveBeenCalled());
     expect(navigation.replace).toHaveBeenCalledWith(
-      '/login?next=%2Fcheckout%3FplanId%3Dplan-3',
+      '/login?next=%2Fcheckout%2Freturn%3FproviderReference%3Dpay%26expiresAt%3D1%26signature%3Dsig',
     );
     vi.unstubAllGlobals();
   });

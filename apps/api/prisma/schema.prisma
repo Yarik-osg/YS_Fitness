@@ -206,6 +206,7 @@ model Subscription {
   provider          PaymentProvider
   providerReference String?            @map("provider_reference") @db.VarChar(255)
   pendingPlanId     String?            @map("pending_plan_id") @db.Uuid
+  checkoutUrl       String?            @map("checkout_url") @db.VarChar(2048)
   currentPeriodEnd  DateTime?          @map("current_period_end")
   grantedByUserId   String?            @map("granted_by_user_id") @db.Uuid
   createdAt         DateTime           @default(now()) @map("created_at")
