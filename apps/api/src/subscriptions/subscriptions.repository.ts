@@ -112,7 +112,7 @@ export class SubscriptionsRepository {
     });
   }
 
-  extendActive(
+  async extendActive(
     input: {
       id: string;
       planId: string;
@@ -121,9 +121,13 @@ export class SubscriptionsRepository {
       pendingPlanId?: string | null;
     },
     client: Client = this.prisma,
-  ): Promise<SubscriptionWithPlan> {
-    return client.subscription.update({
-      where: { id: input.id },
+  ): Promise<SubscriptionWithPlan | null> {
+    const { count } = await client.subscription.updateMany({
+      where: {
+        id: input.id,
+        status: SubscriptionStatus.ACTIVE,
+        pendingPlanId: { not: null },
+      },
       data: {
         planId: input.planId,
         currentPeriodEnd: input.currentPeriodEnd,
@@ -133,6 +137,10 @@ export class SubscriptionsRepository {
           ? { providerReference: input.providerReference }
           : {}),
       },
+    });
+    if (count === 0) return null;
+    return client.subscription.findUniqueOrThrow({
+      where: { id: input.id },
       ...subscriptionWithPlan,
     });
   }
@@ -169,7 +177,7 @@ export class SubscriptionsRepository {
     });
   }
 
-  activate(
+  async activate(
     input: {
       id: string;
       providerReference: string;
@@ -177,9 +185,13 @@ export class SubscriptionsRepository {
       planId?: string;
     },
     client: Client = this.prisma,
-  ): Promise<SubscriptionWithPlan> {
-    return client.subscription.update({
-      where: { id: input.id },
+  ): Promise<SubscriptionWithPlan | null> {
+    const { count } = await client.subscription.updateMany({
+      where: {
+        id: input.id,
+        status: SubscriptionStatus.PENDING,
+        pendingPlanId: { not: null },
+      },
       data: {
         status: SubscriptionStatus.ACTIVE,
         providerReference: input.providerReference,
@@ -187,6 +199,10 @@ export class SubscriptionsRepository {
         pendingPlanId: null,
         ...(input.planId ? { planId: input.planId } : {}),
       },
+    });
+    if (count === 0) return null;
+    return client.subscription.findUniqueOrThrow({
+      where: { id: input.id },
       ...subscriptionWithPlan,
     });
   }

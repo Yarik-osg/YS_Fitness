@@ -113,11 +113,46 @@ function inMemoryRepository(initial: SubscriptionWithPlan) {
       return row;
     }),
     activate: vi.fn(async (input: { currentPeriodEnd: Date }) => {
-      row = subscription({ currentPeriodEnd: input.currentPeriodEnd });
+      if (
+        !row ||
+        row.status !== SubscriptionStatus.PENDING ||
+        row.pendingPlanId == null
+      ) {
+        return null;
+      }
+      row = subscription({
+        currentPeriodEnd: input.currentPeriodEnd,
+        pendingPlanId: null,
+      });
       return row;
     }),
+    extendActive: vi.fn(
+      async (input: {
+        planId: string;
+        currentPeriodEnd: Date;
+        pendingPlanId?: string | null;
+      }) => {
+        if (
+          !row ||
+          row.status !== SubscriptionStatus.ACTIVE ||
+          row.pendingPlanId == null
+        ) {
+          return null;
+        }
+        row = {
+          ...row,
+          planId: input.planId,
+          currentPeriodEnd: input.currentPeriodEnd,
+          pendingPlanId:
+            input.pendingPlanId === undefined
+              ? row.pendingPlanId
+              : input.pendingPlanId,
+        };
+        return row;
+      },
+    ),
     reserveCheckoutSlot: vi.fn(async (input: { pendingPlanId: string }) => {
-      if (!row) return null;
+      if (!row || row.pendingPlanId != null) return null;
       row = { ...row, pendingPlanId: input.pendingPlanId };
       return row;
     }),
@@ -458,6 +493,27 @@ describe('SubscriptionsService checkout transaction', () => {
     expect(retry.subscription.status).toBe(SubscriptionStatus.ACTIVE);
   });
 
+  it('rejects a second finish of the same reserved checkout', async () => {
+    const created = subscription({
+      status: SubscriptionStatus.PENDING,
+      providerReference: null,
+      currentPeriodEnd: null,
+      pendingPlanId: plan.id,
+    });
+    const repository = {
+      findActivePlanById: vi.fn().mockResolvedValue(plan),
+      findNonTerminalByUserId: vi.fn().mockResolvedValue(created),
+      activate: vi.fn().mockResolvedValue(null),
+    };
+    const service = createService(repository);
+
+    await expect(
+      service.checkout(created.userId, { planId: plan.id }),
+    ).rejects.toMatchObject({
+      response: { code: 'SUBSCRIPTION_ALREADY_ACTIVE' },
+    });
+  });
+
   it('does not create a provider session when the pending slot is already taken', async () => {
     const created = subscription({
       status: SubscriptionStatus.PENDING,
@@ -574,6 +630,51 @@ describe('SubscriptionsService.renew', () => {
     expect(result.subscription.currentPeriodEnd).toBe(
       addCalendarMonths(periodEnd, 3).toISOString(),
     );
+  });
+
+  it('rejects a second finish of the same reserved renew', async () => {
+    const periodEnd = new Date('2026-12-01T00:00:00.000Z');
+    const current = subscription({
+      currentPeriodEnd: periodEnd,
+      pendingPlanId: plan.id,
+    });
+    const repository = {
+      findActivePlanById: vi.fn().mockResolvedValue(plan),
+      expireLapsed: vi.fn().mockResolvedValue(0),
+      findNonTerminalByUserId: vi.fn().mockResolvedValue(current),
+      activate: vi.fn().mockResolvedValue(null),
+      extendActive: vi.fn(),
+    };
+    const service = createService(repository);
+
+    await expect(
+      service.renew(current.userId, { planId: plan.id }),
+    ).rejects.toMatchObject({
+      response: { code: 'SUBSCRIPTION_ALREADY_ACTIVE' },
+    });
+    expect(repository.extendActive).not.toHaveBeenCalled();
+  });
+
+  it('rejects a second extend of the same reserved renew', async () => {
+    const periodEnd = new Date('2026-12-01T00:00:00.000Z');
+    const current = subscription({ currentPeriodEnd: periodEnd });
+    const repository = {
+      findActivePlanById: vi.fn().mockResolvedValue(plan),
+      expireLapsed: vi.fn().mockResolvedValue(0),
+      findNonTerminalByUserId: vi.fn().mockResolvedValue(current),
+      reserveCheckoutSlot: vi.fn().mockResolvedValue({
+        ...current,
+        pendingPlanId: plan.id,
+      }),
+      extendActive: vi.fn().mockResolvedValue(null),
+    };
+    const service = createService(repository);
+
+    await expect(
+      service.renew(current.userId, { planId: plan.id }),
+    ).rejects.toMatchObject({
+      response: { code: 'SUBSCRIPTION_ALREADY_ACTIVE' },
+    });
   });
 
   it('completes a pending checkout instead of rejecting', async () => {

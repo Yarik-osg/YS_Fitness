@@ -221,6 +221,9 @@ export class SubscriptionsService {
           },
           transaction,
         );
+        if (!subscription) {
+          throw alreadyActiveConflict();
+        }
         return {
           subscription: toSubscriptionResponse(subscription),
           checkoutUrl: checkout.checkoutUrl,
@@ -247,6 +250,9 @@ export class SubscriptionsService {
         },
         transaction,
       );
+      if (!subscription) {
+        throw alreadyActiveConflict();
+      }
       return {
         subscription: toSubscriptionResponse(subscription),
         checkoutUrl: checkout.checkoutUrl,
