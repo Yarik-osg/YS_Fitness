@@ -16,6 +16,12 @@ Copy [.env.example](.env.example) to `.env.local` for local development.
 
 Landing plan buttons load prices from `GET /subscriptions/plans` and persist the selected `planId` in `sessionStorage` (`ys_selected_plan_id`). Guests and users who have not finished onboarding go to `/onboarding`. After the quiz, guests go to `/register` (with `planId` when one is stored). Onboarded users with no current subscription go to `/checkout?planId=`; users who already have a subscription go to `/dashboard`. `/checkout` is a protected client route with a plan step and a mock payment step (terms plus a local “card added” flag). It posts `POST /subscriptions/checkout` with `{ planId }` only, then links to the dashboard.
 
+## Profile
+
+`/profile` is a protected client route. Completed users reach it from the nav and dashboard. It loads `GET /users/me`, `GET /users/me/onboarding-responses`, `GET /subscriptions/me`, and `GET /programs/assigned`. Saving posts `PATCH /users/me/profile`. Renewing posts `POST /subscriptions/renew` with `{ planId }`. Mock confirmation is immediate, same as checkout, so the page stays on profile.
+
+Login may include a safe internal `next` path (pathname plus query). After a successful login, an onboarded member is sent there instead of the default dashboard/checkout path.
+
 ## Onboarding persistence
 
 `PUT /users/me/onboarding` persists the calculation subset on `UserProfile` /
@@ -36,7 +42,8 @@ resume is not built yet.
 
 The landing nav reads the `ys_web_session` hint. Guests see Log in; users
 still in onboarding see Continue (`/onboarding`); completed users see
-Dashboard (`/dashboard`). The dashboard YS mark links to the landing page.
+Dashboard (`/dashboard`) and Profile (`/profile`). The dashboard YS mark
+links to the landing page.
 A locale switcher (Ukrainian by default, English) is on every page. The
 choice is stored in the `NEXT_LOCALE` cookie, and every URL is prefixed
 (`/uk` or `/en`).

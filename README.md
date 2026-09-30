@@ -60,6 +60,7 @@ PostgreSQL data persists in the named `postgres_data` volume. The Compose file i
 - `GET /api/v1/users/me`
 - `PUT /api/v1/users/me/onboarding`
 - `GET /api/v1/users/me/onboarding-responses`
+- `PATCH /api/v1/users/me/profile`
 
 Passwords require at least eight characters and are hashed with Argon2. Access JWTs contain only `sub`, `sessionId`, `role`, `iat`, and `exp`. Refresh JWTs are rotated once, stored only as SHA-256 digests, and tracked as a token family. Reuse of a consumed token revokes the entire session.
 
@@ -71,16 +72,23 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 `PUT /api/v1/users/me/onboarding` is bearer-authenticated. It upserts the calculation subset on `UserProfile` (name, date of birth, calculation sex, height, activity, goal, timezone, and restrictions), appends a `BodyMeasurement` when weight or body fat changed, and upserts the rest of the quiz on `OnboardingResponses`. An identical retry does not duplicate the measurement. `GET /api/v1/users/me/onboarding-responses` returns that quiz, or `{ responses: null }` when the user finished onboarding before the table existed. Calorie targets and generated programs are deliberately separate future modules.
 
+## Profile
+
+`PATCH /api/v1/users/me/profile` is bearer-authenticated. It accepts any non-empty subset of height, weight, experience, design goal, and training frequency. Height updates `UserProfile`; a changed weight appends a `BodyMeasurement`; the quiz fields update `OnboardingResponses` (or create a stub row when those three quiz fields are sent together and no row exists). Name, date of birth, program track, and calculation sex are not editable here. The same request reassigns or unassigns the workout template only when match-affecting answers changed and the user has active subscription access. Profile, measurements, onboarding answers, and program assign/unassign run in one serializable transaction.
+
+`GET /api/v1/programs/assigned` (JWT + active subscription) returns `{ program }` with template metadata, including `ProgramTemplate.name` from the CSV subtitle. The dashboard and `/profile` both read that summary.
+
 ## Subscriptions
 
 - `GET /api/v1/subscriptions/plans` — public catalog
-- `POST /api/v1/subscriptions/checkout` — JWT; `{ planId }` creates a `PENDING` row, then the mock provider confirms it to `ACTIVE`
+- `POST /api/v1/subscriptions/checkout` — JWT; `{ planId }` reserves a checkout slot, then the mock provider confirms it to `ACTIVE`
+- `POST /api/v1/subscriptions/renew` — JWT; `{ planId }` extends an `ACTIVE` period (or starts checkout when none remains). Mock confirmation is immediate, same as checkout
 - `GET /api/v1/subscriptions/me` — JWT; `{ subscription }` is the current `PENDING`/`ACTIVE` row plus plan, or `null`
 - `POST /api/v1/subscriptions/grant` — JWT + `TRAINER`/`ADMIN`; `{ userId, planId, expiresAt? }` writes a `MANUAL` `ACTIVE` subscription
 
 Prices are integers in kopiykas. A user may have at most one `PENDING` or `ACTIVE` subscription; that rule is enforced by a PostgreSQL partial unique index. A concurrent second checkout returns `409` with `SUBSCRIPTION_ALREADY_ACTIVE`.
 
-On the web app, landing plan CTAs store `planId` in `sessionStorage`. Guests and users who have not finished onboarding go to `/onboarding`. After the quiz, a guest registers (keeping `planId` when one was chosen) and then `/checkout` confirms a mock payment and links to the dashboard. An onboarded user with a selected plan and no current subscription goes straight to checkout. The dashboard shows the saved name, with the email underneath, and falls back to the email when the profile has no name. It also shows the plan name and period end when a subscription is active.
+On the web app, landing plan CTAs store `planId` in `sessionStorage`. Guests and users who have not finished onboarding go to `/onboarding`. After the quiz, a guest registers (keeping `planId` when one was chosen) and then `/checkout` confirms a mock payment and links to the dashboard. An onboarded user with a selected plan and no current subscription goes straight to checkout. The dashboard shows the saved name, with the email underneath, and falls back to the email when the profile has no name. It also shows the plan name and period end when a subscription is active. Completed users open `/profile` from the nav and dashboard to view answers, edit the PATCH fields above, and renew. Login may send the browser back to a safe internal `next` path, including query strings.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md#subscriptions) for the payment-provider token and index details.
 

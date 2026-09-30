@@ -11,7 +11,7 @@ Onboarding previously asked two questions that look similar to users:
 1. Program track (`Для жінок` / `Для чоловіків`) — client-only UX branch for images, copy, and accents.
 2. `biologicalSexForCalculation` (`MALE` / `FEMALE`) — persisted profile input for the Mifflin–St Jeor BMR formula.
 
-They were kept separate for semantic accuracy: a visual/program preference is not guaranteed to match the sex used in calorie math. That extra step added friction. There is still no profile-edit flow that can change calculation sex independently of program track.
+They were kept separate for semantic accuracy: a visual/program preference is not guaranteed to match the sex used in calorie math. That extra step added friction. Profile edit still does not change calculation sex independently of program track.
 
 ## Decision
 
@@ -31,7 +31,7 @@ This reverses the earlier product/architecture choice to keep the two questions 
 ### Negative
 
 - A user whose UX preference differs from their BMR-relevant sex is not asked separately during onboarding.
-- Correcting `biologicalSexForCalculation` independently of `programTrack` requires a future profile-edit flow. That flow does not exist yet, so today this is a one-time onboarding-only input.
+- Correcting `biologicalSexForCalculation` independently of `programTrack` still requires a dedicated edit. `/profile` and `PATCH /users/me/profile` do not change either field; they remain onboarding-only until a later flow.
 - Until nutrition exists, a mismatch would show up as a wrong calorie/macro target that the user would have to fix later.
 
 ## Alternatives considered
@@ -42,4 +42,4 @@ This reverses the earlier product/architecture choice to keep the two questions 
 ## References
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) domain boundaries
-- [apps/web/README.md](../../apps/web/README.md) onboarding persistence
+- [apps/web/README.md](../../apps/web/README.md) onboarding persistence and `/profile`
