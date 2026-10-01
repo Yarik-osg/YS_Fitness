@@ -53,7 +53,9 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
   const t = useTranslations('dashboard');
   const messages = useMessages();
   const locale = useLocale();
-  const day = program.days[0];
+  const day =
+    program.days.find((entry) => entry.dayNumber === program.nextDayNumber) ??
+    program.days[0];
   const exerciseCount = day?.exercises.length ?? 0;
   const setCount =
     day?.exercises.reduce((total, row) => total + row.sets, 0) ?? 0;
@@ -105,6 +107,15 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
               label={t('home.perWeek')}
               value={t('home.times', { count: program.frequencyPerWeek })}
             />
+            {program.programProgress ? (
+              <Stat
+                label={t('home.sessions')}
+                value={t('home.sessionCount', {
+                  completed: program.programProgress.completed,
+                  expected: program.programProgress.expected,
+                })}
+              />
+            ) : null}
           </div>
           {day ? (
             <Link

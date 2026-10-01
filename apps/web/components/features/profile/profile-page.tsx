@@ -462,6 +462,15 @@ function ProgramCard({
             label={t('level')}
             value={experienceLabel(onboarding, program.level, male)}
           />
+          {program.programProgress ? (
+            <Detail
+              label={t('sessions')}
+              value={t('sessionCount', {
+                completed: program.programProgress.completed,
+                expected: program.programProgress.expected,
+              })}
+            />
+          ) : null}
         </>
       ) : (
         <p className="text-sm text-white/45">{t('noProgram')}</p>

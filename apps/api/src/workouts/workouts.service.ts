@@ -26,7 +26,7 @@ export class WorkoutsService {
     userId: string,
     input: LogWorkoutInput,
   ): Promise<WorkoutLogResponse> {
-    const { program } = await this.programs.getMine(userId);
+    const { program } = await this.programs.getAssignedProgram(userId);
     if (!program) {
       throw new ConflictException({
         code: 'PROGRAM_NOT_ASSIGNED',

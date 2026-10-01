@@ -22,7 +22,27 @@ const program: AssignedProgramResponse = {
   frequencyPerWeek: 2,
   accent: 'UPPER',
   assignedAt: '2026-09-27T00:00:00.000Z',
+  nextDayNumber: 1,
+  programProgress: { completed: 0, expected: 16 },
   days: [
+    {
+      dayNumber: 2,
+      exercises: [
+        {
+          order: 1,
+          sets: 1,
+          allowsAbsAddon: false,
+          exercise: {
+            id: '66666666-6666-4666-8666-666666666666',
+            code: 'EX_001',
+            name: 'Не сьогодні',
+            muscleGroups: ['CHEST'],
+            repsMin: 8,
+            repsMax: 10,
+          },
+        },
+      ],
+    },
     {
       dayNumber: 1,
       exercises: [
@@ -111,7 +131,7 @@ describe('WorkoutSessionPage', () => {
     logWorkout.mockResolvedValue({ id: 'log-1' });
   });
 
-  it('pre-fills the assigned day and omits blank sets from the log', async () => {
+  it('logs every prescribed set and leaves extra rows out', async () => {
     const user = userEvent.setup();
     renderSession();
 
@@ -119,16 +139,32 @@ describe('WorkoutSessionPage', () => {
       screen.getByRole('heading', { name: 'Тренування 01' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Тяга вертикального блоку')).toBeInTheDocument();
+    expect(screen.queryByText('Не сьогодні')).not.toBeInTheDocument();
     expect(screen.getByText('Скручування')).toBeInTheDocument();
     expect(screen.getAllByLabelText(/Вага/)).toHaveLength(2);
     expect(
       screen.getByText('Вправа на прес · Опціонально'),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Додати підхід/ }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Минулого разу')).not.toBeInTheDocument();
     expect(screen.queryByText('ПРОГРЕС')).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Вага 1'), '35');
     await user.type(screen.getByLabelText('Повтори 1'), '12');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(logWorkout).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Заповни повторення в кожному підході.'),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Повтори 2'), '10');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
     await user.click(
       screen.getByRole('button', { name: 'Завершити тренування' }),
     );
@@ -144,15 +180,26 @@ describe('WorkoutSessionPage', () => {
           repsCompleted: 12,
           weightKg: 35,
         },
+        {
+          exerciseId: rowId,
+          order: 1,
+          setNumber: 2,
+          repsCompleted: 10,
+        },
+        {
+          exerciseId: pressId,
+          order: 2,
+          setNumber: 1,
+          repsCompleted: 15,
+        },
       ],
     });
-    expect(JSON.stringify(logWorkout.mock.calls[0]?.[0])).not.toContain(
-      pressId,
-    );
     expect(
       screen.getByRole('heading', { name: 'Тренування завершено' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.getByText('2/2')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('Тривалість')).not.toBeInTheDocument();
     expect(
       screen.getByText('Результати збережено. Чудова робота!'),
     ).toBeInTheDocument();
@@ -160,6 +207,71 @@ describe('WorkoutSessionPage', () => {
     expect(
       screen.getByRole('link', { name: 'Повернутися до моєї програми →' }),
     ).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('lets a filled exercise be reopened and corrected before submit', async () => {
+    const user = userEvent.setup();
+    renderSession();
+
+    await user.type(screen.getByLabelText('Вага 1'), '35');
+    await user.type(screen.getByLabelText('Повтори 1'), '12');
+    await user.type(screen.getByLabelText('Повтори 2'), '10');
+    expect(screen.getByText('1 / 2 виконано')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Завершити вправу' }));
+    expect(screen.getAllByLabelText(/^Вага/)).toHaveLength(1);
+
+    await user.click(
+      screen.getByRole('button', { name: /Тяга вертикального блоку/ }),
+    );
+    expect(screen.getByLabelText('Вага 1')).toHaveValue('35');
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('12');
+    expect(screen.getByLabelText('Повтори 2')).toHaveValue('10');
+
+    await user.clear(screen.getByLabelText('Вага 1'));
+    await user.type(screen.getByLabelText('Вага 1'), '40');
+    await user.clear(screen.getByLabelText('Повтори 1'));
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    expect(screen.queryByDisplayValue('40')).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /Тяга вертикального блоку/ }),
+    );
+    expect(screen.getByLabelText('Вага 1')).toHaveValue('40');
+    expect(screen.getByLabelText('Повтори 2')).toHaveValue('10');
+
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(logWorkout).toHaveBeenCalledWith({
+      templateId,
+      dayNumber: 1,
+      sets: [
+        {
+          exerciseId: rowId,
+          order: 1,
+          setNumber: 1,
+          repsCompleted: 8,
+          weightKg: 40,
+        },
+        {
+          exerciseId: rowId,
+          order: 1,
+          setNumber: 2,
+          repsCompleted: 10,
+        },
+        {
+          exerciseId: pressId,
+          order: 2,
+          setNumber: 1,
+          repsCompleted: 15,
+        },
+      ],
+    });
   });
 
   it('shows last time only for an exercise that was logged', () => {
@@ -180,7 +292,7 @@ describe('WorkoutSessionPage', () => {
               setNumber: 1,
               repsCompleted: 10,
               weightKg: 32.5,
-              exercise: program.days[0]!.exercises[0]!.exercise,
+              exercise: program.days[1]!.exercises[0]!.exercise,
             },
           ],
         },

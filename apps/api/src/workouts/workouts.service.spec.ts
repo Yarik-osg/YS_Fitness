@@ -25,6 +25,8 @@ const program: AssignedProgramResponse = {
   frequencyPerWeek: 2,
   accent: 'UPPER',
   assignedAt: '2026-09-27T00:00:00.000Z',
+  nextDayNumber: 1,
+  programProgress: { completed: 0, expected: 16 },
   days: [
     {
       dayNumber: 1,
@@ -96,7 +98,7 @@ const input = {
 };
 
 function createService(
-  programs: { getMine: ReturnType<typeof vi.fn> },
+  programs: { getAssignedProgram: ReturnType<typeof vi.fn> },
   repository: Record<string, ReturnType<typeof vi.fn>> = {},
 ) {
   const workouts = {
@@ -115,7 +117,7 @@ function createService(
 describe('WorkoutsService.log', () => {
   it('creates a log for the assigned template day', async () => {
     const { service, workouts } = createService({
-      getMine: vi.fn().mockResolvedValue({ program }),
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
     });
 
     const result = await service.log(userId, input);
@@ -128,7 +130,7 @@ describe('WorkoutsService.log', () => {
 
   it('allows another log for the same day', async () => {
     const { service, workouts } = createService({
-      getMine: vi.fn().mockResolvedValue({ program }),
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
     });
 
     await service.log(userId, input);
@@ -139,7 +141,7 @@ describe('WorkoutsService.log', () => {
 
   it('rejects logging when no program is assigned', async () => {
     const { service, workouts } = createService({
-      getMine: vi.fn().mockResolvedValue({ program: null }),
+      getAssignedProgram: vi.fn().mockResolvedValue({ program: null }),
     });
 
     await expect(service.log(userId, input)).rejects.toBeInstanceOf(
@@ -153,7 +155,7 @@ describe('WorkoutsService.log', () => {
 
   it('rejects a template that is not the assigned one', async () => {
     const { service } = createService({
-      getMine: vi.fn().mockResolvedValue({ program }),
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
     });
 
     await expect(
@@ -165,7 +167,7 @@ describe('WorkoutsService.log', () => {
 
   it('rejects a day that is not on the template', async () => {
     const { service } = createService({
-      getMine: vi.fn().mockResolvedValue({ program }),
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
     });
 
     await expect(
@@ -180,7 +182,7 @@ describe('WorkoutsService.log', () => {
 
   it('rejects an exercise that is not on the day', async () => {
     const { service } = createService({
-      getMine: vi.fn().mockResolvedValue({ program }),
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
     });
 
     await expect(
@@ -210,7 +212,7 @@ describe('WorkoutsService.list', () => {
       completedAt: new Date('2026-10-01T12:00:00.000Z'),
     });
     const { service, workouts } = createService(
-      { getMine: vi.fn() },
+      { getAssignedProgram: vi.fn() },
       {
         list: vi.fn().mockResolvedValue([newer, older]),
         count: vi.fn().mockResolvedValue(2),

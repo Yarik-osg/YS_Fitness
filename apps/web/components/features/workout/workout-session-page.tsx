@@ -8,7 +8,7 @@ import type {
 } from '@repo/shared-types';
 import type { LogWorkoutInput } from '@repo/validation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { useMyProgram } from '@/lib/hooks/use-programs';
@@ -24,14 +24,12 @@ type ExerciseDraft = {
   repsLabel: string;
   allowsAbsAddon: boolean;
   sets: SetDraft[];
-  completed: boolean;
 };
 
 type SavedSession = {
   exerciseCount: number;
   totalExercises: number;
   setCount: number;
-  durationMs: number;
   dayNumber: string;
   muscles: string;
 };
@@ -54,7 +52,9 @@ export function WorkoutSessionPage() {
   }
 
   const program = programQuery.data;
-  const day = program?.days[0];
+  const day =
+    program?.days.find((entry) => entry.dayNumber === program.nextDayNumber) ??
+    program?.days[0];
   if (!program || !day) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center gap-6 bg-[#0b0b0b] px-6 text-center">
@@ -90,7 +90,6 @@ function SessionForm({
   const t = useTranslations('workouts');
   const muscles = useTranslations('dashboard.workouts');
   const logWorkout = useLogWorkout();
-  const startedAt = useRef(0);
   const [exercises, setExercises] = useState(() => initialExercises(day));
   const [expandedId, setExpandedId] = useState(
     exercises[0]?.exerciseId ?? null,
@@ -99,14 +98,10 @@ function SessionForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedSession | null>(null);
 
-  useEffect(() => {
-    startedAt.current = readNow();
-  }, []);
-
   const dayNumber = String(day.dayNumber).padStart(2, '0');
   const muscleLine = muscleLabels(day, muscles);
-  const completedCount = exercises.filter(
-    (exercise) => exercise.completed,
+  const completedCount = exercises.filter((exercise) =>
+    exercise.sets.some((set) => isFilledReps(set.reps)),
   ).length;
 
   if (saved) {
@@ -117,15 +112,18 @@ function SessionForm({
         exerciseCount={saved.exerciseCount}
         totalExercises={saved.totalExercises}
         setCount={saved.setCount}
-        durationMs={saved.durationMs}
       />
     );
   }
 
   async function finish() {
-    const sets = setsToSubmit(exercises);
-    if (sets.length === 0) {
+    const submission = setsToSubmit(exercises);
+    if (submission.status === 'empty') {
       setConfirmEmpty(true);
+      return;
+    }
+    if (submission.status === 'partial') {
+      setError(t('incompleteSets'));
       return;
     }
     setError(null);
@@ -133,13 +131,13 @@ function SessionForm({
       await logWorkout.mutateAsync({
         templateId: program.templateId,
         dayNumber: day.dayNumber,
-        sets,
+        sets: submission.sets,
       });
       setSaved({
-        exerciseCount: new Set(sets.map((set) => set.exerciseId)).size,
+        exerciseCount: new Set(submission.sets.map((set) => set.exerciseId))
+          .size,
         totalExercises: exercises.length,
-        setCount: sets.length,
-        durationMs: elapsedSince(startedAt.current),
+        setCount: submission.sets.length,
         dayNumber,
         muscles: muscleLine,
       });
@@ -216,28 +214,11 @@ function SessionForm({
                 ),
               )
             }
-            onAddSet={() =>
-              setExercises((current) =>
-                current.map((row) =>
-                  row.exerciseId === exercise.exerciseId
-                    ? { ...row, sets: [...row.sets, { weight: '', reps: '' }] }
-                    : row,
-                ),
-              )
-            }
             onComplete={() => {
-              const next = exercises.find(
-                (row) =>
-                  row.exerciseId !== exercise.exerciseId && !row.completed,
+              const index = exercises.findIndex(
+                (row) => row.exerciseId === exercise.exerciseId,
               );
-              setExercises((current) =>
-                current.map((row) =>
-                  row.exerciseId === exercise.exerciseId
-                    ? { ...row, completed: true }
-                    : row,
-                ),
-              );
-              setExpandedId(next?.exerciseId ?? null);
+              setExpandedId(exercises[index + 1]?.exerciseId ?? null);
             }}
           />
         ))}
@@ -309,7 +290,6 @@ function ExerciseCard({
   previous,
   onToggle,
   onChangeSet,
-  onAddSet,
   onComplete,
 }: {
   exercise: ExerciseDraft;
@@ -317,27 +297,26 @@ function ExerciseCard({
   previous: WorkoutLogSetResponse[] | null;
   onToggle: () => void;
   onChangeSet: (index: number, field: keyof SetDraft, value: string) => void;
-  onAddSet: () => void;
   onComplete: () => void;
 }) {
   const t = useTranslations('workouts');
   const hint = useTranslations('dashboard.workouts');
-  const open = expanded && !exercise.completed;
+  const filled = exercise.sets.some((set) => isFilledReps(set.reps));
 
   return (
     <article
       className={`border-[1.5px] ${
-        exercise.completed
-          ? 'border-[#35f5e8]/30 bg-[#35f5e8]/[0.02]'
-          : open
-            ? 'border-white/15 bg-white/[0.015]'
+        expanded
+          ? 'border-white/15 bg-white/[0.015]'
+          : filled
+            ? 'border-[#35f5e8]/30 bg-[#35f5e8]/[0.02]'
             : 'border-white/6'
       }`}
     >
       <button
         type="button"
         className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
-        onClick={exercise.completed ? undefined : onToggle}
+        onClick={onToggle}
       >
         <span className="grid size-[34px] shrink-0 place-items-center border-[1.5px] border-white/10 font-heading text-sm text-white/40">
           {String(exercise.order).padStart(2, '0')}
@@ -359,7 +338,7 @@ function ExerciseCard({
           ) : null}
         </span>
       </button>
-      {open ? (
+      {expanded ? (
         <div className="border-t border-white/5 px-4 pt-4 pb-5">
           <div className="mb-4 flex gap-2">
             <Prescribed
@@ -449,13 +428,6 @@ function ExerciseCard({
           ))}
           <button
             type="button"
-            className="mt-1 w-full border border-dashed border-white/10 py-2.5 font-label text-[9px] font-semibold tracking-[0.1em] text-white/30 uppercase"
-            onClick={onAddSet}
-          >
-            {t('addSet')}
-          </button>
-          <button
-            type="button"
             className={buttonVariants({ className: 'mt-3.5 w-full' })}
             onClick={onComplete}
           >
@@ -486,7 +458,6 @@ function Completion({
   exerciseCount,
   totalExercises,
   setCount,
-  durationMs,
 }: SavedSession) {
   const t = useTranslations('workouts');
 
@@ -515,7 +486,7 @@ function Completion({
           <p className="text-[11px] font-medium text-white/40">{muscles}</p>
         ) : null}
       </div>
-      <div className="mb-8 grid grid-cols-3 gap-px">
+      <div className="mb-8 grid grid-cols-2 gap-px">
         <Stat
           value={`${exerciseCount}/${totalExercises}`}
           label={t('completion.exercises')}
@@ -525,11 +496,6 @@ function Completion({
           value={String(setCount)}
           label={t('completion.sets')}
           tone="text-[#c8ff2e]"
-        />
-        <Stat
-          value={formatDuration(durationMs, t)}
-          label={t('completion.duration')}
-          tone="text-white"
         />
       </div>
       <Link
@@ -568,14 +534,6 @@ function Stat({
   );
 }
 
-function readNow() {
-  return Date.now();
-}
-
-function elapsedSince(startedAt: number) {
-  return Date.now() - startedAt;
-}
-
 function initialExercises(day: ProgramDayResponse): ExerciseDraft[] {
   return day.exercises.map((row) => ({
     exerciseId: row.exercise.id,
@@ -584,7 +542,6 @@ function initialExercises(day: ProgramDayResponse): ExerciseDraft[] {
     prescribedSets: row.sets,
     repsLabel: `${row.exercise.repsMin}–${row.exercise.repsMax}`,
     allowsAbsAddon: row.allowsAbsAddon,
-    completed: false,
     sets: Array.from({ length: row.sets }, () => ({ weight: '', reps: '' })),
   }));
 }
@@ -615,24 +572,41 @@ function previousSets(logs: WorkoutLogResponse[], exerciseId: string) {
     .sort((left, right) => left.setNumber - right.setNumber);
 }
 
-function setsToSubmit(exercises: ExerciseDraft[]): LogWorkoutInput['sets'] {
-  return exercises.flatMap((exercise) =>
-    exercise.sets.flatMap((set, index) => {
-      if (!/^[1-9]\d{0,2}$/.test(set.reps)) return [];
+function isFilledReps(value: string) {
+  return /^[1-9]\d{0,2}$/.test(value);
+}
+
+function setsToSubmit(
+  exercises: ExerciseDraft[],
+):
+  | { status: 'empty' }
+  | { status: 'partial' }
+  | { status: 'ready'; sets: LogWorkoutInput['sets'] } {
+  const sets: LogWorkoutInput['sets'] = [];
+  let prescribed = 0;
+  let filled = 0;
+
+  for (const exercise of exercises) {
+    exercise.sets.forEach((set, index) => {
+      prescribed += 1;
+      if (!isFilledReps(set.reps)) return;
+      filled += 1;
       const weight = Number(set.weight);
-      return [
-        {
-          exerciseId: exercise.exerciseId,
-          order: exercise.order,
-          setNumber: index + 1,
-          repsCompleted: Number(set.reps),
-          ...(set.weight !== '' && Number.isFinite(weight) && weight > 0
-            ? { weightKg: weight }
-            : {}),
-        },
-      ];
-    }),
-  );
+      sets.push({
+        exerciseId: exercise.exerciseId,
+        order: exercise.order,
+        setNumber: index + 1,
+        repsCompleted: Number(set.reps),
+        ...(set.weight !== '' && Number.isFinite(weight) && weight > 0
+          ? { weightKg: weight }
+          : {}),
+      });
+    });
+  }
+
+  if (filled === 0) return { status: 'empty' };
+  if (filled !== prescribed) return { status: 'partial' };
+  return { status: 'ready', sets };
 }
 
 function sanitizeWeight(value: string) {
@@ -640,19 +614,4 @@ function sanitizeWeight(value: string) {
   const [whole, fraction] = cleaned.split('.');
   if (fraction === undefined) return whole ?? '';
   return `${whole}.${fraction.slice(0, 2)}`;
-}
-
-function formatDuration(
-  durationMs: number,
-  t: ReturnType<typeof useTranslations<'workouts'>>,
-) {
-  const totalSeconds = Math.floor(durationMs / 1000);
-  if (totalSeconds < 60) return t('completion.durationUnderMinute');
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (hours === 0) return t('completion.durationMinutes', { minutes });
-  return t('completion.durationHours', {
-    hours,
-    minutes: String(minutes).padStart(2, '0'),
-  });
 }

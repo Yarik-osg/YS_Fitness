@@ -20,6 +20,8 @@ const program = {
   frequencyPerWeek: 2,
   accent: 'UPPER',
   assignedAt: '2026-09-27T00:00:00.000Z',
+  nextDayNumber: 1,
+  programProgress: { completed: 0, expected: 16 },
   days: [{ dayNumber: 1, exercises: [] }],
 } satisfies AssignedProgramResponse;
 

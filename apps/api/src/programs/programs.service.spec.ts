@@ -63,6 +63,10 @@ function createService() {
       deleteMany: vi.fn(),
     },
     exercise: { findMany: vi.fn() },
+    workoutLog: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      count: vi.fn().mockResolvedValue(0),
+    },
   };
 
   return { prisma, service: new ProgramsService(prisma as never) };
@@ -179,6 +183,71 @@ describe('ProgramsService', () => {
     expect(prisma.workoutProgram.findUnique).toHaveBeenCalledWith({
       where: { userId },
       include: { template: true },
+    });
+  });
+
+  it('starts the rotation at day 1 when this template has no logs', async () => {
+    const { prisma, service } = createService();
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
+
+    const result = await service.getMine(userId);
+
+    expect(result.program).toMatchObject({
+      nextDayNumber: 1,
+      programProgress: { completed: 0, expected: 16 },
+    });
+    expect(prisma.workoutLog.findFirst).toHaveBeenCalledWith({
+      where: { userId, templateId: 'template-1' },
+      orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+      select: { dayNumber: true },
+    });
+  });
+
+  it('advances from the latest logged day', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.frequencyPerWeek = 3;
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+    prisma.workoutLog.findFirst.mockResolvedValue({ dayNumber: 2 });
+
+    const result = await service.getMine(userId);
+
+    expect(result.program?.nextDayNumber).toBe(3);
+  });
+
+  it('wraps the last day back to day 1', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.frequencyPerWeek = 4;
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+    prisma.workoutLog.findFirst.mockResolvedValue({ dayNumber: 4 });
+
+    const result = await service.getMine(userId);
+
+    expect(result.program?.nextDayNumber).toBe(1);
+  });
+
+  it('counts logs since this assignment and lets the count pass the target', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.id = 'template-new';
+    record.template.frequencyPerWeek = 3;
+    record.assignedAt = new Date('2026-10-01T00:00:00.000Z');
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+    prisma.workoutLog.count.mockResolvedValue(26);
+
+    const result = await service.getAssigned(userId);
+
+    expect(result.program?.programProgress).toEqual({
+      completed: 26,
+      expected: 24,
+    });
+    expect(prisma.workoutLog.count).toHaveBeenCalledWith({
+      where: {
+        userId,
+        templateId: 'template-new',
+        completedAt: { gte: new Date('2026-10-01T00:00:00.000Z') },
+      },
     });
   });
 

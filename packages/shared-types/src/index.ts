@@ -173,6 +173,11 @@ export interface ProgramDayResponse {
   exercises: ProgramExerciseResponse[];
 }
 
+export interface ProgramProgress {
+  completed: number;
+  expected: number;
+}
+
 export interface AssignedProgramSummary {
   id: string;
   templateId: string;
@@ -183,6 +188,8 @@ export interface AssignedProgramSummary {
   frequencyPerWeek: number;
   accent: ProgramAccent;
   assignedAt: string;
+  nextDayNumber: number;
+  programProgress: ProgramProgress;
 }
 
 export interface AssignedProgramResponse extends AssignedProgramSummary {
