@@ -374,7 +374,7 @@ function ExerciseCard({
                   .join(' • ')}
               </p>
               {previous.recommendation ? (
-                <p className="mt-1.5 text-xs font-medium text-white/55">
+                <p className="mt-2 text-sm font-semibold text-[#ffb15a]">
                   {t(
                     previous.recommendation === 'increase'
                       ? 'recommendIncrease'
