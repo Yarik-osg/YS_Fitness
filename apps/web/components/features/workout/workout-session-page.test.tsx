@@ -149,6 +149,8 @@ describe('WorkoutSessionPage', () => {
       screen.queryByRole('button', { name: /Додати підхід/ }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Минулого разу')).not.toBeInTheDocument();
+    expect(screen.queryByText('Варто збільшити вагу')).not.toBeInTheDocument();
+    expect(screen.queryByText('Варто зменшити вагу')).not.toBeInTheDocument();
     expect(screen.queryByText('ПРОГРЕС')).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Вага 1'), '35');
@@ -292,6 +294,7 @@ describe('WorkoutSessionPage', () => {
               setNumber: 1,
               repsCompleted: 10,
               weightKg: 32.5,
+              recommendation: null,
               exercise: program.days[1]!.exercises[0]!.exercise,
             },
           ],
@@ -303,5 +306,93 @@ describe('WorkoutSessionPage', () => {
 
     expect(screen.getByText('Минулого разу')).toBeInTheDocument();
     expect(screen.getByText('32.5 кг × 10')).toBeInTheDocument();
+    expect(screen.queryByText('Варто збільшити вагу')).not.toBeInTheDocument();
+    expect(screen.queryByText('Варто зменшити вагу')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Вага 1')).toHaveValue('');
+  });
+
+  it('shows the recommendation from the last set of this day', async () => {
+    const user = userEvent.setup();
+    const row = program.days[1]!.exercises[0]!.exercise;
+    const press = program.days[1]!.exercises[1]!.exercise;
+    logs.current = {
+      total: 2,
+      logs: [
+        {
+          id: 'log-other-day',
+          userId: 'user-1',
+          templateId,
+          dayNumber: 2,
+          completedAt: '2026-10-01T10:00:00.000Z',
+          sets: [
+            {
+              id: 'set-other',
+              exerciseId: rowId,
+              order: 1,
+              setNumber: 1,
+              repsCompleted: 9,
+              weightKg: 20,
+              recommendation: 'decrease',
+              exercise: row,
+            },
+          ],
+        },
+        {
+          id: 'log-1',
+          userId: 'user-1',
+          templateId,
+          dayNumber: 1,
+          completedAt: '2026-09-30T10:00:00.000Z',
+          sets: [
+            {
+              id: 'set-1',
+              exerciseId: rowId,
+              order: 1,
+              setNumber: 1,
+              repsCompleted: 8,
+              weightKg: 30,
+              recommendation: null,
+              exercise: row,
+            },
+            {
+              id: 'set-2',
+              exerciseId: rowId,
+              order: 1,
+              setNumber: 2,
+              repsCompleted: 12,
+              weightKg: 32.5,
+              recommendation: 'increase',
+              exercise: row,
+            },
+            {
+              id: 'set-3',
+              exerciseId: pressId,
+              order: 2,
+              setNumber: 1,
+              repsCompleted: 11,
+              weightKg: null,
+              recommendation: 'decrease',
+              exercise: press,
+            },
+          ],
+        },
+      ],
+    };
+
+    renderSession();
+
+    expect(screen.getByText('30 кг × 8 • 32.5 кг × 12')).toBeInTheDocument();
+    expect(screen.getByText('Варто збільшити вагу')).toBeInTheDocument();
+    expect(screen.queryByText('Варто зменшити вагу')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Вага 1')).toHaveValue('');
+    expect(screen.getByLabelText('Вага 2')).toHaveValue('');
+
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+
+    expect(screen.getByText('× 11')).toBeInTheDocument();
+    expect(screen.getByText('Варто зменшити вагу')).toBeInTheDocument();
+    expect(screen.queryByText('Варто збільшити вагу')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Вага 1')).toHaveValue('');
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
   });
 });

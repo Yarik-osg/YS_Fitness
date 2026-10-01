@@ -213,6 +213,8 @@ export interface ProfileUpdateResponse {
   program: AssignedProgramSummary | null;
 }
 
+export type WeightRecommendation = 'increase' | 'decrease';
+
 export interface WorkoutLogSetResponse {
   id: string;
   exerciseId: string;
@@ -220,6 +222,7 @@ export interface WorkoutLogSetResponse {
   setNumber: number;
   repsCompleted: number;
   weightKg: number | null;
+  recommendation: WeightRecommendation | null;
   exercise: ExerciseResponse;
 }
 

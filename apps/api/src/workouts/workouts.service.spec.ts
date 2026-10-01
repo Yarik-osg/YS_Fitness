@@ -231,5 +231,53 @@ describe('WorkoutsService.list', () => {
     expect(result.logs[0]?.completedAt > result.logs[1]!.completedAt).toBe(
       true,
     );
+    expect(result.logs[0]?.sets[0]?.recommendation).toBe('increase');
+  });
+
+  it('recommends from the last set of each exercise', async () => {
+    const base = logRecord().sets[0]!;
+    const record = logRecord({
+      sets: [
+        { ...base, setNumber: 1, repsCompleted: 9 },
+        {
+          ...base,
+          id: '99999999-9999-4999-8999-999999999999',
+          setNumber: 2,
+          repsCompleted: 12,
+        },
+        {
+          ...base,
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          exerciseId: otherExerciseId,
+          order: 2,
+          setNumber: 1,
+          repsCompleted: 11,
+          exercise: {
+            ...base.exercise,
+            id: otherExerciseId,
+            repsMin: 12,
+            repsMax: 15,
+          },
+        },
+      ],
+    });
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+    const sets = result.logs[0]?.sets ?? [];
+
+    expect(
+      sets.find((set) => set.setNumber === 1 && set.exerciseId === exerciseId)
+        ?.recommendation,
+    ).toBeNull();
+    expect(sets.find((set) => set.setNumber === 2)?.recommendation).toBe(
+      'increase',
+    );
+    expect(
+      sets.find((set) => set.exerciseId === otherExerciseId)?.recommendation,
+    ).toBe('decrease');
   });
 });

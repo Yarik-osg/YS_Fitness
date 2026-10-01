@@ -713,6 +713,8 @@
     "previous": "Минулого разу",
     "previousSet": "{weight} кг × {reps}",
     "previousReps": "× {reps}",
+    "recommendIncrease": "Варто збільшити вагу",
+    "recommendDecrease": "Варто зменшити вагу",
     "columnSet": "Підхід",
     "columnWeight": "Вага",
     "columnReps": "Повтори",

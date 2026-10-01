@@ -3,6 +3,7 @@
 import type {
   AssignedProgramResponse,
   ProgramDayResponse,
+  WeightRecommendation,
   WorkoutLogResponse,
   WorkoutLogSetResponse,
 } from '@repo/shared-types';
@@ -194,7 +195,12 @@ function SessionForm({
             key={exercise.exerciseId}
             exercise={exercise}
             expanded={expandedId === exercise.exerciseId}
-            previous={previousSets(logs, exercise.exerciseId)}
+            previous={previousSession(
+              logs,
+              program.templateId,
+              day.dayNumber,
+              exercise.exerciseId,
+            )}
             onToggle={() =>
               setExpandedId((current) =>
                 current === exercise.exerciseId ? null : exercise.exerciseId,
@@ -294,7 +300,7 @@ function ExerciseCard({
 }: {
   exercise: ExerciseDraft;
   expanded: boolean;
-  previous: WorkoutLogSetResponse[] | null;
+  previous: PreviousSession | null;
   onToggle: () => void;
   onChangeSet: (index: number, field: keyof SetDraft, value: string) => void;
   onComplete: () => void;
@@ -350,13 +356,13 @@ function ExerciseCard({
               label={t('prescribedReps')}
             />
           </div>
-          {previous && previous.length > 0 ? (
+          {previous && previous.sets.length > 0 ? (
             <div className="mb-4 border-l-2 border-white/10 bg-white/[0.015] px-3.5 py-2.5">
               <p className="mb-1.5 font-label text-[7px] font-semibold tracking-[0.16em] text-white/30 uppercase">
                 {t('previous')}
               </p>
               <p className="text-xs font-medium text-white/40">
-                {previous
+                {previous.sets
                   .map((set) =>
                     set.weightKg == null
                       ? t('previousReps', { reps: String(set.repsCompleted) })
@@ -367,6 +373,15 @@ function ExerciseCard({
                   )
                   .join(' • ')}
               </p>
+              {previous.recommendation ? (
+                <p className="mt-1.5 text-xs font-medium text-white/55">
+                  {t(
+                    previous.recommendation === 'increase'
+                      ? 'recommendIncrease'
+                      : 'recommendDecrease',
+                  )}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <div className="mb-2 grid grid-cols-[36px_1fr_1fr] gap-2">
@@ -562,14 +577,31 @@ function muscleLabels(
   return labels.join(' • ');
 }
 
-function previousSets(logs: WorkoutLogResponse[], exerciseId: string) {
-  const log = logs.find((entry) =>
-    entry.sets.some((set) => set.exerciseId === exerciseId),
+type PreviousSession = {
+  sets: WorkoutLogSetResponse[];
+  recommendation: WeightRecommendation | null;
+};
+
+function previousSession(
+  logs: WorkoutLogResponse[],
+  templateId: string,
+  dayNumber: number,
+  exerciseId: string,
+): PreviousSession | null {
+  const log = logs.find(
+    (entry) =>
+      entry.templateId === templateId &&
+      entry.dayNumber === dayNumber &&
+      entry.sets.some((set) => set.exerciseId === exerciseId),
   );
   if (!log) return null;
-  return log.sets
+  const sets = log.sets
     .filter((set) => set.exerciseId === exerciseId)
     .sort((left, right) => left.setNumber - right.setNumber);
+  return {
+    sets,
+    recommendation: sets[sets.length - 1]?.recommendation ?? null,
+  };
 }
 
 function isFilledReps(value: string) {

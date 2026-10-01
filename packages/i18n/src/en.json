@@ -716,6 +716,8 @@
     "previous": "Last time",
     "previousSet": "{weight} kg × {reps}",
     "previousReps": "× {reps}",
+    "recommendIncrease": "Worth increasing the weight",
+    "recommendDecrease": "Worth decreasing the weight",
     "columnSet": "Set",
     "columnWeight": "Weight",
     "columnReps": "Reps",
