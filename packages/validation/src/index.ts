@@ -324,6 +324,29 @@ export const grantSubscriptionSchema = z.object({
     .optional(),
 });
 
+const workoutLogSetSchema = z.object({
+  exerciseId: z.string().uuid(),
+  order: z.number().int().positive(),
+  setNumber: z.number().int().positive(),
+  repsCompleted: z.number().int().positive().max(999),
+  weightKg: z.number().positive().max(999).optional(),
+});
+
+export const logWorkoutSchema = z
+  .object({
+    templateId: z.string().uuid(),
+    dayNumber: z.number().int().positive(),
+    sets: z.array(workoutLogSetSchema).min(1).max(200),
+  })
+  .strict();
+
+export const listWorkoutLogsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;
+export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
+export type ListWorkoutLogsQuery = z.infer<typeof listWorkoutLogsQuerySchema>;

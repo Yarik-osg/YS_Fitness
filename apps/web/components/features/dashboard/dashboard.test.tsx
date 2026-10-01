@@ -45,6 +45,7 @@ const TEMPLATE_NAME =
 
 const ASSIGNED_PROGRAM = {
   id: 'program-1',
+  templateId: '11111111-1111-4111-8111-111111111111',
   templateCode: 'WB2U',
   templateName: TEMPLATE_NAME,
   gender: 'female',
@@ -309,9 +310,8 @@ describe('Dashboard program', () => {
     expect(screen.queryByText('Поточний тиждень')).not.toBeInTheDocument();
     expect(screen.queryByText(/Тиждень/)).not.toBeInTheDocument();
 
-    const start = screen.getByRole('button', { name: 'Почати тренування →' });
-    expect(start).toBeDisabled();
-    expect(start.closest('a')).toBeNull();
+    const start = screen.getByRole('link', { name: 'Почати тренування →' });
+    expect(start).toHaveAttribute('href', '/workout');
 
     const profileCard = screen.getByRole('link', { name: /Аліна/ });
     expect(profileCard).toHaveAttribute('href', '/profile');

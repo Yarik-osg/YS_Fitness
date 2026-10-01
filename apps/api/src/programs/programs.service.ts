@@ -150,6 +150,7 @@ export function toProgramSummary(
 ): AssignedProgramSummary {
   return {
     id: program.id,
+    templateId: program.templateId,
     templateCode: program.templateCode,
     templateName: program.templateName,
     gender: program.gender,
@@ -164,6 +165,7 @@ function toAssignedSummary(program: {
   id: string;
   assignedAt: Date;
   template: {
+    id: string;
     code: string;
     name: string;
     gender: string;
@@ -174,6 +176,7 @@ function toAssignedSummary(program: {
 }): AssignedProgramSummary {
   return {
     id: program.id,
+    templateId: program.template.id,
     templateCode: program.template.code,
     templateName: program.template.name,
     gender: program.template.gender === 'MALE' ? 'male' : 'female',

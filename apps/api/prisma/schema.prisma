@@ -75,6 +75,7 @@ model User {
   subscriptions        Subscription[]
   grantedSubscriptions Subscription[]       @relation("GrantedSubscriptions")
   workoutProgram       WorkoutProgram?
+  workoutLogs          WorkoutLog[]
 
   @@map("users")
 }
@@ -253,6 +254,7 @@ model Exercise {
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
   templateExercises ProgramTemplateExercise[]
+  workoutLogSets    WorkoutLogSet[]
 
   @@map("exercises")
 }
@@ -271,6 +273,7 @@ model ProgramTemplate {
 
   days             ProgramTemplateDay[]
   workoutPrograms  WorkoutProgram[]
+  workoutLogs      WorkoutLog[]
 
   @@unique([gender, level, frequencyPerWeek, accent], map: "program_templates_identity_key")
   @@map("program_templates")
@@ -313,4 +316,35 @@ model WorkoutProgram {
   template ProgramTemplate @relation(fields: [templateId], references: [id])
 
   @@map("workout_programs")
+}
+
+model WorkoutLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  templateId  String   @map("template_id") @db.Uuid
+  dayNumber   Int      @map("day_number")
+  completedAt DateTime @default(now()) @map("completed_at")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template ProgramTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  sets     WorkoutLogSet[]
+
+  @@index([userId, completedAt])
+  @@map("workout_logs")
+}
+
+model WorkoutLogSet {
+  id            String   @id @default(uuid()) @db.Uuid
+  workoutLogId  String   @map("workout_log_id") @db.Uuid
+  exerciseId    String   @map("exercise_id") @db.Uuid
+  order         Int
+  setNumber     Int      @map("set_number")
+  repsCompleted Int      @map("reps_completed")
+  weightKg      Decimal? @map("weight_kg") @db.Decimal(6, 2)
+
+  workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@index([workoutLogId])
+  @@map("workout_log_sets")
 }

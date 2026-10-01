@@ -12,6 +12,7 @@ import {
 
 const program = {
   id: 'program-1',
+  templateId: '11111111-1111-4111-8111-111111111111',
   templateCode: 'WB2U',
   templateName: 'WB2U — test',
   gender: 'female',

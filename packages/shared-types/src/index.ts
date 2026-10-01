@@ -175,6 +175,7 @@ export interface ProgramDayResponse {
 
 export interface AssignedProgramSummary {
   id: string;
+  templateId: string;
   templateCode: string;
   templateName: string;
   gender: ProgramTrack;
@@ -203,4 +204,28 @@ export interface ProfileUpdateResponse {
   mainGoal: OnboardingMainGoal | null;
   trainingFrequency: TrainingFrequency | null;
   program: AssignedProgramSummary | null;
+}
+
+export interface WorkoutLogSetResponse {
+  id: string;
+  exerciseId: string;
+  order: number;
+  setNumber: number;
+  repsCompleted: number;
+  weightKg: number | null;
+  exercise: ExerciseResponse;
+}
+
+export interface WorkoutLogResponse {
+  id: string;
+  userId: string;
+  templateId: string;
+  dayNumber: number;
+  completedAt: string;
+  sets: WorkoutLogSetResponse[];
+}
+
+export interface WorkoutLogListResponse {
+  logs: WorkoutLogResponse[];
+  total: number;
 }

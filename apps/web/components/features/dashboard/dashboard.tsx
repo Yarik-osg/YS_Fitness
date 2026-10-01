@@ -13,7 +13,7 @@ import { useLocale, useMessages, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import { useLogout } from '@/lib/hooks/use-auth';
@@ -106,9 +106,20 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
               value={t('home.times', { count: program.frequencyPerWeek })}
             />
           </div>
-          <Button className="w-full" disabled>
-            {t('home.start')}
-          </Button>
+          {day ? (
+            <Link
+              href="/workout"
+              className={buttonVariants({
+                className: 'w-full text-[#0b0b0b]!',
+              })}
+            >
+              {t('home.start')}
+            </Link>
+          ) : (
+            <Button className="w-full" disabled>
+              {t('home.start')}
+            </Button>
+          )}
         </section>
 
         <div className="grid grid-cols-2 gap-2.5">

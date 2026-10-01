@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
-const buttonVariants = cva(
+export const buttonVariants = cva(
   'inline-flex min-h-12 items-center justify-center gap-2 rounded-none px-6 font-label text-[12px] font-bold uppercase tracking-[0.14em] transition enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
   {
     variants: {
