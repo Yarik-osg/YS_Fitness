@@ -24,6 +24,8 @@ const PROGRAM = {
   frequencyPerWeek: 2,
   accent: 'UPPER',
   assignedAt: '2026-09-27T00:00:00.000Z',
+  nextDayNumber: 1,
+  programProgress: { completed: 9, expected: 16 },
   days: [],
 } satisfies AssignedProgramResponse;
 
@@ -163,6 +165,7 @@ describe('Profile page', () => {
     expect(screen.getByText('Схуднути')).toBeInTheDocument();
     expect(screen.getByText('2 рази')).toBeInTheDocument();
     expect(screen.getByText(TEMPLATE_NAME)).toBeInTheDocument();
+    expect(screen.getByText('9 / 16')).toBeInTheDocument();
     expect(screen.getByText('1 місяць')).toBeInTheDocument();
     expect(
       screen.getByText(formatDay('2026-12-01T00:00:00.000Z')),

@@ -10,6 +10,7 @@ import type {
 } from '@repo/shared-types';
 import type { ListWorkoutLogsQuery, LogWorkoutInput } from '@repo/validation';
 import { ProgramsService } from '../programs/programs.service.js';
+import { weightRecommendation } from './weight-recommendation.js';
 import {
   WorkoutsRepository,
   type WorkoutLogRecord,
@@ -26,7 +27,7 @@ export class WorkoutsService {
     userId: string,
     input: LogWorkoutInput,
   ): Promise<WorkoutLogResponse> {
-    const { program } = await this.programs.getMine(userId);
+    const { program } = await this.programs.getAssignedProgram(userId);
     if (!program) {
       throw new ConflictException({
         code: 'PROGRAM_NOT_ASSIGNED',
@@ -77,6 +78,14 @@ export class WorkoutsService {
 }
 
 function toWorkoutLog(log: WorkoutLogRecord): WorkoutLogResponse {
+  const lastSetNumber = new Map<string, number>();
+  for (const set of log.sets) {
+    const current = lastSetNumber.get(set.exerciseId) ?? 0;
+    if (set.setNumber > current) {
+      lastSetNumber.set(set.exerciseId, set.setNumber);
+    }
+  }
+
   return {
     id: log.id,
     userId: log.userId,
@@ -90,6 +99,14 @@ function toWorkoutLog(log: WorkoutLogRecord): WorkoutLogResponse {
       setNumber: set.setNumber,
       repsCompleted: set.repsCompleted,
       weightKg: set.weightKg?.toNumber() ?? null,
+      recommendation:
+        set.setNumber === lastSetNumber.get(set.exerciseId)
+          ? weightRecommendation(
+              set.repsCompleted,
+              set.exercise.repsMin,
+              set.exercise.repsMax,
+            )
+          : null,
       exercise: {
         id: set.exercise.id,
         code: set.exercise.code,

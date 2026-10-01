@@ -53,6 +53,8 @@ const ASSIGNED_PROGRAM = {
   frequencyPerWeek: 2,
   accent: 'UPPER',
   assignedAt: '2026-09-27T00:00:00.000Z',
+  nextDayNumber: 2,
+  programProgress: { completed: 9, expected: 16 },
   days: [
     {
       dayNumber: 1,
@@ -244,8 +246,9 @@ function expectNoPlaceholderCards() {
 
 function expectHomeCards() {
   expect(screen.getAllByText(TEMPLATE_NAME)).toHaveLength(2);
-  expect(screen.getAllByText('Тренування 01')).toHaveLength(2);
+  expect(screen.getAllByText('Тренування 02')).toHaveLength(2);
   expect(screen.getByText('2 рази', { exact: true })).toBeInTheDocument();
+  expect(screen.getByText('9 / 16')).toBeInTheDocument();
   expect(screen.getByText('2 рази/тиж.')).toBeInTheDocument();
   expect(screen.getByText('6 вправ · 17 підходів')).toBeInTheDocument();
   expect(screen.getByText('Початківець')).toBeInTheDocument();

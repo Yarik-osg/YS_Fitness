@@ -48,6 +48,8 @@ export function toProgramSummary(
     frequencyPerWeek: program.frequencyPerWeek,
     accent: program.accent,
     assignedAt: program.assignedAt,
+    nextDayNumber: program.nextDayNumber,
+    programProgress: program.programProgress,
   };
 }
 

@@ -12,6 +12,7 @@ import type { ListExercisesQuery } from '@repo/validation';
 import type { MuscleGroup, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { matchProgramTemplate } from './match-template.js';
+import { expectedProgramSessions, nextProgramDay } from './program-cycle.js';
 
 const PROGRAM_NOT_AVAILABLE = {
   code: 'PROGRAM_NOT_AVAILABLE',
@@ -42,6 +43,15 @@ type ProgramStore = Pick<
   Prisma.TransactionClient,
   'onboardingResponses' | 'programTemplate' | 'workoutProgram'
 >;
+
+type AssignedProgramBase = Omit<
+  AssignedProgramSummary,
+  'nextDayNumber' | 'programProgress'
+>;
+
+type AssignedProgramRecord = AssignedProgramBase & {
+  days: AssignedProgramResponse['days'];
+};
 
 @Injectable()
 export class ProgramsService {
@@ -83,7 +93,7 @@ export class ProgramsService {
           include: programInclude,
         });
         if (!current) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
-        return toAssignedProgram(current);
+        return this.withProgramCycle(userId, toAssignedProgram(current));
       }
     }
 
@@ -94,18 +104,23 @@ export class ProgramsService {
       include: programInclude,
     });
 
-    return toAssignedProgram(program);
+    return this.withProgramCycle(userId, toAssignedProgram(program));
+  }
+
+  async getAssignedProgram(
+    userId: string,
+    db: ProgramStore = this.prisma,
+  ): Promise<{ program: AssignedProgramRecord | null }> {
+    return { program: await this.loadProgram(userId, db) };
   }
 
   async getMine(
     userId: string,
     db: ProgramStore = this.prisma,
   ): Promise<CurrentProgramResponse> {
-    const program = await db.workoutProgram.findUnique({
-      where: { userId },
-      include: programInclude,
-    });
-    return { program: program ? toAssignedProgram(program) : null };
+    const program = await this.loadProgram(userId, db);
+    if (!program) return { program: null };
+    return { program: await this.withProgramCycle(userId, program) };
   }
 
   async getAssigned(
@@ -116,7 +131,10 @@ export class ProgramsService {
       where: { userId },
       include: { template: true },
     });
-    return { program: program ? toAssignedSummary(program) : null };
+    if (!program) return { program: null };
+    return {
+      program: await this.withProgramCycle(userId, toAssignedSummary(program)),
+    };
   }
 
   async unassign(
@@ -143,6 +161,53 @@ export class ProgramsService {
       repsMax: exercise.repsMax,
     }));
   }
+
+  private async loadProgram(
+    userId: string,
+    db: ProgramStore,
+  ): Promise<AssignedProgramRecord | null> {
+    const program = await db.workoutProgram.findUnique({
+      where: { userId },
+      include: programInclude,
+    });
+    return program ? toAssignedProgram(program) : null;
+  }
+
+  private async withProgramCycle<T extends AssignedProgramBase>(
+    userId: string,
+    program: T,
+  ): Promise<
+    T & Pick<AssignedProgramSummary, 'nextDayNumber' | 'programProgress'>
+  > {
+    const assignedAt = new Date(program.assignedAt);
+    // Read logs here so program lookup does not depend on WorkoutsService.
+    const [latest, completed] = await Promise.all([
+      this.prisma.workoutLog.findFirst({
+        where: { userId, templateId: program.templateId },
+        orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+        select: { dayNumber: true },
+      }),
+      this.prisma.workoutLog.count({
+        where: {
+          userId,
+          templateId: program.templateId,
+          completedAt: { gte: assignedAt },
+        },
+      }),
+    ]);
+
+    return {
+      ...program,
+      nextDayNumber: nextProgramDay(
+        latest?.dayNumber ?? null,
+        program.frequencyPerWeek,
+      ),
+      programProgress: {
+        completed,
+        expected: expectedProgramSessions(program.frequencyPerWeek),
+      },
+    };
+  }
 }
 
 export function toProgramSummary(
@@ -158,6 +223,8 @@ export function toProgramSummary(
     frequencyPerWeek: program.frequencyPerWeek,
     accent: program.accent,
     assignedAt: program.assignedAt,
+    nextDayNumber: program.nextDayNumber,
+    programProgress: program.programProgress,
   };
 }
 
@@ -173,7 +240,7 @@ function toAssignedSummary(program: {
     frequencyPerWeek: number;
     accent: string;
   };
-}): AssignedProgramSummary {
+}): AssignedProgramBase {
   return {
     id: program.id,
     templateId: program.template.id,
@@ -187,7 +254,7 @@ function toAssignedSummary(program: {
   };
 }
 
-function toAssignedProgram(program: ProgramRecord): AssignedProgramResponse {
+function toAssignedProgram(program: ProgramRecord): AssignedProgramRecord {
   return {
     ...toAssignedSummary(program),
     days: program.template.days.map((day) => ({
