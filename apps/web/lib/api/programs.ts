@@ -40,6 +40,7 @@ export function toProgramSummary(
 ): AssignedProgramSummary {
   return {
     id: program.id,
+    templateId: program.templateId,
     templateCode: program.templateCode,
     templateName: program.templateName,
     gender: program.gender,
