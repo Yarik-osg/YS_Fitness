@@ -76,7 +76,14 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 `PATCH /api/v1/users/me/profile` is bearer-authenticated. It accepts any non-empty subset of height, weight, experience, design goal, and training frequency. Height updates `UserProfile`; a changed weight appends a `BodyMeasurement`; the quiz fields update `OnboardingResponses` (or create a stub row when those three quiz fields are sent together and no row exists). Name, date of birth, program track, and calculation sex are not editable here. The same request reassigns or unassigns the workout template only when match-affecting answers changed and the user has active subscription access. Profile, measurements, onboarding answers, and program assign/unassign run in one serializable transaction.
 
-`GET /api/v1/programs/assigned` (JWT + active subscription) returns `{ program }` with template metadata, including `ProgramTemplate.name` from the CSV subtitle. The dashboard and `/profile` both read that summary.
+`GET /api/v1/programs/assigned` (JWT + active subscription) returns `{ program }` with template metadata, including `ProgramTemplate.name` from the CSV subtitle, plus `nextDayNumber`, `programProgress`, and `dayLogCounts`. `/profile` reads that summary. The dashboard, `/training`, and `/workout` read the same cycle fields from `GET /api/v1/programs/me`.
+
+## Workouts
+
+- `POST /api/v1/workouts/log` — JWT + active subscription; saves the sets just performed for one program day
+- `GET /api/v1/workouts/logs` — JWT; paginated history, newest first, used for the previous-session comparison
+
+The next program day rotates forward from the latest log for the assigned template and wraps after `frequencyPerWeek`. `programProgress.completed` counts logs for that template since `assignedAt`; `expected` is `frequencyPerWeek × 8`. `dayLogCounts` is that same window split by day. `/training` lists every assigned day with that count. Day cards start collapsed except the next day, and only that day starts a session at `/workout`. The dashboard training card links to `/training`. The hero start button still opens `/workout` for the next day. After a save, the completion screen shows each submitted exercise with this session's sets and, when a prior log matches the same template, day, and exercise, the previous session's sets. There is no duration. A calendar view is still deferred.
 
 ## Subscriptions
 

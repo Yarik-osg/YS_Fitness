@@ -50,6 +50,7 @@ export function toProgramSummary(
     assignedAt: program.assignedAt,
     nextDayNumber: program.nextDayNumber,
     programProgress: program.programProgress,
+    dayLogCounts: program.dayLogCounts,
   };
 }
 

@@ -178,6 +178,11 @@ export interface ProgramProgress {
   expected: number;
 }
 
+export interface DayLogCount {
+  dayNumber: number;
+  count: number;
+}
+
 export interface AssignedProgramSummary {
   id: string;
   templateId: string;
@@ -190,6 +195,7 @@ export interface AssignedProgramSummary {
   assignedAt: string;
   nextDayNumber: number;
   programProgress: ProgramProgress;
+  dayLogCounts: DayLogCount[];
 }
 
 export interface AssignedProgramResponse extends AssignedProgramSummary {

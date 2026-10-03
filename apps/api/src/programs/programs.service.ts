@@ -46,7 +46,7 @@ type ProgramStore = Pick<
 
 type AssignedProgramBase = Omit<
   AssignedProgramSummary,
-  'nextDayNumber' | 'programProgress'
+  'nextDayNumber' | 'programProgress' | 'dayLogCounts'
 >;
 
 type AssignedProgramRecord = AssignedProgramBase & {
@@ -177,24 +177,37 @@ export class ProgramsService {
     userId: string,
     program: T,
   ): Promise<
-    T & Pick<AssignedProgramSummary, 'nextDayNumber' | 'programProgress'>
+    T &
+      Pick<
+        AssignedProgramSummary,
+        'nextDayNumber' | 'programProgress' | 'dayLogCounts'
+      >
   > {
     const assignedAt = new Date(program.assignedAt);
+    const loggedSinceAssignment = {
+      userId,
+      templateId: program.templateId,
+      completedAt: { gte: assignedAt },
+    };
     // Read logs here so program lookup does not depend on WorkoutsService.
-    const [latest, completed] = await Promise.all([
+    const [latest, groups] = await Promise.all([
       this.prisma.workoutLog.findFirst({
         where: { userId, templateId: program.templateId },
         orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
         select: { dayNumber: true },
       }),
-      this.prisma.workoutLog.count({
-        where: {
-          userId,
-          templateId: program.templateId,
-          completedAt: { gte: assignedAt },
-        },
+      this.prisma.workoutLog.groupBy({
+        by: ['dayNumber'],
+        where: loggedSinceAssignment,
+        _count: { _all: true },
       }),
     ]);
+    const dayLogCounts = groups
+      .map((group) => ({
+        dayNumber: group.dayNumber,
+        count: group._count._all,
+      }))
+      .sort((left, right) => left.dayNumber - right.dayNumber);
 
     return {
       ...program,
@@ -203,9 +216,10 @@ export class ProgramsService {
         program.frequencyPerWeek,
       ),
       programProgress: {
-        completed,
+        completed: dayLogCounts.reduce((sum, day) => sum + day.count, 0),
         expected: expectedProgramSessions(program.frequencyPerWeek),
       },
+      dayLogCounts,
     };
   }
 }
@@ -225,6 +239,7 @@ export function toProgramSummary(
     assignedAt: program.assignedAt,
     nextDayNumber: program.nextDayNumber,
     programProgress: program.programProgress,
+    dayLogCounts: program.dayLogCounts,
   };
 }
 

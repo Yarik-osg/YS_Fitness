@@ -24,6 +24,7 @@ const program: AssignedProgramResponse = {
   assignedAt: '2026-09-27T00:00:00.000Z',
   nextDayNumber: 1,
   programProgress: { completed: 0, expected: 16 },
+  dayLogCounts: [],
   days: [
     {
       dayNumber: 2,
@@ -201,7 +202,15 @@ describe('WorkoutSessionPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('2/2')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
+    expect(
+      screen.getByText('01 — Тяга вертикального блоку'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('35×12 • ×10')).toBeInTheDocument();
+    expect(screen.getByText('02 — Скручування')).toBeInTheDocument();
+    expect(screen.getByText('×15')).toBeInTheDocument();
+    expect(screen.queryByText(/пред\./)).not.toBeInTheDocument();
     expect(screen.queryByText('Тривалість')).not.toBeInTheDocument();
+    expect(screen.queryByText(/хв/)).not.toBeInTheDocument();
     expect(
       screen.getByText('Результати збережено. Чудова робота!'),
     ).toBeInTheDocument();
@@ -209,6 +218,93 @@ describe('WorkoutSessionPage', () => {
     expect(
       screen.getByRole('link', { name: 'Повернутися до моєї програми →' }),
     ).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('compares this session with the previous log for the same exercise', async () => {
+    const user = userEvent.setup();
+    const row = program.days[1]!.exercises[0]!.exercise;
+    logs.current = {
+      total: 2,
+      logs: [
+        {
+          id: 'log-other-day',
+          userId: 'user-1',
+          templateId,
+          dayNumber: 2,
+          completedAt: '2026-10-01T10:00:00.000Z',
+          sets: [
+            {
+              id: 'set-other',
+              exerciseId: pressId,
+              order: 2,
+              setNumber: 1,
+              repsCompleted: 11,
+              weightKg: 20,
+              recommendation: null,
+              exercise: program.days[1]!.exercises[1]!.exercise,
+            },
+          ],
+        },
+        {
+          id: 'log-1',
+          userId: 'user-1',
+          templateId,
+          dayNumber: 1,
+          completedAt: '2026-09-30T10:00:00.000Z',
+          sets: [
+            {
+              id: 'set-1',
+              exerciseId: rowId,
+              order: 1,
+              setNumber: 1,
+              repsCompleted: 10,
+              weightKg: 32.5,
+              recommendation: null,
+              exercise: row,
+            },
+            {
+              id: 'set-2',
+              exerciseId: rowId,
+              order: 1,
+              setNumber: 2,
+              repsCompleted: 8,
+              weightKg: null,
+              recommendation: null,
+              exercise: row,
+            },
+          ],
+        },
+      ],
+    };
+    renderSession();
+
+    await user.type(screen.getByLabelText('Вага 1'), '35');
+    await user.type(screen.getByLabelText('Повтори 1'), '12');
+    await user.type(screen.getByLabelText('Повтори 2'), '10');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(
+      screen.getByText('01 — Тяга вертикального блоку'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === 'P' &&
+          element.textContent === 'пред. 32.5×10 • ×8',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('35×12 • ×10')).toBeInTheDocument();
+    const press = screen.getByText('02 — Скручування').parentElement;
+    expect(press).toHaveTextContent('×15');
+    expect(press).not.toHaveTextContent('пред.');
+    expect(screen.queryByText('20×11')).not.toBeInTheDocument();
+    expect(screen.queryByText('Тривалість')).not.toBeInTheDocument();
+    expect(screen.getByText('2/2')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   it('lets a filled exercise be reopened and corrected before submit', async () => {

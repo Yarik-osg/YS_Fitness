@@ -17,17 +17,11 @@ import {
   TRAINING_FREQUENCIES,
   WEIGHT_KG,
 } from '@repo/validation';
-import {
-  Apple,
-  BarChart3,
-  Dumbbell,
-  Home,
-  LayoutGrid,
-  User,
-} from 'lucide-react';
+import { User } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -53,15 +47,6 @@ import {
   formatHryvniaAmount,
   kopiykasToHryvnia,
 } from '@/lib/subscriptions/money';
-
-const NAV_ITEMS = [
-  { id: 'home', icon: Home },
-  { id: 'training', icon: Dumbbell },
-  { id: 'nutrition', icon: Apple },
-  { id: 'progress', icon: BarChart3 },
-  { id: 'profile', icon: User },
-  { id: 'library', icon: LayoutGrid },
-] as const;
 
 export function ProfilePage() {
   const t = useTranslations('profile');
@@ -712,82 +697,8 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] pb-24 text-white">
       {children}
-      <ProfileNav />
+      <ClientNav active="profile" />
     </div>
-  );
-}
-
-function ProfileNav() {
-  const t = useTranslations('dashboard');
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-[430px] border-t border-white/10 bg-[#0b0b0b] pb-[env(safe-area-inset-bottom,0px)]">
-      {NAV_ITEMS.map((item) => {
-        const active = item.id === 'profile';
-        const Icon = item.icon;
-        const className =
-          'relative flex flex-1 flex-col items-center gap-1 px-0.5 pt-2.5 pb-3';
-        const content = (
-          <>
-            {active ? (
-              <span className="absolute top-0 left-1/2 h-px w-[22px] -translate-x-1/2 bg-[#35f5e8]" />
-            ) : null}
-            <Icon
-              size={20}
-              strokeWidth={1.6}
-              className={
-                active
-                  ? 'text-[#35f5e8]'
-                  : item.id === 'home'
-                    ? 'text-white/70'
-                    : 'text-white/30'
-              }
-            />
-            <span
-              className={`text-[7px] whitespace-nowrap ${
-                active
-                  ? 'font-semibold text-[#35f5e8]'
-                  : item.id === 'home'
-                    ? 'font-medium text-white/70'
-                    : 'font-medium text-white/30'
-              }`}
-            >
-              {t(`home.nav.${item.id}`)}
-            </span>
-          </>
-        );
-        if (item.id === 'home') {
-          return (
-            <Link key={item.id} href="/dashboard" className={className}>
-              {content}
-            </Link>
-          );
-        }
-        if (item.id === 'profile') {
-          return (
-            <Link
-              key={item.id}
-              href="/profile"
-              aria-current="page"
-              className={className}
-            >
-              {content}
-            </Link>
-          );
-        }
-        return (
-          <button
-            key={item.id}
-            type="button"
-            disabled={!active}
-            aria-current={active ? 'page' : undefined}
-            className={`${className} disabled:cursor-not-allowed`}
-          >
-            {content}
-          </button>
-        );
-      })}
-    </nav>
   );
 }
 

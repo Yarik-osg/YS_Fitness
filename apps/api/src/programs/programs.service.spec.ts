@@ -65,7 +65,7 @@ function createService() {
     exercise: { findMany: vi.fn() },
     workoutLog: {
       findFirst: vi.fn().mockResolvedValue(null),
-      count: vi.fn().mockResolvedValue(0),
+      groupBy: vi.fn().mockResolvedValue([]),
     },
   };
 
@@ -195,6 +195,7 @@ describe('ProgramsService', () => {
     expect(result.program).toMatchObject({
       nextDayNumber: 1,
       programProgress: { completed: 0, expected: 16 },
+      dayLogCounts: [],
     });
     expect(prisma.workoutLog.findFirst).toHaveBeenCalledWith({
       where: { userId, templateId: 'template-1' },
@@ -234,7 +235,10 @@ describe('ProgramsService', () => {
     record.template.frequencyPerWeek = 3;
     record.assignedAt = new Date('2026-10-01T00:00:00.000Z');
     prisma.workoutProgram.findUnique.mockResolvedValue(record);
-    prisma.workoutLog.count.mockResolvedValue(26);
+    prisma.workoutLog.groupBy.mockResolvedValue([
+      { dayNumber: 2, _count: { _all: 10 } },
+      { dayNumber: 1, _count: { _all: 16 } },
+    ]);
 
     const result = await service.getAssigned(userId);
 
@@ -242,12 +246,18 @@ describe('ProgramsService', () => {
       completed: 26,
       expected: 24,
     });
-    expect(prisma.workoutLog.count).toHaveBeenCalledWith({
+    expect(result.program?.dayLogCounts).toEqual([
+      { dayNumber: 1, count: 16 },
+      { dayNumber: 2, count: 10 },
+    ]);
+    expect(prisma.workoutLog.groupBy).toHaveBeenCalledWith({
+      by: ['dayNumber'],
       where: {
         userId,
         templateId: 'template-new',
         completedAt: { gte: new Date('2026-10-01T00:00:00.000Z') },
       },
+      _count: { _all: true },
     });
   });
 

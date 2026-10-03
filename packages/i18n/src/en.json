@@ -741,9 +741,23 @@
       "saved": "Results saved. Nice work!",
       "exercises": "Exercises done",
       "sets": "Sets total",
+      "previous": "prev.",
+      "setSummary": "{weight}×{reps}",
+      "repsSummary": "×{reps}",
       "back": "Back to my program →",
       "mottoLead": "TRAIN. DISCIPLINE.",
       "mottoAccent": "EVOLVE"
     }
+  },
+  "training": {
+    "brand": "YS FITNESS",
+    "title": "Training",
+    "program": "Your program",
+    "dayTitle": "Workout {number}",
+    "next": "Next",
+    "completedTimes": "{count, plural, one {Completed: # time this cycle} other {Completed: # times this cycle}}",
+    "exercises": "exercises",
+    "loading": "Loading program",
+    "start": "Start workout →"
   }
 }

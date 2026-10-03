@@ -738,9 +738,23 @@
       "saved": "Результати збережено. Чудова робота!",
       "exercises": "Вправ виконано",
       "sets": "Підходів загалом",
+      "previous": "пред.",
+      "setSummary": "{weight}×{reps}",
+      "repsSummary": "×{reps}",
       "back": "Повернутися до моєї програми →",
       "mottoLead": "TRAIN. DISCIPLINE.",
       "mottoAccent": "EVOLVE"
     }
+  },
+  "training": {
+    "brand": "YS FITNESS",
+    "title": "Тренування",
+    "program": "Твоя програма",
+    "dayTitle": "Тренування {number}",
+    "next": "Наступне",
+    "completedTimes": "{count, plural, one {Виконано: # раз цього циклу} few {Виконано: # рази цього циклу} many {Виконано: # разів цього циклу} other {Виконано: # разів цього циклу}}",
+    "exercises": "вправ",
+    "loading": "Завантажуємо програму",
+    "start": "Почати тренування →"
   }
 }
