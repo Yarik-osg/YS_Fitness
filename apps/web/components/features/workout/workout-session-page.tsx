@@ -27,12 +27,25 @@ type ExerciseDraft = {
   sets: SetDraft[];
 };
 
+type LoggedSetLine = {
+  repsCompleted: number;
+  weightKg: number | null;
+};
+
+type CompletedExercise = {
+  order: number;
+  name: string;
+  sets: LoggedSetLine[];
+  previous: LoggedSetLine[] | null;
+};
+
 type SavedSession = {
   exerciseCount: number;
   totalExercises: number;
   setCount: number;
   dayNumber: string;
   muscles: string;
+  exercises: CompletedExercise[];
 };
 
 export function WorkoutSessionPage() {
@@ -106,15 +119,7 @@ function SessionForm({
   ).length;
 
   if (saved) {
-    return (
-      <Completion
-        dayNumber={saved.dayNumber}
-        muscles={saved.muscles}
-        exerciseCount={saved.exerciseCount}
-        totalExercises={saved.totalExercises}
-        setCount={saved.setCount}
-      />
-    );
+    return <Completion {...saved} />;
   }
 
   async function finish() {
@@ -141,6 +146,13 @@ function SessionForm({
         setCount: submission.sets.length,
         dayNumber,
         muscles: muscleLine,
+        exercises: completedExercises(
+          exercises,
+          submission.sets,
+          logs,
+          program.templateId,
+          day.dayNumber,
+        ),
       });
     } catch {
       setError(t('saveError'));
@@ -473,6 +485,7 @@ function Completion({
   exerciseCount,
   totalExercises,
   setCount,
+  exercises,
 }: SavedSession) {
   const t = useTranslations('workouts');
 
@@ -501,7 +514,7 @@ function Completion({
           <p className="text-[11px] font-medium text-white/40">{muscles}</p>
         ) : null}
       </div>
-      <div className="mb-8 grid grid-cols-2 gap-px">
+      <div className="mb-3 grid grid-cols-2 gap-px">
         <Stat
           value={`${exerciseCount}/${totalExercises}`}
           label={t('completion.exercises')}
@@ -512,6 +525,33 @@ function Completion({
           label={t('completion.sets')}
           tone="text-[#c8ff2e]"
         />
+      </div>
+      <div className="mb-8 border border-white/[0.07] bg-white/[0.015] px-4 py-1">
+        {exercises.map((exercise, index) => (
+          <div
+            key={exercise.order}
+            className={
+              index < exercises.length - 1
+                ? 'border-b border-white/[0.04] py-2.5'
+                : 'py-2.5'
+            }
+          >
+            <p className="font-heading text-xs tracking-[0.04em] text-white uppercase">
+              {String(exercise.order).padStart(2, '0')} — {exercise.name}
+            </p>
+            {exercise.previous ? (
+              <p className="mt-0.5 text-[10px] leading-snug font-medium text-white/25">
+                <span className="text-white/20">
+                  {t('completion.previous')}{' '}
+                </span>
+                {formatSets(exercise.previous, t)}
+              </p>
+            ) : null}
+            <p className="mt-0.5 text-[11px] leading-snug font-semibold text-white">
+              {formatSets(exercise.sets, t)}
+            </p>
+          </div>
+        ))}
       </div>
       <Link
         href="/dashboard"
@@ -602,6 +642,60 @@ function previousSession(
     sets,
     recommendation: sets[sets.length - 1]?.recommendation ?? null,
   };
+}
+
+function completedExercises(
+  drafts: ExerciseDraft[],
+  submitted: LogWorkoutInput['sets'],
+  logs: WorkoutLogResponse[],
+  templateId: string,
+  dayNumber: number,
+): CompletedExercise[] {
+  return drafts.flatMap((exercise) => {
+    const sets = submitted
+      .filter((set) => set.exerciseId === exercise.exerciseId)
+      .map((set) => ({
+        repsCompleted: set.repsCompleted,
+        weightKg: set.weightKg ?? null,
+      }));
+    if (sets.length === 0) return [];
+    const previous = previousSession(
+      logs,
+      templateId,
+      dayNumber,
+      exercise.exerciseId,
+    );
+    return [
+      {
+        order: exercise.order,
+        name: exercise.name,
+        sets,
+        previous:
+          previous && previous.sets.length > 0
+            ? previous.sets.map((set) => ({
+                repsCompleted: set.repsCompleted,
+                weightKg: set.weightKg,
+              }))
+            : null,
+      },
+    ];
+  });
+}
+
+function formatSets(
+  sets: LoggedSetLine[],
+  t: ReturnType<typeof useTranslations<'workouts'>>,
+) {
+  return sets
+    .map((set) =>
+      set.weightKg == null
+        ? t('completion.repsSummary', { reps: String(set.repsCompleted) })
+        : t('completion.setSummary', {
+            weight: String(set.weightKg),
+            reps: String(set.repsCompleted),
+          }),
+    )
+    .join(' • ');
 }
 
 function isFilledReps(value: string) {

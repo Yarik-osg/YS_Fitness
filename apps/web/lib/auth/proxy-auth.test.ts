@@ -150,4 +150,26 @@ describe('applyAuthRedirect', () => {
       }),
     ).toBe('/uk/onboarding');
   });
+
+  it('protects training like other client routes', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/training',
+        locale: 'en',
+        fullPathname: '/en/training',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Ftraining');
+  });
+
+  it('keeps an incomplete session away from training', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/training',
+        locale: 'uk',
+        fullPathname: '/uk/training',
+        hint: 'onboarding',
+      }),
+    ).toBe('/uk/onboarding');
+  });
 });

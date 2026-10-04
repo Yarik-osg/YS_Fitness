@@ -55,6 +55,7 @@ const ASSIGNED_PROGRAM = {
   assignedAt: '2026-09-27T00:00:00.000Z',
   nextDayNumber: 2,
   programProgress: { completed: 9, expected: 16 },
+  dayLogCounts: [],
   days: [
     {
       dayNumber: 1,
@@ -318,17 +319,22 @@ describe('Dashboard program', () => {
 
     const profileCard = screen.getByRole('link', { name: /Аліна/ });
     expect(profileCard).toHaveAttribute('href', '/profile');
-    expect(screen.getByText('6 вправ · 17 підходів').closest('a')).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /6 вправ · 17 підходів/ }),
+    ).toHaveAttribute('href', '/training');
 
-    const home = screen.getByRole('button', { name: 'Головна' });
-    expect(home).toBeEnabled();
+    const home = screen.getByRole('link', { name: 'Головна' });
+    expect(home).toHaveAttribute('href', '/dashboard');
     expect(home).toHaveAttribute('aria-current', 'page');
-    expect(home.closest('a')).toBeNull();
     expect(screen.getByRole('link', { name: 'Профіль' })).toHaveAttribute(
       'href',
       '/profile',
     );
-    for (const name of ['Тренування', 'Харчування', 'Прогрес', 'Бібліотека']) {
+    expect(screen.getByRole('link', { name: 'Тренування' })).toHaveAttribute(
+      'href',
+      '/training',
+    );
+    for (const name of ['Харчування', 'Прогрес', 'Бібліотека']) {
       const tab = screen.getByRole('button', { name });
       expect(tab).toBeDisabled();
       expect(tab.closest('a')).toBeNull();

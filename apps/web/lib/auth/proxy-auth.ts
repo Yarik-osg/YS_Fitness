@@ -3,7 +3,13 @@ import type { AppLocale } from '@/i18n/routing';
 import { routing } from '@/i18n/routing';
 
 const AUTH_ROUTES = ['/login', '/register'];
-const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/profile'];
+const PROTECTED_ROUTES = [
+  '/dashboard',
+  '/checkout',
+  '/profile',
+  '/training',
+  '/workout',
+];
 
 export function splitLocalePath(pathname: string): {
   locale: AppLocale;
@@ -78,7 +84,9 @@ export function applyAuthRedirect({
 
   if (
     (pathnameWithoutLocale.startsWith('/dashboard') ||
-      pathnameWithoutLocale.startsWith('/profile')) &&
+      pathnameWithoutLocale.startsWith('/profile') ||
+      pathnameWithoutLocale.startsWith('/training') ||
+      pathnameWithoutLocale.startsWith('/workout')) &&
     hint === 'onboarding'
   ) {
     return prefixed('/onboarding');

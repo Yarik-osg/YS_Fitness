@@ -1,18 +1,12 @@
 'use client';
 
 import type { AssignedProgramResponse } from '@repo/shared-types';
-import {
-  Apple,
-  BarChart3,
-  Dumbbell,
-  Home,
-  LayoutGrid,
-  User,
-} from 'lucide-react';
+import { Dumbbell } from 'lucide-react';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
@@ -134,7 +128,10 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
         </section>
 
         <div className="grid grid-cols-2 gap-2.5">
-          <article className="relative min-h-[130px] overflow-hidden border-[1.5px] border-[rgba(200,255,46,0.2)] px-4 py-[18px]">
+          <Link
+            href="/training"
+            className="relative block min-h-[130px] overflow-hidden border-[1.5px] border-[rgba(200,255,46,0.2)] px-4 py-[18px]"
+          >
             <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-[#c8ff2e] to-transparent" />
             <p className="mb-2 font-label text-[7px] font-bold tracking-[0.16em] text-[rgba(200,255,46,0.7)] uppercase">
               {t('home.training')}
@@ -146,7 +143,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
               {t('home.summary', { exercises: exerciseCount, sets: setCount })}
             </p>
             <Chevron className="absolute right-3.5 bottom-3.5 text-[#c8ff2e]" />
-          </article>
+          </Link>
 
           <Link
             href="/profile"
@@ -177,7 +174,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
         </p>
       </div>
 
-      <BottomNav />
+      <ClientNav active="home" />
     </div>
   );
 }
@@ -244,13 +241,13 @@ function UnassignedDashboard({
         )}
       </header>
 
-      <TrainingCard program={program} />
-      <BottomNav />
+      <AssignProgramCard program={program} />
+      <ClientNav active="home" />
     </main>
   );
 }
 
-function TrainingCard({
+export function AssignProgramCard({
   program,
 }: {
   program: ReturnType<typeof useMyProgram>;
@@ -310,92 +307,6 @@ function TrainingCard({
         )}
       </div>
     </article>
-  );
-}
-
-const NAV_ITEMS = [
-  { id: 'home', icon: Home },
-  { id: 'training', icon: Dumbbell },
-  { id: 'nutrition', icon: Apple },
-  { id: 'progress', icon: BarChart3 },
-  { id: 'profile', icon: User },
-  { id: 'library', icon: LayoutGrid },
-] as const;
-
-function BottomNav() {
-  const t = useTranslations('dashboard');
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-[430px] border-t border-white/10 bg-[#0b0b0b] pb-[env(safe-area-inset-bottom,0px)]">
-      {NAV_ITEMS.map((item) => {
-        const active = item.id === 'home';
-        const toProfile = item.id === 'profile';
-        const className =
-          'relative flex flex-1 flex-col items-center gap-1 px-0.5 pt-2.5 pb-3';
-        const content = (
-          <NavTabContent
-            active={active}
-            available={toProfile}
-            icon={item.icon}
-            label={t(`home.nav.${item.id}`)}
-          />
-        );
-
-        if (toProfile) {
-          return (
-            <Link key={item.id} href="/profile" className={className}>
-              {content}
-            </Link>
-          );
-        }
-
-        return (
-          <button
-            key={item.id}
-            type="button"
-            disabled={!active}
-            aria-current={active ? 'page' : undefined}
-            className={`${className} disabled:cursor-not-allowed`}
-          >
-            {content}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function NavTabContent({
-  active,
-  available,
-  icon: Icon,
-  label,
-}: {
-  active: boolean;
-  available: boolean;
-  icon: typeof Home;
-  label: string;
-}) {
-  const tone = active
-    ? 'text-[#35f5e8]'
-    : available
-      ? 'text-white/70'
-      : 'text-white/30';
-
-  return (
-    <>
-      {active ? (
-        <span className="absolute top-0 left-1/2 h-px w-[22px] -translate-x-1/2 bg-[#35f5e8]" />
-      ) : null}
-      <Icon size={20} strokeWidth={1.6} className={tone} />
-      <span
-        className={`text-[7px] whitespace-nowrap ${
-          active ? 'font-semibold' : 'font-medium'
-        } ${tone}`}
-      >
-        {label}
-      </span>
-    </>
   );
 }
 

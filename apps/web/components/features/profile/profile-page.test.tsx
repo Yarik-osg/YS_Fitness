@@ -26,6 +26,7 @@ const PROGRAM = {
   assignedAt: '2026-09-27T00:00:00.000Z',
   nextDayNumber: 1,
   programProgress: { completed: 9, expected: 16 },
+  dayLogCounts: [],
   days: [],
 } satisfies AssignedProgramResponse;
 
@@ -178,6 +179,10 @@ describe('Profile page', () => {
     expect(screen.getByRole('link', { name: 'Головна' })).toHaveAttribute(
       'href',
       '/dashboard',
+    );
+    expect(screen.getByRole('link', { name: 'Тренування' })).toHaveAttribute(
+      'href',
+      '/training',
     );
     expect(
       screen.queryByRole('button', { name: /оновити мої дані/i }),
