@@ -51,6 +51,40 @@ pnpm docker:reset
 
 PostgreSQL data persists in the named `postgres_data` volume. The Compose file is structured so Redis can be added under `services` when queues and caching are implemented.
 
+### Testing on mobile devices via ngrok
+
+Free ngrok usually gives one public URL. Point that tunnel at the web app only. Next rewrites `/api/v1/*` to Nest on `localhost:3001`, so the phone uses a single origin. Do not use `--pooling-enabled` to share one URL between ports 3000 and 3001.
+
+1. Start the stack (`pnpm dev`) so web is on 3000 and API is on 3001.
+2. Start one tunnel:
+
+```bash
+ngrok http 3000
+```
+
+3. Copy the `https://….ngrok-free.dev` (or `.ngrok-free.app`) URL with no trailing slash.
+
+`apps/api/.env`
+
+```bash
+WEB_ORIGINS=http://localhost:3000,https://<web-tunnel>.ngrok-free.dev
+COOKIE_SAME_SITE=lax
+```
+
+`apps/web/.env.local`
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=/api/v1
+```
+
+4. Restart both dev servers (web must restart so `NEXT_PUBLIC_*` is inlined). Open the tunnel URL on the phone, not `localhost` and not port 3001.
+
+When you are done, remove the ngrok origin from `WEB_ORIGINS`, set `NEXT_PUBLIC_API_BASE_URL` back to `http://localhost:3001/api/v1`, and restart again.
+
+`apps/web/next.config.js` allows the common ngrok host wildcards in `allowedDevOrigins` (dev only) and rewrites `/api/v1` to `API_PROXY_TARGET` (default `http://localhost:3001`). Same-origin rewrite keeps `COOKIE_SAME_SITE=lax`.
+
+If you ever use two different public hosts for web and API, set `COOKIE_SAME_SITE=none`. Then login/register/refresh return `csrfToken` in JSON; the page stores it as `ys_csrf` and sends `x-csrf-token`, because it cannot read the API cookie on the other host.
+
 ## Authentication endpoints
 
 - `POST /api/v1/auth/register`
@@ -64,7 +98,7 @@ PostgreSQL data persists in the named `postgres_data` volume. The Compose file i
 
 Passwords require at least eight characters and are hashed with Argon2. Access JWTs contain only `sub`, `sessionId`, `role`, `iat`, and `exp`. Refresh JWTs are rotated once, stored only as SHA-256 digests, and tracked as a token family. Reuse of a consumed token revokes the entire session.
 
-Browser requests use `clientType: "WEB"`. Refresh tokens are sent only in an HttpOnly cookie; fetch requests must use `credentials: "include"`. Cookie-authenticated refresh and logout requests enforce trusted origins. If `COOKIE_SAME_SITE=none`, the browser must copy the readable CSRF cookie value into the `x-csrf-token` header.
+Browser requests use `clientType: "WEB"`. Refresh tokens are sent only in an HttpOnly cookie; fetch requests must use `credentials: "include"`. Cookie-authenticated refresh and logout requests enforce trusted origins. When `COOKIE_SAME_SITE=none`, those responses also include `csrfToken`. The web app stores it and sends it back as `x-csrf-token`, because a page on another host cannot read the API cookie.
 
 Native requests use `clientType: "MOBILE"` and receive the refresh token in the response body for storage in Expo SecureStore. Requests with a browser `Origin`/`Referer` cannot select mobile body transport.
 

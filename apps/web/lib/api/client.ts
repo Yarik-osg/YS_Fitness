@@ -1,12 +1,15 @@
 import type { ApiError, AuthResponse } from '@repo/shared-types';
+import {
+  clearCsrfToken,
+  readCsrfToken,
+  writeCsrfToken,
+} from '@/lib/auth/csrf-token';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api/v1';
-const CSRF_COOKIE_NAME = `${
-  process.env.NEXT_PUBLIC_REFRESH_COOKIE_NAME ?? 'ys_refresh'
-}_csrf`;
+const AUTH_PATHS = new Set(['/auth/login', '/auth/register', '/auth/refresh']);
 
 export class ApiClientError extends Error {
   constructor(
@@ -28,13 +31,10 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 
 let refreshPromise: Promise<AuthResponse> | null = null;
 
-function readCookie(name: string) {
-  if (typeof document === 'undefined') return undefined;
-
-  return document.cookie
-    .split('; ')
-    .find((cookie) => cookie.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
+function rememberCsrfToken(path: string, body: unknown) {
+  if (!AUTH_PATHS.has(path) || !body || typeof body !== 'object') return;
+  const token = (body as { csrfToken?: unknown }).csrfToken;
+  if (typeof token === 'string' && token) writeCsrfToken(token);
 }
 
 async function parseError(response: Response): Promise<ApiClientError> {
@@ -59,14 +59,13 @@ async function performRequest<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { body, accessToken, skipRefresh, headers, ...requestInit } = options;
-  const csrfToken = readCookie(CSRF_COOKIE_NAME);
+  const csrfToken = readCsrfToken();
   const requestHeaders = new Headers(headers);
 
   if (body !== undefined)
     requestHeaders.set('content-type', 'application/json');
   if (accessToken) requestHeaders.set('authorization', `Bearer ${accessToken}`);
-  if (csrfToken)
-    requestHeaders.set('x-csrf-token', decodeURIComponent(csrfToken));
+  if (csrfToken) requestHeaders.set('x-csrf-token', csrfToken);
 
   let response: Response;
 
@@ -105,7 +104,9 @@ async function performRequest<T>(
   const text = await response.text();
   if (!text) return null as T;
 
-  return JSON.parse(text) as T;
+  const parsed = JSON.parse(text) as T;
+  rememberCsrfToken(path, parsed);
+  return parsed;
 }
 
 export function apiRequest<T>(path: string, options: RequestOptions = {}) {
@@ -133,6 +134,7 @@ export function refreshSession(): Promise<AuthResponse> {
       .catch((error: unknown) => {
         useAuthStore.getState().clearSession();
         clearSessionHint();
+        clearCsrfToken();
         throw error;
       })
       .finally(() => {

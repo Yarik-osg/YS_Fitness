@@ -20,6 +20,7 @@ import {
   resolvePostLoginPath,
   type OnboardingStatusUser,
 } from '@/lib/auth/routing';
+import { clearCsrfToken } from '@/lib/auth/csrf-token';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 
@@ -110,6 +111,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         if (!active) return;
         useAuthStore.getState().clearSession();
         clearSessionHint();
+        clearCsrfToken();
         if (!pathname.startsWith('/checkout')) {
           resetOnboardingDraft();
         }

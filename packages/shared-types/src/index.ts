@@ -31,6 +31,10 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: SafeUser;
   tokens: AuthTokens;
+  // Present only for browser sessions when COOKIE_SAME_SITE=none. The page
+  // stores this and sends it back as x-csrf-token; it cannot read the cookie
+  // the API set on a different host.
+  csrfToken?: string;
 }
 
 export interface UserProfileResponse {
