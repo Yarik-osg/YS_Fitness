@@ -201,6 +201,67 @@ describe('WorkoutsService.log', () => {
       response: { code: 'EXERCISE_NOT_ON_DAY' },
     });
   });
+
+  it('rejects an exercise logged under another order', async () => {
+    const { service, workouts } = createService({
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
+    });
+
+    await expect(
+      service.log(userId, {
+        ...input,
+        sets: [{ ...input.sets[0]!, order: 2 }],
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'EXERCISE_NOT_ON_DAY' },
+    });
+    expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a set number above the prescribed sets', async () => {
+    const { service, workouts } = createService({
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
+    });
+
+    await expect(
+      service.log(userId, {
+        ...input,
+        sets: [{ ...input.sets[0]!, setNumber: 4 }],
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'SET_NUMBER_OUT_OF_RANGE' },
+    });
+    expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects the same set logged twice', async () => {
+    const { service, workouts } = createService({
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
+    });
+
+    await expect(
+      service.log(userId, {
+        ...input,
+        sets: [input.sets[0]!, { ...input.sets[0]!, repsCompleted: 10 }],
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'DUPLICATE_SET' },
+    });
+    expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts fewer sets than prescribed', async () => {
+    const { service, workouts } = createService({
+      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
+    });
+
+    await service.log(userId, {
+      ...input,
+      sets: [input.sets[0]!, { ...input.sets[0]!, setNumber: 3 }],
+    });
+
+    expect(workouts.create).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('WorkoutsService.list', () => {

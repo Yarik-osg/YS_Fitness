@@ -220,6 +220,33 @@ describe('WorkoutSessionPage', () => {
     ).toHaveAttribute('href', '/dashboard');
   });
 
+  it('logs a bodyweight set entered as 0 kg as reps only', async () => {
+    const user = userEvent.setup();
+    renderSession();
+
+    await user.type(screen.getByLabelText('Вага 1'), '0');
+    await user.type(screen.getByLabelText('Повтори 1'), '10');
+    await user.type(screen.getByLabelText('Вага 2'), '0');
+    await user.type(screen.getByLabelText('Повтори 2'), '8');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(logWorkout).toHaveBeenCalledWith({
+      templateId,
+      dayNumber: 1,
+      sets: [
+        { exerciseId: rowId, order: 1, setNumber: 1, repsCompleted: 10 },
+        { exerciseId: rowId, order: 1, setNumber: 2, repsCompleted: 8 },
+        { exerciseId: pressId, order: 2, setNumber: 1, repsCompleted: 15 },
+      ],
+    });
+    expect(screen.getByText('×10 • ×8')).toBeInTheDocument();
+    expect(screen.queryByText(/0×/)).not.toBeInTheDocument();
+  });
+
   it('compares this session with the previous log for the same exercise', async () => {
     const user = userEvent.setup();
     const row = program.days[1]!.exercises[0]!.exercise;

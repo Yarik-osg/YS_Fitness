@@ -186,7 +186,7 @@ describe('ProgramsService', () => {
     });
   });
 
-  it('starts the rotation at day 1 when this template has no logs', async () => {
+  it('starts the rotation at day 1 when this assignment has no logs', async () => {
     const { prisma, service } = createService();
     prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
 
@@ -198,7 +198,11 @@ describe('ProgramsService', () => {
       dayLogCounts: [],
     });
     expect(prisma.workoutLog.findFirst).toHaveBeenCalledWith({
-      where: { userId, templateId: 'template-1' },
+      where: {
+        userId,
+        templateId: 'template-1',
+        completedAt: { gte: new Date('2026-09-27T00:00:00.000Z') },
+      },
       orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
       select: { dayNumber: true },
     });

@@ -253,6 +253,7 @@ export function AssignProgramCard({
   program: ReturnType<typeof useMyProgram>;
 }) {
   const t = useTranslations('dashboard');
+  const tCheckout = useTranslations('checkout');
   const assign = useAssignProgram();
   const [heldError, setHeldError] = useState<unknown>(null);
   if (program.status === 'success') {
@@ -288,7 +289,11 @@ export function AssignProgramCard({
                   ? t('workouts.assignError')
                   : t('workouts.prompt')}
         </p>
-        {unavailable || subscriptionRequired ? null : loadFailed ? (
+        {unavailable ? null : subscriptionRequired ? (
+          <Link href="/checkout" className={buttonVariants({ size: 'sm' })}>
+            {tCheckout('choosePlanCta')}
+          </Link>
+        ) : loadFailed ? (
           <Button
             size="sm"
             disabled={program.isFetching}

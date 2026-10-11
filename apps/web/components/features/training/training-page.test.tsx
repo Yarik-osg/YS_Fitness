@@ -245,4 +245,34 @@ describe('TrainingPage', () => {
       screen.getByRole('link', { name: 'Почати тренування →' }),
     ).toHaveAttribute('href', '/workout');
   });
+
+  it('links to checkout when the program needs a subscription', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/programs/me')) {
+          return json(
+            {
+              code: 'SUBSCRIPTION_REQUIRED',
+              message: 'An active subscription is required',
+            },
+            403,
+          );
+        }
+        return json({}, 404);
+      }),
+    );
+    signIn();
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Обрати план' }),
+    ).toHaveAttribute('href', '/checkout');
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Почати тренування →' }),
+    ).not.toBeInTheDocument();
+  });
 });

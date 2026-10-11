@@ -600,6 +600,40 @@ describe('Dashboard program', () => {
     ).toBeInTheDocument();
   });
 
+  it('links to checkout when the program needs a subscription', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/subscriptions/me')) {
+          return json({ subscription: null });
+        }
+        if (url.includes('/programs/me')) {
+          return json(
+            {
+              code: 'SUBSCRIPTION_REQUIRED',
+              message: 'An active subscription is required',
+            },
+            403,
+          );
+        }
+        return json({}, 404);
+      }),
+    );
+
+    renderDashboard();
+
+    expect(
+      await screen.findByRole('link', { name: 'Обрати план' }),
+    ).toHaveAttribute('href', '/checkout');
+    expect(
+      screen.queryByRole('button', { name: 'Призначити мою програму' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Спробувати ще раз' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows that no program exists for this track', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(

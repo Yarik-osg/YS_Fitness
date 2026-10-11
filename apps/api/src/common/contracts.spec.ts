@@ -2,6 +2,7 @@ import {
   checkoutSchema,
   grantSubscriptionSchema,
   isPlausibleDateOfBirth,
+  logWorkoutSchema,
   onboardingSchema,
   registerSchema,
 } from '@repo/validation';
@@ -261,5 +262,45 @@ describe('shared API contracts', () => {
         message: 'expiresAt must be in the future',
       }),
     ]);
+  });
+
+  describe('logWorkoutSchema set limits', () => {
+    const validSet = {
+      exerciseId: '44444444-4444-4444-8444-444444444444',
+      order: 1,
+      setNumber: 1,
+      repsCompleted: 12,
+      weightKg: 35.5,
+    };
+
+    function parseSet(overrides: Record<string, unknown>) {
+      return logWorkoutSchema.safeParse({
+        templateId: '11111111-1111-4111-8111-111111111111',
+        dayNumber: 1,
+        sets: [{ ...validSet, ...overrides }],
+      }).success;
+    }
+
+    it('accepts the boundary values', () => {
+      expect(parseSet({ setNumber: 1 })).toBe(true);
+      expect(parseSet({ repsCompleted: 1 })).toBe(true);
+      expect(parseSet({ repsCompleted: 999 })).toBe(true);
+      expect(parseSet({ weightKg: 0.01 })).toBe(true);
+      expect(parseSet({ weightKg: 999 })).toBe(true);
+      expect(parseSet({ weightKg: 35.55 })).toBe(true);
+      expect(parseSet({ weightKg: undefined })).toBe(true);
+    });
+
+    it('rejects values outside the limits', () => {
+      expect(parseSet({ setNumber: 0 })).toBe(false);
+      expect(parseSet({ setNumber: 1.5 })).toBe(false);
+      expect(parseSet({ repsCompleted: 0 })).toBe(false);
+      expect(parseSet({ repsCompleted: 1000 })).toBe(false);
+      expect(parseSet({ repsCompleted: 10.5 })).toBe(false);
+      expect(parseSet({ weightKg: 0 })).toBe(false);
+      expect(parseSet({ weightKg: -5 })).toBe(false);
+      expect(parseSet({ weightKg: 999.01 })).toBe(false);
+      expect(parseSet({ weightKg: 35.555 })).toBe(false);
+    });
   });
 });
