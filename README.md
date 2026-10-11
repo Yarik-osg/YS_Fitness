@@ -114,7 +114,7 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 ## Workouts
 
-- `POST /api/v1/workouts/log` — JWT + active subscription; saves the sets just performed for one program day. Each set must match an exercise and order on that day, use a set number within the prescribed sets, and appear once. Unfilled sets may be left out
+- `POST /api/v1/workouts/log` — JWT + active subscription; saves the sets just performed for one program day. Each set must match an exercise and order on that day, use a set number within the prescribed sets, and appear once (also enforced by a unique index on log, order, and set number). Reps are 1–999; weight is optional, above 0 and at most 999 kg with two decimals. Unfilled sets may be left out
 - `GET /api/v1/workouts/logs` — JWT; paginated history, newest first, used for the previous-session comparison
 
 The next program day rotates forward from the latest log for the assigned template since `assignedAt` and wraps after `frequencyPerWeek`, so a reassignment starts again at day 1. `programProgress.completed` counts logs for that template since `assignedAt`; `expected` is `frequencyPerWeek × 8`. `dayLogCounts` is that same window split by day. `/training` lists every assigned day with that count. Day cards start collapsed except the next day, and only that day starts a session at `/workout`. The dashboard training card links to `/training`. The hero start button still opens `/workout` for the next day. After a save, the completion screen shows each submitted exercise with this session's sets and, when a prior log matches the same template, day, and exercise, the previous session's sets. There is no duration. A calendar view is still deferred.

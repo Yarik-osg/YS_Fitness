@@ -345,6 +345,6 @@ model WorkoutLogSet {
   workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
   exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
 
-  @@index([workoutLogId])
+  @@unique([workoutLogId, order, setNumber])
   @@map("workout_log_sets")
 }

@@ -329,7 +329,14 @@ const workoutLogSetSchema = z.object({
   order: z.number().int().positive(),
   setNumber: z.number().int().positive(),
   repsCompleted: z.number().int().positive().max(999),
-  weightKg: z.number().positive().max(999).optional(),
+  weightKg: z
+    .number()
+    .positive()
+    .max(999)
+    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, {
+      message: 'weightKg allows at most two decimal places',
+    })
+    .optional(),
 });
 
 export const logWorkoutSchema = z
