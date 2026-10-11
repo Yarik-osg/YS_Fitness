@@ -264,6 +264,8 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
   const locale = useLocale();
   const t = useTranslations('training.calendar');
   const sets = useTranslations('workouts.completion');
+  const program = useTranslations('training');
+  const [expanded, setExpanded] = useState(false);
   const time = new Intl.DateTimeFormat(locale, {
     hour: '2-digit',
     minute: '2-digit',
@@ -281,38 +283,60 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
     else exercises.push({ key, name: set.exercise.name, sets: [set] });
   }
 
+  const panelId = `calendar-log-${log.id}`;
+
   return (
-    <div className="border-t border-white/5 px-4 py-3">
-      <p className="mb-2 font-label text-[8px] font-bold tracking-[0.14em] text-[#35f5e8] uppercase">
-        {t('workout', {
-          number: String(log.dayNumber).padStart(2, '0'),
-          time,
-        })}
-      </p>
-      <ul className="space-y-1.5">
-        {exercises.map((exercise) => (
-          <li
-            key={exercise.key}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <span className="min-w-0 text-xs font-medium text-white/70">
-              {exercise.name}
-            </span>
-            <span className="shrink-0 text-[11px] font-semibold text-white/40">
-              {exercise.sets
-                .map((set) =>
-                  set.weightKg == null
-                    ? sets('repsSummary', { reps: String(set.repsCompleted) })
-                    : sets('setSummary', {
-                        weight: String(set.weightKg),
-                        reps: String(set.repsCompleted),
-                      }),
-                )
-                .join(' • ')}
-            </span>
-          </li>
-        ))}
-      </ul>
+    <div className="border-t border-white/5">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        onClick={() => setExpanded((open) => !open)}
+      >
+        <span className="font-label text-[8px] font-bold tracking-[0.14em] text-[#35f5e8] uppercase">
+          {t('workout', {
+            number: String(log.dayNumber).padStart(2, '0'),
+            time,
+          })}
+        </span>
+        <span className="text-right">
+          <span className="block font-heading text-[18px] leading-none text-[#c8ff2e]">
+            {exercises.length}
+          </span>
+          <span className="mt-1 block font-label text-[7px] font-semibold tracking-[0.1em] text-white/25 uppercase">
+            {program('exercises')}
+          </span>
+        </span>
+      </button>
+      {expanded ? (
+        <ul id={panelId} className="space-y-1.5 px-4 pb-3">
+          {exercises.map((exercise) => (
+            <li
+              key={exercise.key}
+              className="flex items-baseline justify-between gap-3"
+            >
+              <span className="min-w-0 text-xs font-medium text-white/70">
+                {exercise.name}
+              </span>
+              <span className="shrink-0 text-[11px] font-semibold text-white/40">
+                {exercise.sets
+                  .map((set) =>
+                    set.weightKg == null
+                      ? sets('repsSummary', {
+                          reps: String(set.repsCompleted),
+                        })
+                      : sets('setSummary', {
+                          weight: String(set.weightKg),
+                          reps: String(set.repsCompleted),
+                        }),
+                  )
+                  .join(' • ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

@@ -208,13 +208,42 @@ describe('TrainingCalendar', () => {
     );
 
     expect(screen.getByText('середа, 7 жовтня')).toBeInTheDocument();
-    expect(screen.getByText('Тренування 01 · 14:05')).toBeInTheDocument();
-    expect(screen.getByText('Тренування 02 · 19:30')).toBeInTheDocument();
+    // Like the program day cards, logged workouts start collapsed and show
+    // only the title, the time, and how many exercises were done.
+    const first = screen.getByRole('button', { name: /Тренування 01 · 14:05/ });
+    const second = screen.getByRole('button', {
+      name: /Тренування 02 · 19:30/,
+    });
+    expect(first).toHaveAttribute('aria-expanded', 'false');
+    expect(second).toHaveAttribute('aria-expanded', 'false');
+    expect(first).toHaveTextContent('2');
+    expect(first).toHaveTextContent('вправ');
+    expect(second).toHaveTextContent('1');
+    expect(screen.queryByText('35×12 • ×10')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Тяга вертикального блоку'),
+    ).not.toBeInTheDocument();
+
+    await user.click(first);
+
+    expect(first).toHaveAttribute('aria-expanded', 'true');
+    expect(second).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('35×12 • ×10')).toBeInTheDocument();
     expect(screen.getByText('×15')).toBeInTheDocument();
+    expect(screen.getByText('Тяга вертикального блоку')).toBeInTheDocument();
+    expect(screen.getByText('Скручування')).toBeInTheDocument();
+    expect(screen.queryByText('40×8')).not.toBeInTheDocument();
+
+    await user.click(second);
+
     expect(screen.getByText('40×8')).toBeInTheDocument();
     expect(screen.getAllByText('Тяга вертикального блоку')).toHaveLength(2);
-    expect(screen.getByText('Скручування')).toBeInTheDocument();
+
+    await user.click(first);
+
+    expect(first).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('35×12 • ×10')).not.toBeInTheDocument();
+    expect(screen.getByText('40×8')).toBeInTheDocument();
     expect(
       screen.queryByText('У цей день тренувань не було.'),
     ).not.toBeInTheDocument();
@@ -274,7 +303,9 @@ describe('TrainingCalendar', () => {
       screen.getByRole('button', { name: '30 вересня, 1 тренування' }),
     );
     expect(screen.getByText('середа, 30 вересня')).toBeInTheDocument();
-    expect(screen.getByText('Тренування 01 · 09:00')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /Тренування 01 · 09:00/ }),
+    );
     expect(screen.getByText('×20')).toBeInTheDocument();
   });
 
@@ -309,7 +340,9 @@ describe('TrainingCalendar', () => {
     await user.click(
       screen.getByRole('button', { name: '15 вересня, 1 тренування' }),
     );
-    expect(screen.getByText('Тренування 02 · 18:00')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /Тренування 02 · 18:00/ }),
+    );
     expect(screen.getByText('30×11')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Наступний місяць' }));
