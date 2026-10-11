@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import type { AuthResponse, SafeUser } from '@repo/shared-types';
 import type { LoginInput, RegisterInput } from '@repo/validation';
 import { AppConfigService } from '../config/app-config.service.js';
+import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 interface RefreshTokenPayload {
@@ -56,6 +57,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     config: AppConfigService,
+    private readonly mail: MailService,
   ) {
     this.accessSecret = config.getOrThrow('JWT_ACCESS_SECRET');
     this.refreshSecret = config.getOrThrow('JWT_REFRESH_SECRET');
@@ -89,6 +91,9 @@ export class AuthService {
         },
         include: { profile: true },
       });
+
+      // Fire and forget: sendWelcome never rejects and must not delay sign-up.
+      void this.mail.sendWelcome(user.email, input.locale);
 
       return this.createSessionResponse(user, {
         ...this.requestMetadata(request),
