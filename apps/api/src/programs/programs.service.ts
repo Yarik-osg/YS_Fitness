@@ -192,7 +192,7 @@ export class ProgramsService {
     // Read logs here so program lookup does not depend on WorkoutsService.
     const [latest, groups] = await Promise.all([
       this.prisma.workoutLog.findFirst({
-        where: { userId, templateId: program.templateId },
+        where: loggedSinceAssignment,
         orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
         select: { dayNumber: true },
       }),

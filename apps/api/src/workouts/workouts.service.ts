@@ -51,12 +51,33 @@ export class WorkoutsService {
       });
     }
 
-    const exerciseIds = new Set(day.exercises.map((row) => row.exercise.id));
-    if (input.sets.some((set) => !exerciseIds.has(set.exerciseId))) {
-      throw new BadRequestException({
-        code: 'EXERCISE_NOT_ON_DAY',
-        message: 'A logged exercise is not on this program day',
-      });
+    const prescribedSets = new Map(
+      day.exercises.map((row) => [`${row.exercise.id}:${row.order}`, row.sets]),
+    );
+    const seenSets = new Set<string>();
+    for (const set of input.sets) {
+      const row = `${set.exerciseId}:${set.order}`;
+      const sets = prescribedSets.get(row);
+      if (sets === undefined) {
+        throw new BadRequestException({
+          code: 'EXERCISE_NOT_ON_DAY',
+          message: 'A logged exercise is not on this program day',
+        });
+      }
+      if (set.setNumber > sets) {
+        throw new BadRequestException({
+          code: 'SET_NUMBER_OUT_OF_RANGE',
+          message: 'A logged set number exceeds the prescribed sets',
+        });
+      }
+      const key = `${row}:${set.setNumber}`;
+      if (seenSets.has(key)) {
+        throw new BadRequestException({
+          code: 'DUPLICATE_SET',
+          message: 'A set was logged more than once',
+        });
+      }
+      seenSets.add(key);
     }
 
     const created = await this.workouts.transaction((transaction) =>
