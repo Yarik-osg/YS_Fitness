@@ -11,6 +11,7 @@ export const registerSchema = z.object({
   password: z.string().min(8).max(128),
   clientType: clientTypeSchema.default('WEB'),
   deviceName: z.string().trim().min(1).max(100).optional(),
+  locale: z.enum(['uk', 'en']).optional(),
 });
 
 export const loginSchema = registerSchema.pick({

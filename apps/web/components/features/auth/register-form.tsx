@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { AuthShell } from '@/components/auth/auth-shell';
@@ -24,6 +24,7 @@ export function RegisterForm() {
   const router = useRouter();
   const registerMutation = useRegister();
   const t = useTranslations('auth');
+  const locale = useLocale();
   const schema = useMemo(
     () => createRegisterFormSchema(t('validation.passwordMismatch')),
     [t],
@@ -42,6 +43,7 @@ export function RegisterForm() {
       const result = await registerMutation.mutateAsync({
         email: input.email,
         password: input.password,
+        locale: locale === 'en' ? 'en' : 'uk',
       });
       router.replace(result.destination);
     } catch {

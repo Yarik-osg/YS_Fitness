@@ -49,6 +49,8 @@ pnpm docker:down
 pnpm docker:reset
 ```
 
+`pnpm docker:up` also starts Mailpit, a local mail catcher. Read the emails the API sends at `http://localhost:8025`; nothing leaves your machine.
+
 PostgreSQL data persists in the named `postgres_data` volume. The Compose file is structured so Redis can be added under `services` when queues and caching are implemented.
 
 ### Testing on mobile devices via ngrok
@@ -85,9 +87,15 @@ When you are done, remove the ngrok origin from `WEB_ORIGINS`, set `NEXT_PUBLIC_
 
 If you ever use two different public hosts for web and API, set `COOKIE_SAME_SITE=none`. Then login/register/refresh return `csrfToken` in JSON; the page stores it as `ys_csrf` and sends `x-csrf-token`, because it cannot read the API cookie on the other host.
 
+## Welcome email
+
+A successful registration sends one plain-text "account created" email with a link to the login page. It is a notice only: there is no code or link to confirm, and the account works immediately. The email is sent after the account exists and never blocks or fails registration; a delivery error is only logged. Copy lives in `apps/api/src/mail/welcome-email.ts` (uk and en).
+
+Sending uses Nodemailer over SMTP. Set `SMTP_HOST`, `SMTP_PORT`, and, for a real provider, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_SECURE` in `apps/api/.env`, plus `MAIL_FROM`. Leave `SMTP_HOST` empty to disable email. Links use `APP_URL`, or the first `WEB_ORIGINS` entry when it is unset. Use `127.0.0.1` rather than `localhost` for local Mailpit: `localhost` tries IPv6 first and the Docker port mapping can stall for several seconds.
+
 ## Authentication endpoints
 
-- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/register` — optional `locale` (`uk` or `en`, default `uk`) picks the language of the welcome email
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
@@ -158,7 +166,7 @@ Use `feature/`, `fix/`, `chore/`, `docs/`, or `refactor/` prefixes followed by k
 
 ## Intentional deferrals
 
-- Email verification
+- Email verification (the welcome email is a notice only; the address is not confirmed)
 - OAuth and two-factor authentication
 - Relational health-restriction records (currently validated JSON tags)
 - Goal-history tracking (the profile stores the current goal)
