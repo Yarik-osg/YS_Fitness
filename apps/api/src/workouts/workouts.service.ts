@@ -5,10 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  WorkoutCalendarResponse,
   WorkoutLogListResponse,
   WorkoutLogResponse,
 } from '@repo/shared-types';
-import type { ListWorkoutLogsQuery, LogWorkoutInput } from '@repo/validation';
+import type {
+  ListWorkoutLogsQuery,
+  LogWorkoutInput,
+  WorkoutCalendarQuery,
+} from '@repo/validation';
 import { ProgramsService } from '../programs/programs.service.js';
 import { weightRecommendation } from './weight-recommendation.js';
 import {
@@ -95,6 +100,18 @@ export class WorkoutsService {
       this.workouts.count(userId),
     ]);
     return { logs: logs.map(toWorkoutLog), total };
+  }
+
+  async calendar(
+    userId: string,
+    query: WorkoutCalendarQuery,
+  ): Promise<WorkoutCalendarResponse> {
+    const logs = await this.workouts.listBetween(
+      userId,
+      new Date(query.from),
+      new Date(query.to),
+    );
+    return { logs: logs.map(toWorkoutLog) };
   }
 }
 

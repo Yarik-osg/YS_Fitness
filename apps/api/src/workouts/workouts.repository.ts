@@ -61,6 +61,19 @@ export class WorkoutsRepository {
     });
   }
 
+  /** Logs completed in [from, to), oldest first. */
+  listBetween(
+    userId: string,
+    from: Date,
+    to: Date,
+  ): Promise<WorkoutLogRecord[]> {
+    return this.prisma.workoutLog.findMany({
+      where: { userId, completedAt: { gte: from, lt: to } },
+      orderBy: [{ completedAt: 'asc' }, { id: 'asc' }],
+      ...logWithSets,
+    });
+  }
+
   count(userId: string): Promise<number> {
     return this.prisma.workoutLog.count({ where: { userId } });
   }

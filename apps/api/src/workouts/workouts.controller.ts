@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type {
+  WorkoutCalendarResponse,
   WorkoutLogListResponse,
   WorkoutLogResponse,
 } from '@repo/shared-types';
@@ -18,6 +19,7 @@ import type { AuthenticatedUser } from '../common/authenticated-user.js';
 import { SubscriptionGuard } from '../subscriptions/subscription.guard.js';
 import { ListWorkoutLogsQueryDto } from './dto/list-workout-logs-query.dto.js';
 import { LogWorkoutDto } from './dto/log-workout.dto.js';
+import { WorkoutCalendarQueryDto } from './dto/workout-calendar-query.dto.js';
 import { WorkoutsService } from './workouts.service.js';
 
 @Controller('workouts')
@@ -41,5 +43,13 @@ export class WorkoutsController {
     @Query() query: ListWorkoutLogsQueryDto,
   ): Promise<WorkoutLogListResponse> {
     return this.workouts.list(user.sub, query);
+  }
+
+  @Get('calendar')
+  calendar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: WorkoutCalendarQueryDto,
+  ): Promise<WorkoutCalendarResponse> {
+    return this.workouts.calendar(user.sub, query);
   }
 }
