@@ -91,13 +91,14 @@ export class AuthController {
     clientType: 'WEB' | 'MOBILE',
     response: Response,
   ): AuthResponse {
-    if (clientType === 'WEB' && result.refreshToken) {
-      this.csrf.setBrowserCookies(
-        response,
-        result.refreshToken,
-        result.refreshMaxAgeMs,
-      );
-    }
+    const csrfToken =
+      clientType === 'WEB' && result.refreshToken
+        ? this.csrf.setBrowserCookies(
+            response,
+            result.refreshToken,
+            result.refreshMaxAgeMs,
+          )
+        : undefined;
 
     return {
       user: result.user,
@@ -107,6 +108,7 @@ export class AuthController {
           ? { refreshToken: result.refreshToken }
           : {}),
       },
+      ...(csrfToken ? { csrfToken } : {}),
     };
   }
 

@@ -131,6 +131,7 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
 
     expect(refreshCookie).toBeDefined();
     expect(csrfToken).toBeDefined();
+    expect(registration.body.csrfToken).toBe(csrfToken);
     expect(registration.body.tokens.refreshToken).toBeUndefined();
 
     await request(app.getHttpServer())
@@ -232,6 +233,7 @@ describeWithDatabase('auth and onboarding (e2e)', () => {
       const cookies = browserCookies(login);
       expect(cookies.refresh).toBeDefined();
       expect(cookies.csrf).toBeDefined();
+      expect(login.body.csrfToken).toBe(cookies.csrfToken);
       return cookies as { refresh: string; csrf: string; csrfToken: string };
     }
 

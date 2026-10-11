@@ -15,6 +15,7 @@ import * as authApi from '@/lib/api/auth';
 import { ApiClientError } from '@/lib/api/client';
 import { getMe, saveOnboarding } from '@/lib/api/users';
 import { getPostAuthPath, getPostRegisterPath } from '@/lib/auth/routing';
+import { clearCsrfToken } from '@/lib/auth/csrf-token';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
 import { persistProgramTrack } from '@/lib/subscriptions/selected-plan';
@@ -137,6 +138,7 @@ export function useLogout() {
     onSettled: () => {
       useAuthStore.getState().clearSession();
       clearSessionHint();
+      clearCsrfToken();
       resetOnboardingDraft();
       queryClient.clear();
     },

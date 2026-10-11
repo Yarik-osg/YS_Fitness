@@ -71,19 +71,21 @@ export class CsrfService {
     response: Response,
     refreshToken: string,
     maxAgeMs: number,
-  ): void {
+  ): string | undefined {
     response.cookie(this.refreshCookieName, refreshToken, {
       ...this.baseCookieOptions(maxAgeMs),
       httpOnly: true,
     });
 
-    if (this.sameSite === 'none') {
-      response.cookie(
-        this.csrfCookieName,
-        this.createSignedToken(),
-        this.baseCookieOptions(maxAgeMs),
-      );
-    }
+    if (this.sameSite !== 'none') return undefined;
+
+    const csrfToken = this.createSignedToken();
+    response.cookie(
+      this.csrfCookieName,
+      csrfToken,
+      this.baseCookieOptions(maxAgeMs),
+    );
+    return csrfToken;
   }
 
   clearBrowserCookies(response: Response): void {
