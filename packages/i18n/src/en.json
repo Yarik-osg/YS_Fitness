@@ -698,6 +698,8 @@
     "missingPlan": "Plans are unavailable right now. Try again from the home page.",
     "choosePlanCta": "Choose a plan",
     "error": "We could not confirm the subscription. Try again.",
+    "continuePayment": "Continue payment →",
+    "continuePaymentBody": "Payment is not confirmed yet. Continue to finish access.",
     "retry": "Try again"
   }
 }

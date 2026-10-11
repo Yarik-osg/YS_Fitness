@@ -284,6 +284,12 @@ export const checkoutSchema = z.object({
   planId: z.string().uuid(),
 });
 
+export const mockPaymentWebhookSchema = z.object({
+  providerReference: z.string().trim().min(1).max(255),
+  expiresAt: z.coerce.number().int().positive(),
+  signature: z.string().trim().min(1).max(255),
+});
+
 export const profileUpdateSchema = z
   .object({
     heightCm: z
@@ -325,5 +331,6 @@ export const grantSubscriptionSchema = z.object({
 });
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type MockPaymentWebhookInput = z.infer<typeof mockPaymentWebhookSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;

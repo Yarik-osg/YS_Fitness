@@ -129,10 +129,40 @@ export class SubscriptionsRepository {
         currentPeriodEnd: input.currentPeriodEnd,
         pendingPlanId:
           input.pendingPlanId === undefined ? undefined : input.pendingPlanId,
+        checkoutUrl: input.pendingPlanId === null ? null : undefined,
         ...(input.providerReference
           ? { providerReference: input.providerReference }
           : {}),
       },
+      ...subscriptionWithPlan,
+    });
+  }
+
+  async claimPendingRenewal(
+    input: {
+      id: string;
+      planId: string;
+      pendingPlanId: string;
+      currentPeriodEnd: Date;
+    },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan | null> {
+    const { count } = await client.subscription.updateMany({
+      where: {
+        id: input.id,
+        status: SubscriptionStatus.ACTIVE,
+        pendingPlanId: input.pendingPlanId,
+      },
+      data: {
+        planId: input.planId,
+        currentPeriodEnd: input.currentPeriodEnd,
+        pendingPlanId: null,
+        checkoutUrl: null,
+      },
+    });
+    if (count === 0) return null;
+    return client.subscription.findUniqueOrThrow({
+      where: { id: input.id },
       ...subscriptionWithPlan,
     });
   }
@@ -154,6 +184,46 @@ export class SubscriptionsRepository {
     if (count === 0) return null;
     return client.subscription.findUniqueOrThrow({
       where: { id: input.id },
+      ...subscriptionWithPlan,
+    });
+  }
+
+  async attachCheckoutProvider(
+    input: {
+      id: string;
+      pendingPlanId: string;
+      providerReference: string;
+      checkoutUrl: string | null;
+    },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan | null> {
+    const { count } = await client.subscription.updateMany({
+      where: {
+        id: input.id,
+        pendingPlanId: input.pendingPlanId,
+        status: {
+          in: [SubscriptionStatus.PENDING, SubscriptionStatus.ACTIVE],
+        },
+      },
+      data: {
+        providerReference: input.providerReference,
+        checkoutUrl: input.checkoutUrl,
+      },
+    });
+    if (count === 0) return null;
+    return client.subscription.findUniqueOrThrow({
+      where: { id: input.id },
+      ...subscriptionWithPlan,
+    });
+  }
+
+  setCheckoutUrl(
+    input: { id: string; checkoutUrl: string },
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan> {
+    return client.subscription.update({
+      where: { id: input.id },
+      data: { checkoutUrl: input.checkoutUrl },
       ...subscriptionWithPlan,
     });
   }
@@ -185,6 +255,7 @@ export class SubscriptionsRepository {
         providerReference: input.providerReference,
         currentPeriodEnd: input.currentPeriodEnd,
         pendingPlanId: null,
+        checkoutUrl: null,
         ...(input.planId ? { planId: input.planId } : {}),
       },
       ...subscriptionWithPlan,
@@ -193,6 +264,16 @@ export class SubscriptionsRepository {
 
   findPlanById(id: string, client: Client = this.prisma): Promise<Plan | null> {
     return client.plan.findUnique({ where: { id } });
+  }
+
+  findByProviderReference(
+    providerReference: string,
+    client: Client = this.prisma,
+  ): Promise<SubscriptionWithPlan | null> {
+    return client.subscription.findFirst({
+      where: { providerReference },
+      ...subscriptionWithPlan,
+    });
   }
 
   findUserId(
