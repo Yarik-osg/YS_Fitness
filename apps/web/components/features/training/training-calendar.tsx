@@ -16,14 +16,26 @@ import {
   weekDays,
 } from '@/lib/calendar';
 import { useWorkoutCalendar } from '@/lib/hooks/use-workouts';
+import { isRecommendedDay } from '@/lib/training-schedule';
 
 const LIME = 'bg-[#c8ff2e]';
 
-export function TrainingCalendar() {
+export function TrainingCalendar({
+  frequencyPerWeek,
+  assignedAt,
+}: {
+  /** With `assignedAt`, marks the recommended training weekdays. */
+  frequencyPerWeek?: number;
+  assignedAt?: string;
+} = {}) {
   const locale = useLocale();
   const t = useTranslations('training.calendar');
   const today = new Date();
   const todayKey = localDateKey(today);
+  const schedule =
+    frequencyPerWeek != null && assignedAt != null
+      ? { frequencyPerWeek, assignedAt }
+      : undefined;
   const [monthOpen, setMonthOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(() => startOfDay(new Date()));
@@ -71,8 +83,15 @@ export function TrainingCalendar() {
 
   function cellLabel(date: Date) {
     const count = logsByDay.get(localDateKey(date))?.length ?? 0;
-    return `${dayFormat.format(date)}, ${t('workoutCount', { count })}`;
+    const label = `${dayFormat.format(date)}, ${t('workoutCount', { count })}`;
+    return isRecommendedDay(date, schedule)
+      ? `${label}, ${t('recommended')}`
+      : label;
   }
+
+  const selectedRecommended = isRecommendedDay(selected, schedule);
+  const selectedInFuture =
+    startOfDay(selected).getTime() > startOfDay(today).getTime();
 
   return (
     <section aria-label={t('title')}>
@@ -143,6 +162,7 @@ export function TrainingCalendar() {
                   isToday={key === todayKey}
                   isSelected={key === localDateKey(selected)}
                   hasWorkout={(logsByDay.get(key)?.length ?? 0) > 0}
+                  isRecommended={isRecommendedDay(day, schedule)}
                   dimmed={!isSameMonth(day, viewMonth)}
                   onSelect={() => setSelected(day)}
                 >
@@ -165,6 +185,7 @@ export function TrainingCalendar() {
                 isToday={key === todayKey}
                 isSelected={key === localDateKey(selected)}
                 hasWorkout={(logsByDay.get(key)?.length ?? 0) > 0}
+                isRecommended={isRecommendedDay(day, schedule)}
                 onSelect={() => setSelected(day)}
               >
                 <span className="font-label text-[7px] font-semibold tracking-[0.08em] uppercase">
@@ -181,13 +202,20 @@ export function TrainingCalendar() {
         aria-busy={activeQuery.isPending}
         className="mt-3 border-[1.5px] border-white/[0.07] bg-white/[0.015]"
       >
-        <p className="px-4 py-3 font-heading text-sm tracking-[0.04em] text-white/70 uppercase">
-          {new Intl.DateTimeFormat(locale, {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          }).format(selected)}
-        </p>
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <p className="font-heading text-sm tracking-[0.04em] text-white/70 uppercase">
+            {new Intl.DateTimeFormat(locale, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            }).format(selected)}
+          </p>
+          {selectedRecommended ? (
+            <span className="shrink-0 font-label text-[7px] font-semibold tracking-[0.16em] text-[#35f5e8] uppercase">
+              {t('recommended')}
+            </span>
+          ) : null}
+        </div>
         {activeQuery.isError ? (
           <div className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-3">
             <p className="text-xs text-white/50">{t('loadError')}</p>
@@ -202,7 +230,7 @@ export function TrainingCalendar() {
           </div>
         ) : selectedLogs.length > 0 ? (
           selectedLogs.map((log) => <LoggedWorkout key={log.id} log={log} />)
-        ) : activeQuery.isPending ? null : (
+        ) : activeQuery.isPending || selectedInFuture ? null : (
           <p className="border-t border-white/5 px-4 py-3 text-xs text-white/40">
             {t('empty')}
           </p>
@@ -217,6 +245,7 @@ function DayButton({
   isToday,
   isSelected,
   hasWorkout,
+  isRecommended,
   dimmed = false,
   onSelect,
   children,
@@ -225,6 +254,7 @@ function DayButton({
   isToday: boolean;
   isSelected: boolean;
   hasWorkout: boolean;
+  isRecommended: boolean;
   dimmed?: boolean;
   onSelect: () => void;
   children: React.ReactNode;
@@ -233,12 +263,16 @@ function DayButton({
     ? 'text-[#c8ff2e]'
     : dimmed
       ? 'text-white/20'
-      : 'text-white/45';
+      : isRecommended
+        ? 'text-white/75'
+        : 'text-white/45';
   const frame = isSelected
     ? 'border-[rgba(200,255,46,0.6)] bg-[rgba(200,255,46,0.08)]'
     : isToday
       ? 'border-[rgba(200,255,46,0.3)] bg-[rgba(200,255,46,0.04)]'
-      : 'border-white/[0.06] bg-white/[0.02]';
+      : isRecommended
+        ? 'border-[rgba(53,245,232,0.28)] bg-[rgba(53,245,232,0.03)]'
+        : 'border-white/[0.06] bg-white/[0.02]';
 
   return (
     <button
@@ -253,7 +287,13 @@ function DayButton({
       <span
         aria-hidden="true"
         className={`size-1.5 rounded-full ${
-          hasWorkout ? LIME : dimmed ? 'bg-white/[0.04]' : 'bg-white/[0.08]'
+          hasWorkout
+            ? LIME
+            : isRecommended
+              ? 'border border-[#35f5e8]/70'
+              : dimmed
+                ? 'bg-white/[0.04]'
+                : 'bg-white/[0.08]'
         }`}
       />
     </button>

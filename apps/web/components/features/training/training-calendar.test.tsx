@@ -7,6 +7,7 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
 import { I18nTestProvider } from '@/test/i18n';
@@ -137,15 +138,20 @@ function stubCalendarApi(options: { failFirst?: boolean } = {}) {
   return requests;
 }
 
-function renderCalendar(locale: 'uk' | 'en' = 'uk') {
+function renderCalendar(
+  locale: 'uk' | 'en' = 'uk',
+  props: ComponentProps<typeof TrainingCalendar> = {},
+) {
   return render(
     <Providers>
       <I18nTestProvider locale={locale}>
-        <TrainingCalendar />
+        <TrainingCalendar {...props} />
       </I18nTestProvider>
     </Providers>,
   );
 }
+
+const LONG_AGO = new Date(2026, 0, 1, 9).toISOString();
 
 function local(year: number, month: number, day: number) {
   return new Date(year, month, day).toISOString();
@@ -435,6 +441,177 @@ describe('TrainingCalendar', () => {
     );
     expect(
       await grid.findByRole('button', { name: 'September 30, 1 workout' }),
+    ).toBeInTheDocument();
+  });
+
+  it('marks the recommended training days of a three-day program', async () => {
+    const user = userEvent.setup();
+    stubCalendarApi();
+    renderCalendar('uk', { frequencyPerWeek: 3, assignedAt: LONG_AGO });
+
+    // Mon 5, Wed 7 and Fri 9 October, whether or not they were trained.
+    const recommended = await screen.findAllByRole('button', {
+      name: /Рекомендований день/,
+    });
+    expect(recommended).toHaveLength(3);
+    expect(
+      screen.getByRole('button', {
+        name: '5 жовтня, без тренувань, Рекомендований день',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', {
+        name: '7 жовтня, 2 тренування, Рекомендований день',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: '9 жовтня, без тренувань, Рекомендований день',
+      }),
+    ).toBeInTheDocument();
+    for (const name of [
+      '6 жовтня, без тренувань',
+      '8 жовтня, без тренувань',
+      '10 жовтня, без тренувань',
+      '11 жовтня, без тренувань',
+    ]) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+
+    // The selected day says so too, next to the date.
+    expect(screen.queryByText('Рекомендований день')).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', {
+        name: '9 жовтня, без тренувань, Рекомендований день',
+      }),
+    );
+    expect(screen.getByText('пʼятниця, 9 жовтня')).toBeInTheDocument();
+    expect(screen.getByText('Рекомендований день')).toBeInTheDocument();
+    // It is already past and nothing was logged, so the usual line applies.
+    expect(
+      screen.getByText('У цей день тренувань не було.'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: '8 жовтня, без тренувань' }),
+    );
+    expect(screen.queryByText('Рекомендований день')).not.toBeInTheDocument();
+  });
+
+  it('recommends Tuesday and Thursday for two days and four weekdays for four', async () => {
+    const user = userEvent.setup();
+    stubCalendarApi();
+    const two = renderCalendar('uk', {
+      frequencyPerWeek: 2,
+      assignedAt: LONG_AGO,
+    });
+    expect(
+      await screen.findAllByRole('button', { name: /Рекомендований день/ }),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: /^6 жовтня, .*Рекомендований день/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^8 жовтня, .*Рекомендований день/ }),
+    ).toBeInTheDocument();
+    two.unmount();
+
+    renderCalendar('uk', { frequencyPerWeek: 4, assignedAt: LONG_AGO });
+    expect(
+      await screen.findAllByRole('button', { name: /Рекомендований день/ }),
+    ).toHaveLength(4);
+    for (const day of [5, 6, 8, 9]) {
+      expect(
+        screen.getByRole('button', {
+          name: new RegExp(`^${day} жовтня, .*Рекомендований день`),
+        }),
+      ).toBeInTheDocument();
+    }
+
+    // The month grid carries the same weekday pattern: Mon, Tue, Thu, Fri of
+    // the five weeks from 28 September to 1 November.
+    await user.click(screen.getByRole('button', { name: 'Показати місяць' }));
+    expect(
+      await screen.findAllByRole('button', { name: /Рекомендований день/ }),
+    ).toHaveLength(20);
+  });
+
+  it('does not recommend days before the program was assigned', async () => {
+    stubCalendarApi();
+    // Assigned on Wednesday 7 October, late in the evening.
+    renderCalendar('uk', {
+      frequencyPerWeek: 3,
+      assignedAt: new Date(2026, 9, 7, 23, 30).toISOString(),
+    });
+
+    const recommended = await screen.findAllByRole('button', {
+      name: /Рекомендований день/,
+    });
+    expect(recommended).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: /^7 жовтня, .*Рекомендований день/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '5 жовтня, без тренувань' }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not say a coming day had no workouts', async () => {
+    const user = userEvent.setup();
+    // Wednesday 7 October, so Thursday and Friday are still ahead.
+    vi.setSystemTime(new Date(2026, 9, 7, 12, 0, 0));
+    stubCalendarApi();
+    renderCalendar('uk', { frequencyPerWeek: 3, assignedAt: LONG_AGO });
+
+    // Today is recommended and has workouts that already happened.
+    expect(await screen.findByText('середа, 7 жовтня')).toBeInTheDocument();
+    expect(await screen.findByText('Рекомендований день')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /Тренування 01 · 14:05/ }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: '9 жовтня, без тренувань, Рекомендований день',
+      }),
+    );
+    expect(screen.getByText('пʼятниця, 9 жовтня')).toBeInTheDocument();
+    expect(screen.getByText('Рекомендований день')).toBeInTheDocument();
+    expect(
+      screen.queryByText('У цей день тренувань не було.'),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: '8 жовтня, без тренувань' }),
+    );
+    expect(screen.getByText('четвер, 8 жовтня')).toBeInTheDocument();
+    expect(screen.queryByText('Рекомендований день')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('У цей день тренувань не було.'),
+    ).not.toBeInTheDocument();
+
+    // A day that has passed still gets the line.
+    await user.click(
+      screen.getByRole('button', { name: '6 жовтня, без тренувань' }),
+    );
+    expect(
+      screen.getByText('У цей день тренувань не було.'),
+    ).toBeInTheDocument();
+  });
+
+  it('labels recommended days in English', async () => {
+    stubCalendarApi();
+    renderCalendar('en', { frequencyPerWeek: 2, assignedAt: LONG_AGO });
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'October 6, no workouts, Recommended day',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'October 8, no workouts, Recommended day',
+      }),
     ).toBeInTheDocument();
   });
 

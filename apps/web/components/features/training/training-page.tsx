@@ -62,7 +62,10 @@ function ProgramDays({ program }: { program: AssignedProgramResponse }) {
             {program.templateName}
           </h2>
         </section>
-        <TrainingCalendar />
+        <TrainingCalendar
+          frequencyPerWeek={program.frequencyPerWeek}
+          assignedAt={program.assignedAt}
+        />
         {days.map((day) => (
           <DayCard
             key={day.dayNumber}

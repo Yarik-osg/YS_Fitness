@@ -768,6 +768,7 @@
       "workoutCount": "{count, plural, =0 {no workouts} one {# workout} other {# workouts}}",
       "workout": "Workout {number} · {time}",
       "empty": "No workouts on this day.",
+      "recommended": "Recommended day",
       "loadError": "The calendar could not be loaded.",
       "retry": "Retry"
     }
