@@ -114,9 +114,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
           {day ? (
             <Link
               href="/workout"
-              className={buttonVariants({
-                className: 'w-full text-[#0b0b0b]!',
-              })}
+              className={buttonVariants({ className: 'w-full' })}
             >
               {t('home.start')}
             </Link>
