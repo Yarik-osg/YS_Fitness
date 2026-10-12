@@ -20,3 +20,23 @@ describe('WorkoutsRepository.list', () => {
     );
   });
 });
+
+describe('WorkoutsRepository.listBetween', () => {
+  it('reads only the caller rows inside a half-open range, oldest first', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = new WorkoutsRepository({
+      workoutLog: { findMany },
+    } as never);
+    const from = new Date('2026-10-04T21:00:00.000Z');
+    const to = new Date('2026-10-11T21:00:00.000Z');
+
+    await repository.listBetween('user-1', from, to);
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-1', completedAt: { gte: from, lt: to } },
+        orderBy: [{ completedAt: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+});

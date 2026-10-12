@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { AssignProgramCard } from '@/components/features/dashboard/dashboard';
 import { ClientNav } from '@/components/features/shell/client-nav';
+import { TrainingCalendar } from '@/components/features/training/training-calendar';
 import { Link } from '@/i18n/navigation';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 
@@ -61,6 +62,10 @@ function ProgramDays({ program }: { program: AssignedProgramResponse }) {
             {program.templateName}
           </h2>
         </section>
+        <TrainingCalendar
+          frequencyPerWeek={program.frequencyPerWeek}
+          assignedAt={program.assignedAt}
+        />
         {days.map((day) => (
           <DayCard
             key={day.dayNumber}

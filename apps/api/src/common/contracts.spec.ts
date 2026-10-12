@@ -5,6 +5,7 @@ import {
   logWorkoutSchema,
   onboardingSchema,
   registerSchema,
+  workoutCalendarQuerySchema,
 } from '@repo/validation';
 
 const femaleOnboarding = {
@@ -262,6 +263,51 @@ describe('shared API contracts', () => {
         message: 'expiresAt must be in the future',
       }),
     ]);
+  });
+
+  describe('workoutCalendarQuerySchema', () => {
+    const from = '2026-09-28T00:00:00.000Z';
+
+    function parse(query: Record<string, unknown>) {
+      return workoutCalendarQuerySchema.safeParse(query);
+    }
+
+    function daysAfter(days: number) {
+      return new Date(Date.parse(from) + days * 86_400_000).toISOString();
+    }
+
+    it('accepts a week and a 6-week grid', () => {
+      expect(parse({ from, to: daysAfter(7) }).success).toBe(true);
+      expect(parse({ from, to: daysAfter(42) }).success).toBe(true);
+    });
+
+    it('allows one extra day for a DST change in a 6-week grid', () => {
+      expect(parse({ from, to: daysAfter(42.05) }).success).toBe(true);
+      expect(parse({ from, to: daysAfter(43) }).success).toBe(true);
+    });
+
+    it('rejects a range longer than the cap', () => {
+      const result = parse({ from, to: daysAfter(44) });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues).toEqual([
+        expect.objectContaining({ path: ['to'] }),
+      ]);
+    });
+
+    it('rejects an end that is not after the start', () => {
+      expect(parse({ from, to: from }).success).toBe(false);
+      expect(parse({ from, to: daysAfter(-1) }).success).toBe(false);
+    });
+
+    it('rejects missing or malformed dates', () => {
+      expect(parse({ from }).success).toBe(false);
+      expect(parse({ to: daysAfter(7) }).success).toBe(false);
+      expect(parse({ from: '2026-09-28', to: daysAfter(7) }).success).toBe(
+        false,
+      );
+      expect(parse({ from, to: 'tomorrow' }).success).toBe(false);
+    });
   });
 
   describe('logWorkoutSchema set limits', () => {

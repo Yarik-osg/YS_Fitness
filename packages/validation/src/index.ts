@@ -353,8 +353,32 @@ export const listWorkoutLogsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+// A 6-week month grid is 42 local days. The extra day absorbs a DST change,
+// which makes a local-midnight range one hour longer or shorter than 42 days.
+export const WORKOUT_CALENDAR_MAX_DAYS = 43;
+
+export const workoutCalendarQuerySchema = z
+  .object({
+    from: z.iso.datetime(),
+    to: z.iso.datetime(),
+  })
+  .refine((value) => Date.parse(value.to) > Date.parse(value.from), {
+    message: 'to must be after from',
+    path: ['to'],
+  })
+  .refine(
+    (value) =>
+      Date.parse(value.to) - Date.parse(value.from) <=
+      WORKOUT_CALENDAR_MAX_DAYS * 86_400_000,
+    {
+      message: `The range cannot exceed ${WORKOUT_CALENDAR_MAX_DAYS} days`,
+      path: ['to'],
+    },
+  );
+
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;
 export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
 export type ListWorkoutLogsQuery = z.infer<typeof listWorkoutLogsQuerySchema>;
+export type WorkoutCalendarQuery = z.infer<typeof workoutCalendarQuerySchema>;

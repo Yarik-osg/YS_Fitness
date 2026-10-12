@@ -210,6 +210,73 @@ describe('TrainingPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows the calendar between the program banner and the day cards', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/me')) return json({ program: PROGRAM });
+        if (url.includes('/workouts/calendar')) return json({ logs: [] });
+        return json({}, 404);
+      }),
+    );
+    signIn();
+    renderPage();
+
+    const banner = await screen.findByText('WB2U — верх');
+    const calendar = await screen.findByText('Цього тижня');
+    const firstDay = screen.getByRole('heading', { name: 'Тренування 01' });
+
+    expect(banner.compareDocumentPosition(calendar)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(calendar.compareDocumentPosition(firstDay)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(
+      await screen.findByText('У цей день тренувань не було.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Показати місяць' }),
+    ).toBeInTheDocument();
+  });
+
+  it('marks the recommended days for the assigned program frequency', async () => {
+    // Sunday 11 October 2026. The fixture is a two-day program assigned on
+    // 27 September, so this week's Tuesday and Thursday are recommended.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 11, 12, 0, 0));
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes('/programs/me')) return json({ program: PROGRAM });
+          if (url.includes('/workouts/calendar')) return json({ logs: [] });
+          return json({}, 404);
+        }),
+      );
+      signIn();
+      renderPage();
+
+      expect(
+        await screen.findByRole('button', {
+          name: '6 жовтня, без тренувань, Рекомендований день',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name: '8 жовтня, без тренувань, Рекомендований день',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('button', { name: /Рекомендований день/ }),
+      ).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reuses the assign-program action when nothing is assigned', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
@@ -233,6 +300,7 @@ describe('TrainingPage', () => {
     expect(
       screen.queryByRole('link', { name: 'Почати тренування →' }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText('Цього тижня')).not.toBeInTheDocument();
 
     await user.click(
       screen.getByRole('button', { name: 'Призначити мою програму' }),

@@ -1,7 +1,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listWorkoutLogs, logWorkout } from '@/lib/api/workouts';
+import {
+  getWorkoutCalendar,
+  listWorkoutLogs,
+  logWorkout,
+} from '@/lib/api/workouts';
 import {
   assignedProgramQueryKey,
   myProgramQueryKey,
@@ -13,6 +17,22 @@ export function useWorkoutLogs() {
   return useQuery({
     queryKey: workoutLogsQueryKey,
     queryFn: () => listWorkoutLogs(),
+  });
+}
+
+/**
+ * Logs inside [from, to). The key sits under `workoutLogsQueryKey`, so logging
+ * a workout refreshes every calendar range that is on screen.
+ */
+export function useWorkoutCalendar(range: {
+  from: string;
+  to: string;
+  enabled?: boolean;
+}) {
+  return useQuery({
+    queryKey: [...workoutLogsQueryKey, 'calendar', range.from, range.to],
+    queryFn: () => getWorkoutCalendar(range.from, range.to),
+    enabled: range.enabled ?? true,
   });
 }
 

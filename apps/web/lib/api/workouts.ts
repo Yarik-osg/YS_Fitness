@@ -1,4 +1,5 @@
 import type {
+  WorkoutCalendarResponse,
   WorkoutLogListResponse,
   WorkoutLogResponse,
 } from '@repo/shared-types';
@@ -10,6 +11,12 @@ export function logWorkout(input: LogWorkoutInput) {
     method: 'POST',
     body: input,
   });
+}
+
+export function getWorkoutCalendar(from: string, to: string) {
+  return apiRequest<WorkoutCalendarResponse>(
+    `/workouts/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
 }
 
 export function listWorkoutLogs(limit = 20, offset = 0) {

@@ -1,6 +1,8 @@
+import { workoutCalendarQuerySchema } from '@repo/validation';
 import { describe, expect, it } from 'vitest';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { SubscriptionGuard } from '../subscriptions/subscription.guard.js';
+import { WorkoutCalendarQueryDto } from './dto/workout-calendar-query.dto.js';
 import { WorkoutsController } from './workouts.controller.js';
 
 const GUARDS_METADATA = '__guards__';
@@ -23,5 +25,21 @@ describe('WorkoutsController guards', () => {
     expect(controllerGuards).toEqual([JwtAuthGuard]);
     expect(logGuards).toEqual([SubscriptionGuard]);
     expect(listGuards).toBeUndefined();
+  });
+
+  it('lets the calendar read history with only a JWT', () => {
+    const calendarGuards = Reflect.getMetadata(
+      GUARDS_METADATA,
+      WorkoutsController.prototype.calendar,
+    );
+
+    expect(calendarGuards).toBeUndefined();
+    expect(
+      Reflect.getMetadata('path', WorkoutsController.prototype.calendar),
+    ).toBe('calendar');
+  });
+
+  it('validates the calendar query with the shared schema', () => {
+    expect(WorkoutCalendarQueryDto.schema).toBe(workoutCalendarQuerySchema);
   });
 });

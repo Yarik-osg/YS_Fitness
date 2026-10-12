@@ -758,6 +758,19 @@
     "completedTimes": "{count, plural, one {Completed: # time this cycle} other {Completed: # times this cycle}}",
     "exercises": "exercises",
     "loading": "Loading program",
-    "start": "Start workout →"
+    "start": "Start workout →",
+    "calendar": {
+      "title": "This week",
+      "showMonth": "Show month",
+      "showWeek": "Show week",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "workoutCount": "{count, plural, =0 {no workouts} one {# workout} other {# workouts}}",
+      "workout": "Workout {number} · {time}",
+      "empty": "No workouts on this day.",
+      "recommended": "Recommended day",
+      "loadError": "The calendar could not be loaded.",
+      "retry": "Retry"
+    }
   }
 }

@@ -249,3 +249,7 @@ export interface WorkoutLogListResponse {
   logs: WorkoutLogResponse[];
   total: number;
 }
+
+export interface WorkoutCalendarResponse {
+  logs: WorkoutLogResponse[];
+}

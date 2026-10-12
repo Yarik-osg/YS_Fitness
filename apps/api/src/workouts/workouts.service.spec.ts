@@ -106,6 +106,7 @@ function createService(
     transaction: vi.fn((work: (client: unknown) => unknown) => work({})),
     create: vi.fn().mockResolvedValue(logRecord()),
     list: vi.fn().mockResolvedValue([]),
+    listBetween: vi.fn().mockResolvedValue([]),
     count: vi.fn().mockResolvedValue(0),
     ...repository,
   };
@@ -294,6 +295,46 @@ describe('WorkoutsService.list', () => {
       true,
     );
     expect(result.logs[0]?.sets[0]?.recommendation).toBe('increase');
+  });
+
+  it('returns the caller logs for a date range, oldest first', async () => {
+    const first = logRecord({
+      id: '88888888-8888-4888-8888-888888888888',
+      completedAt: new Date('2026-10-05T08:00:00.000Z'),
+    });
+    const second = logRecord({
+      completedAt: new Date('2026-10-07T08:00:00.000Z'),
+    });
+    const { service, workouts } = createService(
+      { getAssignedProgram: vi.fn() },
+      { listBetween: vi.fn().mockResolvedValue([first, second]) },
+    );
+
+    const result = await service.calendar(userId, {
+      from: '2026-10-04T21:00:00.000Z',
+      to: '2026-10-11T21:00:00.000Z',
+    });
+
+    expect(workouts.listBetween).toHaveBeenCalledWith(
+      userId,
+      new Date('2026-10-04T21:00:00.000Z'),
+      new Date('2026-10-11T21:00:00.000Z'),
+    );
+    expect(result.logs.map((log) => log.id)).toEqual([first.id, second.id]);
+    expect(result.logs[0]?.completedAt).toBe('2026-10-05T08:00:00.000Z');
+    expect(result.logs[1]?.sets[0]?.weightKg).toBe(35.5);
+    expect(result.logs[1]?.sets[0]?.exercise.name).toBe('Row');
+  });
+
+  it('returns no logs for an empty range', async () => {
+    const { service } = createService({ getAssignedProgram: vi.fn() });
+
+    const result = await service.calendar(userId, {
+      from: '2026-10-04T21:00:00.000Z',
+      to: '2026-10-11T21:00:00.000Z',
+    });
+
+    expect(result).toEqual({ logs: [] });
   });
 
   it('recommends from the last set of each exercise', async () => {
