@@ -618,6 +618,12 @@
     "height": "Зріст",
     "weight": "Поточна вага",
     "level": "Рівень підготовки",
+    "trainingYears": "Стаж тренувань",
+    "trainingYearsValue": {
+      "beginner": "До 6 місяців",
+      "intermediate": "6–24 місяці",
+      "advanced": "Понад 2 роки"
+    },
     "goal": "Основна ціль",
     "frequency": "Тренувань на тиждень",
     "program": "Моя програма",

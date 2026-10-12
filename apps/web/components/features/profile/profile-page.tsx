@@ -10,7 +10,6 @@ import type {
   TrainingFrequency,
 } from '@repo/shared-types';
 import {
-  EXPERIENCE_LEVELS,
   HEIGHT_CM,
   MAIN_GOALS,
   profileUpdateSchema,
@@ -215,18 +214,31 @@ function ParametersCard({
   const [weight, setWeight] = useState(
     weightKg === undefined ? '' : String(weightKg),
   );
-  const [level, setLevel] = useState(experience ?? EXPERIENCE_LEVELS[0]);
   const [goal, setGoal] = useState(mainGoal ?? MAIN_GOALS[0]);
   const [frequency, setFrequency] = useState(
     trainingFrequency ?? TRAINING_FREQUENCIES[0],
   );
   const [error, setError] = useState<string | null>(null);
   const male = track === 'male';
+  // Goal and frequency are stored with the onboarding answers, so they can
+  // only be edited once those exist. Experience is never edited here.
+  const canEditAnswers = !loadError && experience !== undefined;
+  const levelRows = (
+    <>
+      <Detail
+        label={t('level')}
+        value={experienceLabel(onboarding, experience ?? '', male)}
+      />
+      <Detail
+        label={t('trainingYears')}
+        value={trainingYearsLabel(t, experience ?? '')}
+      />
+    </>
+  );
 
   function beginEdit() {
     setHeight(heightCm === undefined ? '' : String(heightCm));
     setWeight(weightKg === undefined ? '' : String(weightKg));
-    setLevel(experience ?? EXPERIENCE_LEVELS[0]);
     setGoal(mainGoal ?? MAIN_GOALS[0]);
     setFrequency(trainingFrequency ?? TRAINING_FREQUENCIES[0]);
     setError(null);
@@ -235,7 +247,7 @@ function ParametersCard({
 
   function save() {
     const parsed = profileUpdateSchema.safeParse(
-      loadError
+      !canEditAnswers
         ? {
             heightCm: Number(height),
             weightKg: weight === '' ? undefined : Number(weight),
@@ -243,7 +255,6 @@ function ParametersCard({
         : {
             heightCm: Number(height),
             weightKg: weight === '' ? undefined : Number(weight),
-            experience: level,
             mainGoal: goal,
             trainingFrequency: frequency,
           },
@@ -319,18 +330,9 @@ function ParametersCard({
             max={WEIGHT_KG.max}
             onChange={setWeight}
           />
-          {loadError ? null : (
+          <div>{levelRows}</div>
+          {canEditAnswers ? (
             <>
-              <SelectField
-                id="profile-level"
-                label={t('level')}
-                value={level}
-                options={EXPERIENCE_LEVELS.map((value) => ({
-                  value,
-                  label: experienceLabel(onboarding, value, male),
-                }))}
-                onChange={(value) => setLevel(value as TrainingExperience)}
-              />
               <SelectField
                 id="profile-goal"
                 label={t('goal')}
@@ -352,7 +354,7 @@ function ParametersCard({
                 onChange={(value) => setFrequency(value as TrainingFrequency)}
               />
             </>
-          )}
+          ) : null}
           {error ? (
             <p role="alert" className="text-xs text-red-300">
               {error}
@@ -380,10 +382,7 @@ function ParametersCard({
                 : `${formatMeasure(weightKg)} ${t('kg')}`
             }
           />
-          <Detail
-            label={t('level')}
-            value={experienceLabel(onboarding, experience ?? '', male)}
-          />
+          {levelRows}
           <Detail
             label={t('goal')}
             value={goalLabel(onboarding, mainGoal ?? '', male)}
@@ -739,6 +738,22 @@ function experienceLabel(
       return male
         ? t('choices.experience.advanced_male')
         : t('choices.experience.advanced_female');
+    default:
+      return '—';
+  }
+}
+
+function trainingYearsLabel(
+  t: ReturnType<typeof useTranslations<'profile'>>,
+  experience: string,
+) {
+  switch (experience) {
+    case 'beginner':
+      return t('trainingYearsValue.beginner');
+    case 'intermediate':
+      return t('trainingYearsValue.intermediate');
+    case 'advanced':
+      return t('trainingYearsValue.advanced');
     default:
       return '—';
   }

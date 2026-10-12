@@ -1,5 +1,11 @@
 import type { AssignedProgramResponse } from '@repo/shared-types';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
@@ -163,6 +169,8 @@ describe('Profile page', () => {
     expect(screen.getByText('168 см')).toBeInTheDocument();
     expect(screen.getByText('58 кг')).toBeInTheDocument();
     expect(screen.getAllByText('Початківець').length).toBeGreaterThan(0);
+    expect(screen.getByText('Стаж тренувань')).toBeInTheDocument();
+    expect(screen.getByText('До 6 місяців')).toBeInTheDocument();
     expect(screen.getByText('Схуднути')).toBeInTheDocument();
     expect(screen.getByText('2 рази')).toBeInTheDocument();
     expect(screen.getByText(TEMPLATE_NAME)).toBeInTheDocument();
@@ -242,17 +250,14 @@ describe('Profile page', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('lets a member without answers edit height and training fields', async () => {
+  it('lets a member without answers edit only height and weight', async () => {
     const user = userEvent.setup();
-    let answers: { responses: typeof RESPONSES.responses | null } = {
-      responses: null,
-    };
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.includes('/onboarding-responses')) {
-          return json(answers);
+          return json({ responses: null });
         }
         if (url.includes('/programs/assigned')) return json({ program: null });
         if (url.includes('/users/me/profile')) {
@@ -260,29 +265,13 @@ describe('Profile page', () => {
           expect(JSON.parse(String(init?.body))).toEqual({
             heightCm: 170,
             weightKg: 58,
-            experience: 'beginner',
-            mainGoal: 'lose_weight',
-            trainingFrequency: '2',
           });
-          answers = {
-            responses: {
-              ...RESPONSES.responses,
-              experience: 'beginner',
-              mainGoal: 'lose_weight',
-              trainingFrequency: '2',
-              focusAreas: [],
-              currentBody: '',
-              desiredBody: '',
-              mealsPerDay: '',
-              eatingHabits: [],
-            },
-          };
           return json({
             heightCm: 170,
             weightKg: 58,
-            experience: 'beginner',
-            mainGoal: 'lose_weight',
-            trainingFrequency: '2',
+            experience: null,
+            mainGoal: null,
+            trainingFrequency: null,
             program: null,
           });
         }
@@ -293,13 +282,15 @@ describe('Profile page', () => {
     renderProfile();
     await screen.findByRole('heading', { name: 'Профіль' });
     await user.click(screen.getByRole('button', { name: 'Редагувати' }));
+    // Goal and frequency need stored answers, and experience is never edited.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     const height = screen.getByRole('spinbutton', { name: /Зріст/ });
     await user.clear(height);
     await user.type(height, '170');
     await user.click(screen.getByRole('button', { name: 'Зберегти' }));
 
     expect(await screen.findByText('170 см')).toBeInTheDocument();
-    expect(await screen.findByText('Початківець')).toBeInTheDocument();
+    expect(screen.queryByText('Початківець')).not.toBeInTheDocument();
   });
 
   it('keeps section errors from looking like empty data', async () => {
@@ -449,21 +440,19 @@ describe('Profile page', () => {
           expect(JSON.parse(String(init?.body))).toEqual({
             heightCm: 170,
             weightKg: 58,
-            experience: 'intermediate',
             mainGoal: 'build_muscle',
             trainingFrequency: '4',
           });
           return json({
             heightCm: 170,
             weightKg: 58,
-            experience: 'intermediate',
+            experience: 'beginner',
             mainGoal: 'build_muscle',
             trainingFrequency: '4',
             program: {
               ...PROGRAM,
               templateCode: 'WM4',
               templateName: NEXT_TEMPLATE_NAME,
-              level: 'intermediate',
               frequencyPerWeek: 4,
             },
           });
@@ -482,17 +471,120 @@ describe('Profile page', () => {
     const height = screen.getByRole('spinbutton', { name: /Зріст/ });
     await user.clear(height);
     await user.type(height, '170');
-    await selectLabeledOption(user, 'Рівень підготовки', 'Середній рівень');
     await selectLabeledOption(user, 'Основна ціль', "Набрати м'язову масу");
     await selectLabeledOption(user, 'Тренувань на тиждень', '4 рази');
     await user.click(screen.getByRole('button', { name: 'Зберегти' }));
 
     expect(await screen.findByText(NEXT_TEMPLATE_NAME)).toBeInTheDocument();
     expect(screen.getByText('170 см')).toBeInTheDocument();
-    expect(screen.getAllByText('Середній рівень').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Початківець').length).toBeGreaterThan(0);
     expect(screen.getByText("Набрати м'язову масу")).toBeInTheDocument();
     expect(screen.getByText('4 рази')).toBeInTheDocument();
   });
+
+  it('shows the experience level and training years but does not let them be edited', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => jsonFor(String(input))),
+    );
+
+    renderProfile();
+    await screen.findByRole('heading', { name: 'Профіль' });
+    await user.click(screen.getByRole('button', { name: 'Редагувати' }));
+
+    // Level and years stay on screen as plain rows while editing.
+    const parameters = within(
+      screen
+        .getByRole('heading', { name: 'Мої параметри' })
+        .closest('section')!,
+    );
+    expect(parameters.getByText('Рівень підготовки')).toBeInTheDocument();
+    expect(parameters.getByText('Початківець')).toBeInTheDocument();
+    expect(parameters.getByText('Стаж тренувань')).toBeInTheDocument();
+    expect(parameters.getByText('До 6 місяців')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Рівень підготовки' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Стаж тренувань' }),
+    ).not.toBeInTheDocument();
+    // Goal and frequency can still be changed.
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(
+      screen.getByRole('combobox', { name: 'Основна ціль' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: 'Тренувань на тиждень' }),
+    ).toBeInTheDocument();
+  });
+
+  it('never sends experience when goal or frequency change', async () => {
+    const user = userEvent.setup();
+    let body: unknown;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/users/me/profile')) {
+          body = JSON.parse(String(init?.body));
+          return json({
+            heightCm: 168,
+            weightKg: 58,
+            experience: 'beginner',
+            mainGoal: 'build_muscle',
+            trainingFrequency: '2',
+            program: PROGRAM,
+          });
+        }
+        return jsonFor(url);
+      }),
+    );
+
+    renderProfile();
+    await screen.findByRole('heading', { name: 'Профіль' });
+    await user.click(screen.getByRole('button', { name: 'Редагувати' }));
+    await selectLabeledOption(user, 'Основна ціль', "Набрати м'язову масу");
+    await user.click(screen.getByRole('button', { name: 'Зберегти' }));
+
+    await waitFor(() => expect(body).toBeDefined());
+    expect(body).toEqual({
+      heightCm: 168,
+      weightKg: 58,
+      mainGoal: 'build_muscle',
+      trainingFrequency: '2',
+    });
+    expect(body).not.toHaveProperty('experience');
+  });
+
+  it.each([
+    ['intermediate', 'Середній рівень', '6–24 місяці'],
+    ['advanced', 'Досвідчена', 'Понад 2 роки'],
+  ] as const)(
+    'shows the %s level with its training years',
+    async (experience, level, years) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes('/onboarding-responses')) {
+            return json({
+              responses: { ...RESPONSES.responses, experience },
+            });
+          }
+          if (url.includes('/programs/assigned')) {
+            return json({ program: null });
+          }
+          return jsonFor(url);
+        }),
+      );
+
+      renderProfile();
+
+      expect(await screen.findByText(level)).toBeInTheDocument();
+      expect(screen.getByText(years)).toBeInTheDocument();
+    },
+  );
 
   it('keeps unfinished settings rows from navigating', async () => {
     vi.stubGlobal(

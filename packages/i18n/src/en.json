@@ -621,6 +621,12 @@
     "height": "Height",
     "weight": "Current weight",
     "level": "Training level",
+    "trainingYears": "Training experience",
+    "trainingYearsValue": {
+      "beginner": "Under 6 months",
+      "intermediate": "6–24 months",
+      "advanced": "Over 2 years"
+    },
     "goal": "Main goal",
     "frequency": "Workouts per week",
     "program": "My program",
