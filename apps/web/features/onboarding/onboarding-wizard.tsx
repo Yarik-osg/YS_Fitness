@@ -312,7 +312,6 @@ export function OnboardingWizard() {
     { value: 'shoulders', label: t('choices.focus.shoulders') },
     { value: 'back', label: t('choices.focus.back') },
     { value: 'arms', label: t('choices.focus.arms') },
-    { value: 'abs', label: t('choices.focus.abs') },
     { value: 'full_body', label: t('choices.focus.full_body') },
   ];
 
@@ -1085,8 +1084,6 @@ function focusAreaLabel(
       return t('choices.focus.back');
     case 'arms':
       return t('choices.focus.arms');
-    case 'abs':
-      return t('choices.focus.abs');
     case 'full_body':
       return t('choices.focus.full_body');
     case 'chest':

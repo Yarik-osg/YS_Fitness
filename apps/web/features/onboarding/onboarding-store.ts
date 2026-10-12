@@ -8,6 +8,7 @@ import type {
 import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { MALE_FOCUS_AREAS } from '@repo/validation';
 import {
   biologicalSexFromProgramTrack,
   ONBOARDING_WIZARD_STEPS,
@@ -167,7 +168,11 @@ function migrateOnboardingDraft(
     next.physiqueLevel = undefined;
   }
 
-  next.focusAreas = next.focusAreas.slice(0, 1);
+  // Drop focus areas that are no longer offered (for example 'abs'), so a
+  // saved draft cannot hold an answer the quiz can neither show nor submit.
+  next.focusAreas = next.focusAreas
+    .filter((area) => (MALE_FOCUS_AREAS as readonly string[]).includes(area))
+    .slice(0, 1);
   next.bodyScaleVersion = BODY_SCALE_VERSION;
 
   return next;

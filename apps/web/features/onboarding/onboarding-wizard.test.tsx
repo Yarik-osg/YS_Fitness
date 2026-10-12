@@ -137,6 +137,30 @@ describe('OnboardingWizard', () => {
     expect(useOnboardingStore.getState().focusAreas).toEqual(['back']);
   });
 
+  it.each(['female', 'male'] as const)(
+    'does not offer abs as a training focus on the %s track',
+    (programTrack) => {
+      useOnboardingStore.setState({ programTrack, step: 7 });
+      render(
+        <I18nTestProvider>
+          <Providers>
+            <OnboardingWizard />
+          </Providers>
+        </I18nTestProvider>,
+      );
+
+      expect(screen.getByRole('button', { name: 'Спина' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name: /Рівномірний розвиток усього тіла/,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Прес' }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it('uses the reference option sets for the male track', () => {
     useOnboardingStore.setState({ programTrack: 'male', step: 9 });
     render(
