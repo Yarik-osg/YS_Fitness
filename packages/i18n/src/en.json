@@ -618,6 +618,9 @@
     "height": "Height",
     "weight": "Current weight",
     "level": "Training level",
+    "confirmProgramTitle": "Change your program?",
+    "confirmProgramBody": "Your training level and workouts per week decide which program fits you. If a different program matches your new answers, you will start it from workout 01 and the completed-workouts counter starts over. Your workout history is kept.",
+    "confirmProgramSave": "Confirm and save",
     "trainingYears": "Training experience",
     "trainingYearsValue": {
       "beginner": "Under 6 months",
