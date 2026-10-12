@@ -90,7 +90,6 @@ export const FEMALE_FOCUS_AREAS = [
   'shoulders',
   'back',
   'arms',
-  'abs',
   'full_body',
 ] as const;
 export const MALE_FOCUS_AREAS = ['chest', ...FEMALE_FOCUS_AREAS] as const;

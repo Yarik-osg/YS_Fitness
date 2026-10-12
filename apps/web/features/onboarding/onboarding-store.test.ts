@@ -94,6 +94,46 @@ describe('onboarding draft ownership', () => {
     expect(useOnboardingStore.getState().physiqueLevel).toBeUndefined();
   });
 
+  it('drops a saved focus area that is no longer offered', async () => {
+    await useOnboardingStore.persist.clearStorage();
+    window.sessionStorage.setItem(
+      'ys-onboarding-draft',
+      JSON.stringify({
+        state: {
+          programTrack: 'female',
+          focusAreas: ['abs'],
+          step: 8,
+          bodyScaleVersion: 2,
+        },
+        version: 0,
+      }),
+    );
+
+    await useOnboardingStore.persist.rehydrate();
+
+    expect(useOnboardingStore.getState().focusAreas).toEqual([]);
+  });
+
+  it('keeps a saved focus area that is still offered', async () => {
+    await useOnboardingStore.persist.clearStorage();
+    window.sessionStorage.setItem(
+      'ys-onboarding-draft',
+      JSON.stringify({
+        state: {
+          programTrack: 'female',
+          focusAreas: ['glutes'],
+          step: 8,
+          bodyScaleVersion: 2,
+        },
+        version: 0,
+      }),
+    );
+
+    await useOnboardingStore.persist.rehydrate();
+
+    expect(useOnboardingStore.getState().focusAreas).toEqual(['glutes']);
+  });
+
   it('replaces the current draft when register asks for a fresh quiz', () => {
     useOnboardingStore.setState({
       ownerUserId: 'user-a',

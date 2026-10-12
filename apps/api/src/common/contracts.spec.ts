@@ -154,6 +154,18 @@ describe('shared API contracts', () => {
     expect(issuePaths(mixedFocus)).toEqual([['focusAreas'], ['focusAreas', 1]]);
   });
 
+  it('no longer accepts abs as a training focus for either track', () => {
+    for (const base of [femaleOnboarding, maleOnboarding]) {
+      const result = onboardingSchema.safeParse({
+        ...base,
+        focusAreas: ['abs'],
+      });
+
+      expect(result.success).toBe(false);
+      expect(issuePaths(result)).toContainEqual(['focusAreas', 0]);
+    }
+  });
+
   it('accepts physiqueLevel 0-9 and rejects values outside that scale', () => {
     expect(
       onboardingSchema.safeParse({ ...femaleOnboarding, physiqueLevel: '0' })

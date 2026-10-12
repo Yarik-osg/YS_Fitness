@@ -16,10 +16,12 @@ import {
   profileUpdateSchema,
   TRAINING_FREQUENCIES,
   WEIGHT_KG,
+  type ProfileUpdateInput,
 } from '@repo/validation';
 import { User } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
@@ -215,13 +217,32 @@ function ParametersCard({
   const [weight, setWeight] = useState(
     weightKg === undefined ? '' : String(weightKg),
   );
-  const [level, setLevel] = useState(experience ?? EXPERIENCE_LEVELS[0]);
+  const [level, setLevel] = useState<TrainingExperience>(
+    experience ?? EXPERIENCE_LEVELS[0],
+  );
   const [goal, setGoal] = useState(mainGoal ?? MAIN_GOALS[0]);
   const [frequency, setFrequency] = useState(
     trainingFrequency ?? TRAINING_FREQUENCIES[0],
   );
   const [error, setError] = useState<string | null>(null);
+  // Set while the member is asked to confirm a change that can switch program.
+  const [confirming, setConfirming] = useState<ProfileUpdateInput | null>(null);
   const male = track === 'male';
+  // Level, goal and frequency are stored with the onboarding answers, so they
+  // can only be edited once those exist.
+  const canEditAnswers = !loadError && experience !== undefined;
+  const levelRows = (
+    <>
+      <Detail
+        label={t('level')}
+        value={experienceLabel(onboarding, experience ?? '', male)}
+      />
+      <Detail
+        label={t('trainingYears')}
+        value={trainingYearsLabel(t, experience ?? '')}
+      />
+    </>
+  );
 
   function beginEdit() {
     setHeight(heightCm === undefined ? '' : String(heightCm));
@@ -230,12 +251,13 @@ function ParametersCard({
     setGoal(mainGoal ?? MAIN_GOALS[0]);
     setFrequency(trainingFrequency ?? TRAINING_FREQUENCIES[0]);
     setError(null);
+    setConfirming(null);
     setEditing(true);
   }
 
   function save() {
     const parsed = profileUpdateSchema.safeParse(
-      loadError
+      !canEditAnswers
         ? {
             heightCm: Number(height),
             weightKg: weight === '' ? undefined : Number(weight),
@@ -253,9 +275,28 @@ function ParametersCard({
       return;
     }
     setError(null);
-    update.mutate(parsed.data, {
-      onSuccess: () => setEditing(false),
-      onError: () => setError(t('saveError')),
+    // Level and weekly frequency decide which program fits, so changing either
+    // needs an explicit yes before it is saved.
+    if (
+      canEditAnswers &&
+      (level !== experience || frequency !== trainingFrequency)
+    ) {
+      setConfirming(parsed.data);
+      return;
+    }
+    submit(parsed.data);
+  }
+
+  function submit(input: ProfileUpdateInput) {
+    update.mutate(input, {
+      onSuccess: () => {
+        setConfirming(null);
+        setEditing(false);
+      },
+      onError: () => {
+        setConfirming(null);
+        setError(t('saveError'));
+      },
     });
   }
 
@@ -319,7 +360,7 @@ function ParametersCard({
             max={WEIGHT_KG.max}
             onChange={setWeight}
           />
-          {loadError ? null : (
+          {canEditAnswers ? (
             <>
               <SelectField
                 id="profile-level"
@@ -331,6 +372,12 @@ function ParametersCard({
                 }))}
                 onChange={(value) => setLevel(value as TrainingExperience)}
               />
+              <div className="-mt-3">
+                <Detail
+                  label={t('trainingYears')}
+                  value={trainingYearsLabel(t, level)}
+                />
+              </div>
               <SelectField
                 id="profile-goal"
                 label={t('goal')}
@@ -352,6 +399,8 @@ function ParametersCard({
                 onChange={(value) => setFrequency(value as TrainingFrequency)}
               />
             </>
+          ) : (
+            <div>{levelRows}</div>
           )}
           {error ? (
             <p role="alert" className="text-xs text-red-300">
@@ -380,10 +429,7 @@ function ParametersCard({
                 : `${formatMeasure(weightKg)} ${t('kg')}`
             }
           />
-          <Detail
-            label={t('level')}
-            value={experienceLabel(onboarding, experience ?? '', male)}
-          />
+          {levelRows}
           <Detail
             label={t('goal')}
             value={goalLabel(onboarding, mainGoal ?? '', male)}
@@ -394,7 +440,77 @@ function ParametersCard({
           />
         </>
       )}
+      {confirming ? (
+        <ConfirmProgramChange
+          busy={update.isPending}
+          onConfirm={() => submit(confirming)}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function ConfirmProgramChange({
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('profile');
+  const dialog = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialog.current?.focus();
+  }, []);
+
+  // Rendered into the body, above the bottom navigation, so no ancestor can
+  // trap it underneath (the nav is fixed at z-50).
+  return createPortal(
+    <div className="fixed inset-0 z-[60] mx-auto flex w-full max-w-[430px] items-end bg-black/70">
+      <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-program-title"
+        aria-describedby="confirm-program-body"
+        tabIndex={-1}
+        className="w-full border-t border-white/10 bg-[#111] px-5 pt-7 pb-9 outline-none"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !busy) onCancel();
+        }}
+      >
+        <h2
+          id="confirm-program-title"
+          className="mb-3 text-center font-label text-sm font-bold tracking-[0.06em] text-white uppercase"
+        >
+          {t('confirmProgramTitle')}
+        </h2>
+        <p
+          id="confirm-program-body"
+          className="mb-7 text-center text-[13px] leading-relaxed text-white/50"
+        >
+          {t('confirmProgramBody')}
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <Button className="w-full" disabled={busy} onClick={onConfirm}>
+            {busy ? t('saving') : t('confirmProgramSave')}
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            {t('cancel')}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -739,6 +855,22 @@ function experienceLabel(
       return male
         ? t('choices.experience.advanced_male')
         : t('choices.experience.advanced_female');
+    default:
+      return '—';
+  }
+}
+
+function trainingYearsLabel(
+  t: ReturnType<typeof useTranslations<'profile'>>,
+  experience: string,
+) {
+  switch (experience) {
+    case 'beginner':
+      return t('trainingYearsValue.beginner');
+    case 'intermediate':
+      return t('trainingYearsValue.intermediate');
+    case 'advanced':
+      return t('trainingYearsValue.advanced');
     default:
       return '—';
   }
