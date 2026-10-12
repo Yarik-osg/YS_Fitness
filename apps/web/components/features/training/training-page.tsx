@@ -198,9 +198,7 @@ function DayCard({
             <div className="px-4 pt-2 pb-4">
               <Link
                 href="/workout"
-                className={buttonVariants({
-                  className: 'w-full text-[#0b0b0b]!',
-                })}
+                className={buttonVariants({ className: 'w-full' })}
               >
                 {t('start')}
               </Link>
