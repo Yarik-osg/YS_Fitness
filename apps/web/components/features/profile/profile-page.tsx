@@ -21,6 +21,7 @@ import {
 import { User } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
@@ -466,8 +467,10 @@ function ConfirmProgramChange({
     dialog.current?.focus();
   }, []);
 
-  return (
-    <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-[430px] items-end bg-black/70">
+  // Rendered into the body, above the bottom navigation, so no ancestor can
+  // trap it underneath (the nav is fixed at z-50).
+  return createPortal(
+    <div className="fixed inset-0 z-[60] mx-auto flex w-full max-w-[430px] items-end bg-black/70">
       <div
         ref={dialog}
         role="dialog"
@@ -506,7 +509,8 @@ function ConfirmProgramChange({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

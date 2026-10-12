@@ -532,6 +532,14 @@ describe('Profile page', () => {
     });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(dialog).toHaveFocus();
+    // It must sit above the bottom navigation (fixed, z-50) and outside the
+    // profile card, so nothing can trap it underneath or hide Cancel.
+    const overlay = dialog.parentElement!;
+    expect(overlay.parentElement).toBe(document.body);
+    expect(overlay).toHaveClass('z-[60]');
+    expect(
+      screen.getByRole('link', { name: 'Профіль' }).closest('nav'),
+    ).toHaveClass('z-50');
     expect(
       within(dialog).getByText(/почнеш її з тренування 01/),
     ).toBeInTheDocument();
