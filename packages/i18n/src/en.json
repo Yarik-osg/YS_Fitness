@@ -542,8 +542,6 @@
       "unavailable": "No program is available for this track yet.",
       "day": "Day {number}",
       "prescription": "{sets} × {repsMin}–{repsMax}",
-      "absExercise": "Abs exercise",
-      "optional": "Optional",
       "muscles": {
         "GLUTES": "Glutes",
         "QUADRICEPS": "Quads",
@@ -710,6 +708,16 @@
     "retry": "Try again"
   },
   "workouts": {
+    "fixed": {
+      "warmup": {
+        "title": "Joint warm-up",
+        "description": "5–7 minutes before the first exercise"
+      },
+      "abs": {
+        "title": "Abs",
+        "description": "Optional, after the last exercise"
+      }
+    },
     "back": "Back",
     "eyebrow": "Training program",
     "title": "Workout {number}",

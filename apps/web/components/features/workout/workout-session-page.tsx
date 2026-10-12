@@ -9,7 +9,7 @@ import type {
 } from '@repo/shared-types';
 import type { LogWorkoutInput } from '@repo/validation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { useMyProgram } from '@/lib/hooks/use-programs';
@@ -202,43 +202,56 @@ function SessionForm({
       </header>
 
       <div className="flex flex-col gap-2 px-3.5 pt-2.5 pb-36">
+        <FixedCard
+          title={t('fixed.warmup.title')}
+          description={t('fixed.warmup.description')}
+        />
         {exercises.map((exercise) => (
-          <ExerciseCard
-            key={exercise.exerciseId}
-            exercise={exercise}
-            expanded={expandedId === exercise.exerciseId}
-            previous={previousSession(
-              logs,
-              program.templateId,
-              day.dayNumber,
-              exercise.exerciseId,
-            )}
-            onToggle={() =>
-              setExpandedId((current) =>
-                current === exercise.exerciseId ? null : exercise.exerciseId,
-              )
-            }
-            onChangeSet={(index, field, value) =>
-              setExercises((current) =>
-                current.map((row) =>
-                  row.exerciseId === exercise.exerciseId
-                    ? {
-                        ...row,
-                        sets: row.sets.map((set, setIndex) =>
-                          setIndex === index ? { ...set, [field]: value } : set,
-                        ),
-                      }
-                    : row,
-                ),
-              )
-            }
-            onComplete={() => {
-              const index = exercises.findIndex(
-                (row) => row.exerciseId === exercise.exerciseId,
-              );
-              setExpandedId(exercises[index + 1]?.exerciseId ?? null);
-            }}
-          />
+          <Fragment key={exercise.exerciseId}>
+            <ExerciseCard
+              exercise={exercise}
+              expanded={expandedId === exercise.exerciseId}
+              previous={previousSession(
+                logs,
+                program.templateId,
+                day.dayNumber,
+                exercise.exerciseId,
+              )}
+              onToggle={() =>
+                setExpandedId((current) =>
+                  current === exercise.exerciseId ? null : exercise.exerciseId,
+                )
+              }
+              onChangeSet={(index, field, value) =>
+                setExercises((current) =>
+                  current.map((row) =>
+                    row.exerciseId === exercise.exerciseId
+                      ? {
+                          ...row,
+                          sets: row.sets.map((set, setIndex) =>
+                            setIndex === index
+                              ? { ...set, [field]: value }
+                              : set,
+                          ),
+                        }
+                      : row,
+                  ),
+                )
+              }
+              onComplete={() => {
+                const index = exercises.findIndex(
+                  (row) => row.exerciseId === exercise.exerciseId,
+                );
+                setExpandedId(exercises[index + 1]?.exerciseId ?? null);
+              }}
+            />
+            {exercise.allowsAbsAddon ? (
+              <FixedCard
+                title={t('fixed.abs.title')}
+                description={t('fixed.abs.description')}
+              />
+            ) : null}
+          </Fragment>
         ))}
       </div>
 
@@ -318,7 +331,6 @@ function ExerciseCard({
   onComplete: () => void;
 }) {
   const t = useTranslations('workouts');
-  const hint = useTranslations('dashboard.workouts');
   const filled = exercise.sets.some((set) => isFilledReps(set.reps));
 
   return (
@@ -349,11 +361,6 @@ function ExerciseCard({
               reps: exercise.repsLabel,
             })}
           </span>
-          {exercise.allowsAbsAddon ? (
-            <span className="mt-1 block font-label text-[8px] font-semibold tracking-[0.12em] text-[#c8ff2e]/80 uppercase">
-              {hint('absExercise')} · {hint('optional')}
-            </span>
-          ) : null}
         </span>
       </button>
       {expanded ? (
@@ -462,6 +469,32 @@ function ExerciseCard({
           </button>
         </div>
       ) : null}
+    </article>
+  );
+}
+
+/**
+ * A fixed part of the session (joint warm-up, abs) that is shown but never
+ * logged: no number, no sets, nothing to fill in.
+ */
+function FixedCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <article
+      aria-disabled="true"
+      className="border-[1.5px] border-dashed border-white/[0.08] bg-white/[0.01] px-4 py-3.5 opacity-70 select-none"
+    >
+      <p className="font-heading text-[15px] tracking-[0.04em] text-white/55 uppercase">
+        {title}
+      </p>
+      <p className="mt-1 text-[11px] font-medium text-white/30">
+        {description}
+      </p>
     </article>
   );
 }

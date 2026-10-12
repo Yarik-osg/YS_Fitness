@@ -2,7 +2,7 @@ import type {
   AssignedProgramResponse,
   WorkoutLogListResponse,
 } from '@repo/shared-types';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
@@ -144,8 +144,8 @@ describe('WorkoutSessionPage', () => {
     expect(screen.getByText('Скручування')).toBeInTheDocument();
     expect(screen.getAllByLabelText(/Вага/)).toHaveLength(2);
     expect(
-      screen.getByText('Вправа на прес · Опціонально'),
-    ).toBeInTheDocument();
+      screen.queryByText('Вправа на прес · Опціонально'),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Додати підхід/ }),
     ).not.toBeInTheDocument();
@@ -218,6 +218,118 @@ describe('WorkoutSessionPage', () => {
     expect(
       screen.getByRole('link', { name: 'Повернутися до моєї програми →' }),
     ).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('shows a fixed joint warm-up first and an abs card after the marked exercise', () => {
+    renderSession();
+
+    const warmup = screen.getByText('Суглобова розминка').closest('article')!;
+    const first = screen
+      .getByRole('button', { name: /Тяга вертикального блоку/ })
+      .closest('article')!;
+    const marked = screen
+      .getByRole('button', { name: /Скручування/ })
+      .closest('article')!;
+    const abs = screen.getByText('Прес').closest('article')!;
+    const finish = screen.getByRole('button', {
+      name: 'Завершити тренування',
+    });
+
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(warmup.compareDocumentPosition(first) & following).toBeTruthy();
+    expect(first.compareDocumentPosition(marked) & following).toBeTruthy();
+    expect(marked.compareDocumentPosition(abs) & following).toBeTruthy();
+    expect(abs.compareDocumentPosition(finish) & following).toBeTruthy();
+    expect(screen.getByText('5–7 хвилин перед першою вправою')).toBeVisible();
+    expect(
+      screen.getByText('За бажанням, після останньої вправи'),
+    ).toBeVisible();
+  });
+
+  it('keeps the fixed cards unnumbered, disabled, and out of the counts', () => {
+    renderSession();
+
+    for (const [title, text] of [
+      ['Суглобова розминка', '5–7 хвилин перед першою вправою'],
+      ['Прес', 'За бажанням, після останньої вправи'],
+    ]) {
+      const card = screen.getByText(title!).closest('article')!;
+      expect(card).toHaveAttribute('aria-disabled', 'true');
+      expect(card).toHaveTextContent(`${title}${text}`);
+      expect(within(card).queryByRole('button')).not.toBeInTheDocument();
+      expect(within(card).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(within(card).queryByText(/^\d+$/)).not.toBeInTheDocument();
+    }
+
+    // Only the two real exercises are numbered, counted and fillable.
+    expect(screen.getByText('01')).toBeInTheDocument();
+    expect(screen.getByText('02')).toBeInTheDocument();
+    expect(screen.queryByText('03')).not.toBeInTheDocument();
+    expect(screen.getByText('0 / 2 виконано')).toBeInTheDocument();
+    expect(screen.getByText('2 вправ')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /Тяга|Скручування/ }),
+    ).toHaveLength(2);
+  });
+
+  it('shows only the warm-up on a day that does not end with abs', () => {
+    program.nextDayNumber = 2;
+    try {
+      renderSession();
+
+      expect(screen.getByText('Не сьогодні')).toBeInTheDocument();
+      expect(screen.getByText('Суглобова розминка')).toBeInTheDocument();
+      expect(screen.queryByText('Прес')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('За бажанням, після останньої вправи'),
+      ).not.toBeInTheDocument();
+    } finally {
+      program.nextDayNumber = 1;
+    }
+  });
+
+  it('translates the fixed cards', () => {
+    render(
+      <I18nTestProvider locale="en">
+        <WorkoutSessionPage />
+      </I18nTestProvider>,
+    );
+
+    expect(screen.getByText('Joint warm-up')).toBeInTheDocument();
+    expect(
+      screen.getByText('5–7 minutes before the first exercise'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Abs')).toBeInTheDocument();
+    expect(
+      screen.getByText('Optional, after the last exercise'),
+    ).toBeInTheDocument();
+  });
+
+  it('does not log the fixed cards', async () => {
+    const user = userEvent.setup();
+    renderSession();
+
+    await user.type(screen.getByLabelText('Вага 1'), '35');
+    await user.type(screen.getByLabelText('Повтори 1'), '12');
+    await user.type(screen.getByLabelText('Повтори 2'), '10');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(logWorkout).toHaveBeenCalledTimes(1);
+    const submitted = logWorkout.mock.calls[0]![0] as {
+      sets: { exerciseId: string; order: number }[];
+    };
+    // The warm-up and abs cards add nothing to what is saved.
+    expect(submitted.sets).toHaveLength(3);
+    expect(new Set(submitted.sets.map((set) => set.exerciseId))).toEqual(
+      new Set([rowId, pressId]),
+    );
+    expect(Math.max(...submitted.sets.map((set) => set.order))).toBe(2);
+    expect(screen.getByText('2/2')).toBeInTheDocument();
+    expect(screen.queryByText('Суглобова розминка')).not.toBeInTheDocument();
   });
 
   it('logs a bodyweight set entered as 0 kg as reps only', async () => {

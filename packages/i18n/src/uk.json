@@ -539,8 +539,6 @@
       "unavailable": "Для цього напрямку програми ще немає.",
       "day": "День {number}",
       "prescription": "{sets} × {repsMin}–{repsMax}",
-      "absExercise": "Вправа на прес",
-      "optional": "Опціонально",
       "muscles": {
         "GLUTES": "Сідниці",
         "QUADRICEPS": "Квадрицепси",
@@ -707,6 +705,16 @@
     "retry": "Спробувати ще"
   },
   "workouts": {
+    "fixed": {
+      "warmup": {
+        "title": "Суглобова розминка",
+        "description": "5–7 хвилин перед першою вправою"
+      },
+      "abs": {
+        "title": "Прес",
+        "description": "За бажанням, після останньої вправи"
+      }
+    },
     "back": "Назад",
     "eyebrow": "Програма тренувань",
     "title": "Тренування {number}",
