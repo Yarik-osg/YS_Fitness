@@ -1,6 +1,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { domAnimation, LazyMotion, MotionConfig } from 'motion/react';
 import { useState, type ReactNode } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -20,6 +21,12 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      {/* `m.*` components load their animation features lazily, and users
+          who prefer reduced motion get instant changes. */}
+      <LazyMotion features={domAnimation} strict>
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+      </LazyMotion>
+    </QueryClientProvider>
   );
 }

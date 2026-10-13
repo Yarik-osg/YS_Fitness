@@ -11,6 +11,7 @@ import type { LogWorkoutInput } from '@repo/validation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
+import { Collapse } from '@/components/ui/collapse';
 import {
   Sheet,
   SheetContent,
@@ -118,6 +119,10 @@ function SessionForm({
   const [expandedId, setExpandedId] = useState(
     exercises[0]?.exerciseId ?? null,
   );
+  // True only for the change made by "Complete exercise": the page then
+  // scrolls to the next card, so both cards switch without animating and the
+  // scroll measures the final layout. Opening a card by hand animates.
+  const [advancing, setAdvancing] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedSession | null>(null);
@@ -248,17 +253,19 @@ function SessionForm({
             <ExerciseCard
               exercise={exercise}
               expanded={expandedId === exercise.exerciseId}
+              instant={advancing}
               previous={previousSession(
                 logs,
                 program.templateId,
                 day.dayNumber,
                 exercise.exerciseId,
               )}
-              onToggle={() =>
+              onToggle={() => {
+                setAdvancing(false);
                 setExpandedId((current) =>
                   current === exercise.exerciseId ? null : exercise.exerciseId,
-                )
-              }
+                );
+              }}
               onChangeSet={(index, field, value) =>
                 setExercises((current) =>
                   current.map((row) =>
@@ -281,6 +288,7 @@ function SessionForm({
                 );
                 const next = exercises[index + 1]?.exerciseId ?? null;
                 scrollAfterOpen.current = next;
+                setAdvancing(true);
                 setExpandedId(next);
               }}
               cardRef={(element) => {
@@ -348,6 +356,7 @@ function SessionForm({
 function ExerciseCard({
   exercise,
   expanded,
+  instant,
   previous,
   onToggle,
   onChangeSet,
@@ -356,6 +365,7 @@ function ExerciseCard({
 }: {
   exercise: ExerciseDraft;
   expanded: boolean;
+  instant: boolean;
   previous: PreviousSession | null;
   onToggle: () => void;
   onChangeSet: (index: number, field: keyof SetDraft, value: string) => void;
@@ -397,7 +407,7 @@ function ExerciseCard({
           </span>
         </span>
       </button>
-      {expanded ? (
+      <Collapse open={expanded} instant={instant}>
         <div className="border-t border-white/5 px-4 pt-4 pb-5">
           <div className="mb-4 flex gap-2">
             <Prescribed
@@ -502,7 +512,7 @@ function ExerciseCard({
             {t('completeExercise')}
           </button>
         </div>
-      ) : null}
+      </Collapse>
     </article>
   );
 }

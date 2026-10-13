@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { PlanResponse } from '@repo/shared-types';
+import { Collapse } from '@/components/ui/collapse';
 import { useRouter } from '@/i18n/navigation';
 import { usePlans } from '@/lib/hooks/use-subscriptions';
 import {
@@ -241,7 +242,7 @@ function PlanCard({
           </button>
         </div>
       </div>
-      {expanded ? (
+      <Collapse open={expanded}>
         <ul className="flex flex-col gap-[11px] border-t border-white/6 px-5 pt-4 pb-5">
           {copy.features.map((feature) => (
             <li
@@ -262,7 +263,7 @@ function PlanCard({
             </li>
           ))}
         </ul>
-      ) : null}
+      </Collapse>
     </article>
   );
 }
