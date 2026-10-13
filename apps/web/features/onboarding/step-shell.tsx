@@ -1,7 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { m } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
@@ -41,6 +43,15 @@ export function StepShell({
 }) {
   const t = useTranslations('onboarding');
 
+  // Direction of the last step change (+1 forward, -1 back), 0 until the
+  // first change so the initial render does not animate.
+  const [shownStep, setShownStep] = useState(step);
+  const [direction, setDirection] = useState<-1 | 0 | 1>(0);
+  if (step !== shownStep) {
+    setShownStep(step);
+    setDirection(step > shownStep ? 1 : -1);
+  }
+
   return (
     <main
       className={cn(
@@ -70,7 +81,7 @@ export function StepShell({
             <span
               key={index}
               className={cn(
-                'h-[3px] flex-1 rounded-sm',
+                'h-[3px] flex-1 rounded-sm transition-colors duration-300',
                 index <= step ? 'bg-accent' : 'bg-white/18',
               )}
             />
@@ -78,7 +89,13 @@ export function StepShell({
         </div>
       </nav>
 
-      <section className="flex flex-1 flex-col px-5 pb-8 pt-7">
+      <m.section
+        key={step}
+        initial={direction === 0 ? false : { opacity: 0, x: 24 * direction }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        className="flex flex-1 flex-col px-5 pb-8 pt-7"
+      >
         <header className="mb-6">
           <p className="mb-2.5 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
             {eyebrow}
@@ -112,7 +129,7 @@ export function StepShell({
         >
           {pending ? t('saving') : (continueLabel ?? t('continue'))}
         </Button>
-      </section>
+      </m.section>
     </main>
   );
 }

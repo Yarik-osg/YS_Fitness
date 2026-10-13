@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Collapse } from '@/components/ui/collapse';
 
 export function FaqSection() {
   const t = useTranslations('marketing');
@@ -52,11 +53,11 @@ export function FaqSection() {
                   </svg>
                 </span>
               </button>
-              {isOpen && (
+              <Collapse open={isOpen}>
                 <p className="pb-[18px] text-[12px] leading-[1.7] text-white/50">
                   {item.a}
                 </p>
-              )}
+              </Collapse>
             </div>
           );
         })}

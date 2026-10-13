@@ -7,6 +7,7 @@ import type {
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
+import { Collapse } from '@/components/ui/collapse';
 import { AssignProgramCard } from '@/components/features/dashboard/dashboard';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { TrainingCalendar } from '@/components/features/training/training-calendar';
@@ -161,8 +162,8 @@ function DayCard({
           </span>
         </span>
       </button>
-      {expanded ? (
-        <div id={panelId}>
+      <Collapse open={expanded} id={panelId}>
+        <div>
           <ul>
             {day.exercises.map((row, index) => (
               <li
@@ -207,7 +208,7 @@ function DayCard({
             </div>
           ) : null}
         </div>
-      ) : null}
+      </Collapse>
     </article>
   );
 }

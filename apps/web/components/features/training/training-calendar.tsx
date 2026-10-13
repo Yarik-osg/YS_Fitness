@@ -2,8 +2,10 @@
 
 import type { WorkoutLogResponse } from '@repo/shared-types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AnimatePresence, m } from 'motion/react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import { Collapse } from '@/components/ui/collapse';
 import {
   addMonths,
   dayRange,
@@ -18,6 +20,13 @@ import {
 import { exerciseName } from '@/lib/exercise-name';
 import { useWorkoutCalendar } from '@/lib/hooks/use-workouts';
 import { isRecommendedDay } from '@/lib/training-schedule';
+
+// Fade the swapped week/month view in; no layout animation, so nothing clips.
+const fadeIn = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.18 },
+} as const;
 
 const LIME = 'bg-[#c8ff2e]';
 
@@ -141,20 +150,44 @@ export function TrainingCalendar({
         </button>
       </div>
 
-      {monthOpen ? (
-        <div>
-          <div className="mb-1 grid grid-cols-7 gap-1" aria-hidden="true">
-            {week.map((day) => (
-              <span
-                key={day.getDay()}
-                className="text-center font-label text-[7px] font-semibold tracking-[0.08em] text-white/30 uppercase"
-              >
-                {weekdayShort.format(day)}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {grid.map((day) => {
+      <AnimatePresence initial={false}>
+        {monthOpen ? (
+          <m.div key="month" {...fadeIn}>
+            <div className="mb-1 grid grid-cols-7 gap-1" aria-hidden="true">
+              {week.map((day) => (
+                <span
+                  key={day.getDay()}
+                  className="text-center font-label text-[7px] font-semibold tracking-[0.08em] text-white/30 uppercase"
+                >
+                  {weekdayShort.format(day)}
+                </span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {grid.map((day) => {
+                const key = localDateKey(day);
+                return (
+                  <DayButton
+                    key={key}
+                    label={cellLabel(day)}
+                    isToday={key === todayKey}
+                    isSelected={key === localDateKey(selected)}
+                    hasWorkout={(logsByDay.get(key)?.length ?? 0) > 0}
+                    isRecommended={isRecommendedDay(day, schedule)}
+                    dimmed={!isSameMonth(day, viewMonth)}
+                    onSelect={() => setSelected(day)}
+                  >
+                    <span className="font-heading text-[13px] leading-none">
+                      {day.getDate()}
+                    </span>
+                  </DayButton>
+                );
+              })}
+            </div>
+          </m.div>
+        ) : (
+          <m.div key="week" className="flex gap-1.5" {...fadeIn}>
+            {week.map((day) => {
               const key = localDateKey(day);
               return (
                 <DayButton
@@ -164,39 +197,17 @@ export function TrainingCalendar({
                   isSelected={key === localDateKey(selected)}
                   hasWorkout={(logsByDay.get(key)?.length ?? 0) > 0}
                   isRecommended={isRecommendedDay(day, schedule)}
-                  dimmed={!isSameMonth(day, viewMonth)}
                   onSelect={() => setSelected(day)}
                 >
-                  <span className="font-heading text-[13px] leading-none">
-                    {day.getDate()}
+                  <span className="font-label text-[7px] font-semibold tracking-[0.08em] uppercase">
+                    {weekdayShort.format(day)}
                   </span>
                 </DayButton>
               );
             })}
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-1.5">
-          {week.map((day) => {
-            const key = localDateKey(day);
-            return (
-              <DayButton
-                key={key}
-                label={cellLabel(day)}
-                isToday={key === todayKey}
-                isSelected={key === localDateKey(selected)}
-                hasWorkout={(logsByDay.get(key)?.length ?? 0) > 0}
-                isRecommended={isRecommendedDay(day, schedule)}
-                onSelect={() => setSelected(day)}
-              >
-                <span className="font-label text-[7px] font-semibold tracking-[0.08em] uppercase">
-                  {weekdayShort.format(day)}
-                </span>
-              </DayButton>
-            );
-          })}
-        </div>
-      )}
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <div
         aria-live="polite"
@@ -350,8 +361,8 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
           </span>
         </span>
       </button>
-      {expanded ? (
-        <ul id={panelId} className="space-y-1.5 px-4 pb-3">
+      <Collapse open={expanded} id={panelId}>
+        <ul className="space-y-1.5 px-4 pb-3">
           {exercises.map((exercise) => (
             <li
               key={exercise.key}
@@ -377,7 +388,7 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
             </li>
           ))}
         </ul>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

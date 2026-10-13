@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom/vitest';
+import { MotionGlobalConfig } from 'motion/react';
+
+// Finish animations immediately so exit animations never leave nodes behind.
+MotionGlobalConfig.skipAnimations = true;
 
 class ResizeObserverMock {
   observe() {}
