@@ -20,8 +20,7 @@ import {
 } from '@repo/validation';
 import { User } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, type ReactNode } from 'react';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
@@ -32,6 +31,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { useAssignedProgram } from '@/lib/hooks/use-programs';
@@ -440,62 +446,45 @@ function ParametersCard({
           />
         </>
       )}
-      {confirming ? (
-        <ConfirmProgramChange
-          busy={update.isPending}
-          onConfirm={() => submit(confirming)}
-          onCancel={() => setConfirming(null)}
-        />
-      ) : null}
+      <ConfirmProgramChange
+        open={confirming !== null}
+        busy={update.isPending}
+        onConfirm={() => {
+          if (confirming) submit(confirming);
+        }}
+        onCancel={() => setConfirming(null)}
+      />
     </section>
   );
 }
 
 function ConfirmProgramChange({
+  open,
   busy,
   onConfirm,
   onCancel,
 }: {
+  open: boolean;
   busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('profile');
-  const dialog = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    dialog.current?.focus();
-  }, []);
-
-  // Rendered into the body, above the bottom navigation, so no ancestor can
-  // trap it underneath (the nav is fixed at z-50).
-  return createPortal(
-    <div className="fixed inset-0 z-[60] mx-auto flex w-full max-w-[430px] items-end bg-black/70">
-      <div
-        ref={dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-program-title"
-        aria-describedby="confirm-program-body"
-        tabIndex={-1}
-        className="w-full border-t border-white/10 bg-[#111] px-5 pt-7 pb-9 outline-none"
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && !busy) onCancel();
-        }}
-      >
-        <h2
-          id="confirm-program-title"
-          className="mb-3 text-center font-label text-sm font-bold tracking-[0.06em] text-white uppercase"
-        >
-          {t('confirmProgramTitle')}
-        </h2>
-        <p
-          id="confirm-program-body"
-          className="mb-7 text-center text-[13px] leading-relaxed text-white/50"
-        >
-          {t('confirmProgramBody')}
-        </p>
-        <div className="flex flex-col gap-2.5">
+  // The sheet portals into the body above the bottom navigation, and cannot
+  // be dismissed (Escape, outside tap, swipe) while the save is in flight.
+  return (
+    <Sheet
+      open={open}
+      dismissible={!busy}
+      onOpenChange={(next) => {
+        if (!next && !busy) onCancel();
+      }}
+    >
+      <SheetContent>
+        <SheetTitle>{t('confirmProgramTitle')}</SheetTitle>
+        <SheetDescription>{t('confirmProgramBody')}</SheetDescription>
+        <SheetFooter>
           <Button className="w-full" disabled={busy} onClick={onConfirm}>
             {busy ? t('saving') : t('confirmProgramSave')}
           </Button>
@@ -507,10 +496,9 @@ function ConfirmProgramChange({
           >
             {t('cancel')}
           </Button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 

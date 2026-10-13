@@ -530,16 +530,18 @@ describe('Profile page', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'Змінити програму?',
     });
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveFocus();
+    // Focus moves into the sheet (focus trap).
+    await waitFor(() =>
+      expect(dialog.contains(document.activeElement)).toBe(true),
+    );
     // It must sit above the bottom navigation (fixed, z-50) and outside the
     // profile card, so nothing can trap it underneath or hide Cancel.
-    const overlay = dialog.parentElement!;
-    expect(overlay.parentElement).toBe(document.body);
-    expect(overlay).toHaveClass('z-[60]');
-    expect(
-      screen.getByRole('link', { name: 'Профіль' }).closest('nav'),
-    ).toHaveClass('z-50');
+    expect(dialog.parentElement).toBe(document.body);
+    expect(dialog).toHaveClass('z-[60]');
+    const nav = document.querySelector('nav')!;
+    expect(nav).toHaveClass('z-50');
+    // Modal: the page behind is hidden from assistive tech while it is open.
+    expect(nav.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(
       within(dialog).getByText(/почнеш її з тренування 01/),
     ).toBeInTheDocument();

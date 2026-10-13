@@ -11,6 +11,13 @@ import type { LogWorkoutInput } from '@repo/validation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Link } from '@/i18n/navigation';
 import { exerciseName } from '@/lib/exercise-name';
 import { useMyProgram } from '@/lib/hooks/use-programs';
@@ -310,43 +317,30 @@ function SessionForm({
         </button>
       </div>
 
-      {confirmEmpty ? (
-        <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-[430px] items-end bg-black/70">
-          <div
-            role="dialog"
-            aria-labelledby="empty-log-title"
-            className="w-full border-t border-white/10 bg-[#111] px-5 pt-7 pb-9"
-          >
-            <h2
-              id="empty-log-title"
-              className="mb-3 text-center font-label text-sm font-bold tracking-[0.06em] text-white uppercase"
+      <Sheet open={confirmEmpty} onOpenChange={setConfirmEmpty}>
+        <SheetContent>
+          <SheetTitle>{t('emptyTitle')}</SheetTitle>
+          <SheetDescription>{t('emptyBody')}</SheetDescription>
+          <SheetFooter>
+            <button
+              type="button"
+              className={buttonVariants({ className: 'w-full' })}
+              onClick={() => setConfirmEmpty(false)}
             >
-              {t('emptyTitle')}
-            </h2>
-            <p className="mb-7 text-center text-[13px] leading-relaxed text-white/50">
-              {t('emptyBody')}
-            </p>
-            <div className="flex flex-col gap-2.5">
-              <button
-                type="button"
-                className={buttonVariants({ className: 'w-full' })}
-                onClick={() => setConfirmEmpty(false)}
-              >
-                {t('continue')}
-              </button>
-              <Link
-                href="/dashboard"
-                className={buttonVariants({
-                  variant: 'outline',
-                  className: 'w-full',
-                })}
-              >
-                {t('finishWithoutSave')}
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : null}
+              {t('continue')}
+            </button>
+            <Link
+              href="/dashboard"
+              className={buttonVariants({
+                variant: 'outline',
+                className: 'w-full',
+              })}
+            >
+              {t('finishWithoutSave')}
+            </Link>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
