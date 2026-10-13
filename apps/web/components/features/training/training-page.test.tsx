@@ -34,6 +34,7 @@ const PROGRAM = {
             id: '55555555-5555-4555-8555-555555555555',
             code: 'EX_070',
             name: 'Скручування',
+            nameEn: 'Crunch',
             muscleGroups: ['ABS'],
             repsMin: 15,
             repsMax: 20,
@@ -52,6 +53,7 @@ const PROGRAM = {
             id: '44444444-4444-4444-8444-444444444444',
             code: 'EX_039',
             name: 'Тяга вертикального блоку',
+            nameEn: 'Lat pulldown',
             muscleGroups: ['BACK', 'BICEPS'],
             repsMin: 10,
             repsMax: 12,
@@ -65,6 +67,7 @@ const PROGRAM = {
             id: '66666666-6666-4666-8666-666666666666',
             code: 'EX_008',
             name: 'Жим гантелей вгору сидячи',
+            nameEn: 'Seated dumbbell shoulder press',
             muscleGroups: ['SHOULDERS'],
             repsMin: 10,
             repsMax: 12,
@@ -93,10 +96,10 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ replace: routerReplace, push: vi.fn() }),
 }));
 
-function renderPage() {
+function renderPage(locale: 'uk' | 'en' = 'uk') {
   return render(
     <Providers>
-      <I18nTestProvider>
+      <I18nTestProvider locale={locale}>
         <TrainingPage />
       </I18nTestProvider>
     </Providers>,
@@ -207,6 +210,34 @@ describe('TrainingPage', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText('Жим гантелей вгору сидячи'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lists the exercises with their English names in the English locale', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/programs/me')) {
+          return json({ program: PROGRAM });
+        }
+        return json({}, 404);
+      }),
+    );
+    signIn();
+    renderPage('en');
+
+    expect(await screen.findByText('Crunch')).toBeInTheDocument();
+    expect(screen.queryByText('Скручування')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Workout 01/ }));
+
+    expect(screen.getByText('Lat pulldown')).toBeInTheDocument();
+    expect(
+      screen.getByText('Seated dumbbell shoulder press'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Тяга вертикального блоку'),
     ).not.toBeInTheDocument();
   });
 

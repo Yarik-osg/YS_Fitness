@@ -19,11 +19,17 @@ const NOW = new Date(2026, 9, 11, 12, 0, 0);
 const rowId = '44444444-4444-4444-8444-444444444444';
 const pressId = '55555555-5555-4555-8555-555555555555';
 
+const ENGLISH_NAMES: Record<string, string> = {
+  'Тяга вертикального блоку': 'Lat pulldown',
+  Скручування: 'Crunch',
+};
+
 function exercise(id: string, name: string) {
   return {
     id,
     code: name,
     name,
+    nameEn: ENGLISH_NAMES[name] ?? name,
     muscleGroups: ['BACK' as const],
     repsMin: 10,
     repsMax: 12,
@@ -597,6 +603,21 @@ describe('TrainingCalendar', () => {
     expect(
       screen.getByText('У цей день тренувань не було.'),
     ).toBeInTheDocument();
+  });
+
+  it('names logged exercises in English', async () => {
+    const user = userEvent.setup();
+    stubCalendarApi();
+    renderCalendar('en');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'October 7, 2 workouts' }),
+    );
+    await user.click(screen.getByRole('button', { name: /^Workout 01/ }));
+
+    expect(screen.getByText('Lat pulldown')).toBeInTheDocument();
+    expect(screen.getByText('Crunch')).toBeInTheDocument();
+    expect(screen.queryByText('Скручування')).not.toBeInTheDocument();
   });
 
   it('labels recommended days in English', async () => {

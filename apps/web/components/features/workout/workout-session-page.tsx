@@ -8,10 +8,11 @@ import type {
   WorkoutLogSetResponse,
 } from '@repo/shared-types';
 import type { LogWorkoutInput } from '@repo/validation';
-import { useTranslations } from 'next-intl';
-import { Fragment, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
+import { exerciseName } from '@/lib/exercise-name';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 import { useLogWorkout, useWorkoutLogs } from '@/lib/hooks/use-workouts';
 
@@ -21,6 +22,7 @@ type ExerciseDraft = {
   exerciseId: string;
   order: number;
   name: string;
+  nameEn: string;
   prescribedSets: number;
   repsLabel: string;
   allowsAbsAddon: boolean;
@@ -35,6 +37,7 @@ type LoggedSetLine = {
 type CompletedExercise = {
   order: number;
   name: string;
+  nameEn: string;
   sets: LoggedSetLine[];
   previous: LoggedSetLine[] | null;
 };
@@ -111,6 +114,30 @@ function SessionForm({
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedSession | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const cardRefs = useRef(new Map<string, HTMLElement>());
+  // Set only by "Complete exercise", so opening a card by hand never scrolls.
+  const scrollAfterOpen = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (expandedId === null || scrollAfterOpen.current !== expandedId) return;
+    scrollAfterOpen.current = null;
+    const card = cardRefs.current.get(expandedId);
+    const header = headerRef.current;
+    if (!card || !header) return;
+    const reduceMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    window.scrollTo({
+      top: Math.max(
+        0,
+        card.getBoundingClientRect().top +
+          window.scrollY -
+          header.offsetHeight -
+          8,
+      ),
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  }, [expandedId]);
 
   const dayNumber = String(day.dayNumber).padStart(2, '0');
   const muscleLine = muscleLabels(day, muscles);
@@ -161,7 +188,10 @@ function SessionForm({
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] text-white">
-      <header className="sticky top-0 z-10 border-b border-white/5 bg-[#0b0b0b] px-5 pt-8 pb-4">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-10 border-b border-white/5 bg-[#0b0b0b] px-5 pt-8 pb-4"
+      >
         <Link
           href="/dashboard"
           className="mb-4 inline-flex items-center gap-2 font-label text-[9px] font-semibold tracking-[0.14em] text-white/30 uppercase"
@@ -242,7 +272,13 @@ function SessionForm({
                 const index = exercises.findIndex(
                   (row) => row.exerciseId === exercise.exerciseId,
                 );
-                setExpandedId(exercises[index + 1]?.exerciseId ?? null);
+                const next = exercises[index + 1]?.exerciseId ?? null;
+                scrollAfterOpen.current = next;
+                setExpandedId(next);
+              }}
+              cardRef={(element) => {
+                if (element) cardRefs.current.set(exercise.exerciseId, element);
+                else cardRefs.current.delete(exercise.exerciseId);
               }}
             />
             {exercise.allowsAbsAddon ? (
@@ -322,6 +358,7 @@ function ExerciseCard({
   onToggle,
   onChangeSet,
   onComplete,
+  cardRef,
 }: {
   exercise: ExerciseDraft;
   expanded: boolean;
@@ -329,12 +366,15 @@ function ExerciseCard({
   onToggle: () => void;
   onChangeSet: (index: number, field: keyof SetDraft, value: string) => void;
   onComplete: () => void;
+  cardRef: (element: HTMLElement | null) => void;
 }) {
+  const locale = useLocale();
   const t = useTranslations('workouts');
   const filled = exercise.sets.some((set) => isFilledReps(set.reps));
 
   return (
     <article
+      ref={cardRef}
       className={`border-[1.5px] ${
         expanded
           ? 'border-white/15 bg-white/[0.015]'
@@ -353,7 +393,7 @@ function ExerciseCard({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-heading text-[15px] tracking-[0.04em] text-white/80 uppercase">
-            {exercise.name}
+            {exerciseName(exercise, locale)}
           </span>
           <span className="mt-1 block text-[11px] font-medium text-white/30">
             {t('meta', {
@@ -520,6 +560,7 @@ function Completion({
   setCount,
   exercises,
 }: SavedSession) {
+  const locale = useLocale();
   const t = useTranslations('workouts');
 
   return (
@@ -570,7 +611,8 @@ function Completion({
             }
           >
             <p className="font-heading text-xs tracking-[0.04em] text-white uppercase">
-              {String(exercise.order).padStart(2, '0')} — {exercise.name}
+              {String(exercise.order).padStart(2, '0')} —{' '}
+              {exerciseName(exercise, locale)}
             </p>
             {exercise.previous ? (
               <p className="mt-0.5 text-[10px] leading-snug font-medium text-white/25">
@@ -627,6 +669,7 @@ function initialExercises(day: ProgramDayResponse): ExerciseDraft[] {
     exerciseId: row.exercise.id,
     order: row.order,
     name: row.exercise.name,
+    nameEn: row.exercise.nameEn,
     prescribedSets: row.sets,
     repsLabel: `${row.exercise.repsMin}–${row.exercise.repsMax}`,
     allowsAbsAddon: row.allowsAbsAddon,
@@ -702,6 +745,7 @@ function completedExercises(
       {
         order: exercise.order,
         name: exercise.name,
+        nameEn: exercise.nameEn,
         sets,
         previous:
           previous && previous.sets.length > 0

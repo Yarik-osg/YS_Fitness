@@ -59,6 +59,7 @@ const GENDER_LABELS: Record<string, ParsedGender> = {
 export interface ParsedExercise {
   code: string;
   name: string;
+  nameEn: string;
   muscleGroups: ParsedMuscleGroup[];
   repsMin: number;
   repsMax: number;
@@ -172,14 +173,15 @@ function rowsAfterHeader(lines: string[]): string[] {
 
 function parseLibrary(section: string[]): ParsedExercise[] {
   return rowsAfterHeader(section.slice(1)).map((line) => {
-    const [name, muscles, code, reps] = cells(line);
-    if (!name || !code || !reps) {
+    const [name, muscles, code, reps, nameEn] = cells(line);
+    if (!name || !code || !reps || !nameEn) {
       throw new Error(`Exercise library row is incomplete: ${line}`);
     }
     const range = parseRepRange(reps, code);
     return {
       code,
       name,
+      nameEn,
       muscleGroups: parseMuscles(muscles ?? '', code),
       ...range,
     };

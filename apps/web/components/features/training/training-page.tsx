@@ -4,13 +4,14 @@ import type {
   AssignedProgramResponse,
   ProgramDayResponse,
 } from '@repo/shared-types';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { AssignProgramCard } from '@/components/features/dashboard/dashboard';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { TrainingCalendar } from '@/components/features/training/training-calendar';
 import { Link } from '@/i18n/navigation';
+import { exerciseName } from '@/lib/exercise-name';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 
 export function TrainingPage() {
@@ -108,6 +109,7 @@ function DayCard({
   count: number;
   isNext: boolean;
 }) {
+  const locale = useLocale();
   const t = useTranslations('training');
   const muscles = useTranslations('dashboard.workouts');
   const [expanded, setExpanded] = useState(isNext);
@@ -176,7 +178,7 @@ function DayCard({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-medium text-white/70">
-                    {row.exercise.name}
+                    {exerciseName(row.exercise, locale)}
                   </span>
                   <span className="mt-0.5 block text-[10px] font-medium text-white/30">
                     {row.exercise.muscleGroups

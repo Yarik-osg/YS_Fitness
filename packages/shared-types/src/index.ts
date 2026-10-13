@@ -160,6 +160,7 @@ export interface ExerciseResponse {
   id: string;
   code: string;
   name: string;
+  nameEn: string;
   muscleGroups: MuscleGroup[];
   repsMin: number;
   repsMax: number;

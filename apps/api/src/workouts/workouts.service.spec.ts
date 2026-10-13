@@ -40,6 +40,7 @@ const program: AssignedProgramResponse = {
             id: exerciseId,
             code: 'EX_039',
             name: 'Row',
+            nameEn: 'English row',
             muscleGroups: ['BACK'],
             repsMin: 10,
             repsMax: 12,
@@ -72,6 +73,7 @@ function logRecord(
           id: exerciseId,
           code: 'EX_039',
           name: 'Row',
+          nameEn: 'English row',
           muscleGroups: ['BACK'],
           repsMin: 10,
           repsMax: 12,
@@ -128,6 +130,7 @@ describe('WorkoutsService.log', () => {
     expect(result.templateId).toBe(templateId);
     expect(result.sets[0]?.weightKg).toBe(35.5);
     expect(result.sets[0]?.exercise.name).toBe('Row');
+    expect(result.sets[0]?.exercise.nameEn).toBe('English row');
   });
 
   it('allows another log for the same day', async () => {
@@ -324,6 +327,7 @@ describe('WorkoutsService.list', () => {
     expect(result.logs[0]?.completedAt).toBe('2026-10-05T08:00:00.000Z');
     expect(result.logs[1]?.sets[0]?.weightKg).toBe(35.5);
     expect(result.logs[1]?.sets[0]?.exercise.name).toBe('Row');
+    expect(result.logs[1]?.sets[0]?.exercise.nameEn).toBe('English row');
   });
 
   it('returns no logs for an empty range', async () => {
