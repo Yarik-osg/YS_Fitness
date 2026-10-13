@@ -481,6 +481,7 @@ describe('Profile page', () => {
       },
     ]);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByText('Програму оновлено.')).toBeInTheDocument();
     expect(screen.getByText('170 см')).toBeInTheDocument();
     expect(screen.getAllByText('Середній рівень').length).toBeGreaterThan(0);
     expect(screen.getByText("Набрати м'язову масу")).toBeInTheDocument();
@@ -607,6 +608,7 @@ describe('Profile page', () => {
     await user.click(screen.getByRole('button', { name: 'Зберегти' }));
 
     await waitFor(() => expect(patches).toHaveLength(1));
+    expect(await screen.findByText('Зміни збережено.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(patches[0]).toMatchObject({
       experience: 'beginner',
@@ -745,6 +747,7 @@ describe('Profile page', () => {
     await user.click(await screen.findByRole('button', { name: /1 місяць/ }));
     await user.click(screen.getByRole('button', { name: 'Підтвердити' }));
 
+    expect(await screen.findByText('Підписку продовжено.')).toBeInTheDocument();
     expect(
       await screen.findByText(formatDay('2027-01-01T00:00:00.000Z')),
     ).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Providers } from '@/components/providers';
 import { I18nTestProvider } from '@/test/i18n';
 import { LoginForm } from './login-form';
 
@@ -33,9 +34,11 @@ vi.mock('next/navigation', () => ({
 
 function renderForm(locale: 'uk' | 'en' = 'en') {
   return render(
-    <I18nTestProvider locale={locale}>
-      <LoginForm />
-    </I18nTestProvider>,
+    <Providers>
+      <I18nTestProvider locale={locale}>
+        <LoginForm />
+      </I18nTestProvider>
+    </Providers>,
   );
 }
 
@@ -58,15 +61,19 @@ describe('LoginForm password recovery', () => {
     ).toHaveAttribute('href', '/forgot-password');
   });
 
-  it('confirms a finished reset only when the URL says so', () => {
+  it('confirms a finished reset only when the URL says so', async () => {
     renderForm('en');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Password changed. Log in with your new password.'),
+    ).not.toBeInTheDocument();
     cleanup();
 
     nav.query = '?reset=1';
     renderForm('en');
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Password changed. Log in with your new password.',
-    );
+    expect(
+      await screen.findByText(
+        'Password changed. Log in with your new password.',
+      ),
+    ).toBeInTheDocument();
   });
 });

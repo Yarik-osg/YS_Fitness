@@ -4,10 +4,12 @@ import type { AssignedProgramResponse } from '@repo/shared-types';
 import { Dumbbell } from 'lucide-react';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import { useLogout } from '@/lib/hooks/use-auth';
@@ -266,8 +268,6 @@ export function AssignProgramCard({
     displayedError ?? assign.error,
   );
   const loadFailed = displayedError != null && !subscriptionRequired;
-  const assignFailed =
-    assign.isError && !unavailable && !isSubscriptionRequired(assign.error);
 
   return (
     <article className="border border-line bg-panel p-5">
@@ -283,9 +283,7 @@ export function AssignProgramCard({
               ? t('subscription.none')
               : loadFailed
                 ? t('workouts.loadError')
-                : assignFailed
-                  ? t('workouts.assignError')
-                  : t('workouts.prompt')}
+                : t('workouts.prompt')}
         </p>
         {unavailable ? null : subscriptionRequired ? (
           <Link href="/checkout" className={buttonVariants({ size: 'sm' })}>
@@ -303,7 +301,21 @@ export function AssignProgramCard({
           <Button
             size="sm"
             disabled={assign.isPending}
-            onClick={() => void assign.mutate()}
+            onClick={() =>
+              void assign.mutate(undefined, {
+                onSuccess: () => toast.success(t('workouts.assigned')),
+                onError: (error) => {
+                  if (
+                    !isProgramUnavailable(error) &&
+                    !isSubscriptionRequired(error)
+                  ) {
+                    toast.error(t('workouts.assignError'), {
+                      duration: ERROR_DURATION_MS,
+                    });
+                  }
+                },
+              })
+            }
           >
             {assign.isPending ? t('workouts.assigning') : t('workouts.assign')}
           </Button>

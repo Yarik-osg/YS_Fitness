@@ -92,6 +92,11 @@ const logs = vi.hoisted(() => ({
 }));
 
 const logWorkout = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
+
+vi.mock('sonner', () => ({
+  toast: { error: toastError, success: vi.fn(), dismiss: vi.fn() },
+}));
 
 vi.mock('@/lib/hooks/use-programs', () => ({
   useMyProgram: () => ({
@@ -144,6 +149,7 @@ describe('WorkoutSessionPage', () => {
     logs.current = { logs: [], total: 0 };
     logWorkout.mockReset();
     logWorkout.mockResolvedValue({ id: 'log-1' });
+    toastError.mockReset();
   });
 
   it('logs every prescribed set and leaves extra rows out', async () => {
@@ -175,6 +181,7 @@ describe('WorkoutSessionPage', () => {
     );
 
     expect(logWorkout).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
     expect(
       screen.getByText('Заповни повторення в кожному підході.'),
     ).toBeInTheDocument();
@@ -232,6 +239,31 @@ describe('WorkoutSessionPage', () => {
     expect(
       screen.getByRole('link', { name: 'Повернутися до моєї програми →' }),
     ).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('toasts when saving the workout fails', async () => {
+    const user = userEvent.setup();
+    logWorkout.mockRejectedValue(new Error('fail'));
+    renderSession();
+
+    await user.type(screen.getByLabelText('Вага 1'), '35');
+    await user.type(screen.getByLabelText('Повтори 1'), '12');
+    await user.type(screen.getByLabelText('Повтори 2'), '10');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(toastError).toHaveBeenCalledWith('Не вдалося зберегти тренування.', {
+      duration: 6_000,
+    });
+    expect(
+      screen.queryByText('Не вдалося зберегти тренування.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Тренування завершено' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a fixed joint warm-up first and an abs card after the marked exercise', () => {
