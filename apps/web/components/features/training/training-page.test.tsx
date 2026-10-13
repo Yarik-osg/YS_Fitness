@@ -128,6 +128,22 @@ function json(body: unknown, status = 200) {
 }
 
 describe('TrainingPage', () => {
+  it('shows a skeleton instead of the program while it loads', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    signIn();
+    renderPage();
+
+    expect(
+      screen.getByRole('main', { name: 'Завантажуємо програму' }),
+    ).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByRole('heading', { name: 'Тренування' }),
+    ).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();

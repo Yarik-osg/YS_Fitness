@@ -139,6 +139,22 @@ function renderProfile() {
 }
 
 describe('Profile page', () => {
+  it('shows a skeleton instead of the profile while it loads', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    renderProfile();
+
+    expect(
+      screen.getByRole('main', { name: 'Завантажуємо профіль…' }),
+    ).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByRole('heading', { name: 'Профіль' }),
+    ).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
