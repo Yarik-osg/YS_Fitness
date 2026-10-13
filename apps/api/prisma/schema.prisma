@@ -244,14 +244,15 @@ enum ProgramAccent {
 }
 
 model Exercise {
-  id            String        @id @default(uuid()) @db.Uuid
-  code          String        @unique @db.VarChar(16)
-  name          String        @db.VarChar(200)
-  muscleGroups  MuscleGroup[] @map("muscle_groups")
-  repsMin       Int           @map("reps_min")
-  repsMax       Int           @map("reps_max")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id           String        @id @default(uuid()) @db.Uuid
+  code         String        @unique @db.VarChar(16)
+  name         String        @db.VarChar(200)
+  nameEn       String        @default("") @map("name_en") @db.VarChar(200)
+  muscleGroups MuscleGroup[] @map("muscle_groups")
+  repsMin      Int           @map("reps_min")
+  repsMax      Int           @map("reps_max")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
   templateExercises ProgramTemplateExercise[]
   workoutLogSets    WorkoutLogSet[]
@@ -260,20 +261,20 @@ model Exercise {
 }
 
 model ProgramTemplate {
-  id                String             @id @default(uuid()) @db.Uuid
-  code              String             @unique @db.VarChar(16)
-  name              String             @db.VarChar(200)
-  gender            ProgramTrack
-  level             TrainingExperience
-  frequencyPerWeek  Int                @map("frequency_per_week")
-  accent            ProgramAccent
-  active            Boolean            @default(true)
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
+  id               String             @id @default(uuid()) @db.Uuid
+  code             String             @unique @db.VarChar(16)
+  name             String             @db.VarChar(200)
+  gender           ProgramTrack
+  level            TrainingExperience
+  frequencyPerWeek Int                @map("frequency_per_week")
+  accent           ProgramAccent
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
 
-  days             ProgramTemplateDay[]
-  workoutPrograms  WorkoutProgram[]
-  workoutLogs      WorkoutLog[]
+  days            ProgramTemplateDay[]
+  workoutPrograms WorkoutProgram[]
+  workoutLogs     WorkoutLog[]
 
   @@unique([gender, level, frequencyPerWeek, accent], map: "program_templates_identity_key")
   @@map("program_templates")
@@ -292,9 +293,9 @@ model ProgramTemplateDay {
 }
 
 model ProgramTemplateExercise {
-  id            String @id @default(uuid()) @db.Uuid
-  templateDayId String @map("template_day_id") @db.Uuid
-  exerciseId    String @map("exercise_id") @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
+  templateDayId  String  @map("template_day_id") @db.Uuid
+  exerciseId     String  @map("exercise_id") @db.Uuid
   order          Int
   sets           Int
   allowsAbsAddon Boolean @default(false) @map("allows_abs_addon")

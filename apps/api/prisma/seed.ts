@@ -83,6 +83,7 @@ async function seedPrograms(): Promise<void> {
       if (
         existing &&
         (existing.name !== exercise.name ||
+          existing.nameEn !== exercise.nameEn ||
           existing.muscleGroups.join() !== exercise.muscleGroups.join() ||
           existing.repsMin !== exercise.repsMin ||
           existing.repsMax !== exercise.repsMax)
@@ -104,6 +105,7 @@ async function seedPrograms(): Promise<void> {
         create: exercise,
         update: {
           name: exercise.name,
+          nameEn: exercise.nameEn,
           muscleGroups: exercise.muscleGroups,
           repsMin: exercise.repsMin,
           repsMax: exercise.repsMax,

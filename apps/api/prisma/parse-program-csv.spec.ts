@@ -20,6 +20,7 @@ describe('parseProgramCsv', () => {
     ).toEqual({
       code: 'EX_033',
       name: 'Румунська тяга з гантелями',
+      nameEn: 'Dumbbell Romanian deadlift',
       muscleGroups: ['HAMSTRINGS', 'GLUTES'],
       repsMin: 10,
       repsMax: 12,
@@ -144,8 +145,8 @@ describe('parseProgramCsv', () => {
       'День 2;1;Присідання;Сідниці;EX_001;3;',
       '',
       'Список вправ: Таблиця 1',
-      'Назва вправи;М’язова група;ID вправи;Повторення;',
-      'Присідання;Сідниці;EX_001;10-12;',
+      'Назва вправи;М’язова група;ID вправи;Повторення;Назва англійською;',
+      'Присідання;Сідниці;EX_001;10-12;Squat;',
     ].join('\n');
 
     expect(() => parseProgramCsv(source)).toThrow(
@@ -162,8 +163,8 @@ describe('parseProgramCsv', () => {
       'День 1;1;Присідання;Сідниці;EX_001;3;',
       '',
       'Список вправ: Таблиця 1',
-      'Назва вправи;М’язова група;ID вправи;Повторення;',
-      'Присідання;Сідниці;EX_001;10-12;',
+      'Назва вправи;М’язова група;ID вправи;Повторення;Назва англійською;',
+      'Присідання;Сідниці;EX_001;10-12;Squat;',
     ].join('\n');
 
     expect(() => parseProgramCsv(source)).toThrow(
@@ -182,8 +183,8 @@ describe('parseProgramCsv', () => {
       'День 2;1;Присідання;Сідниці;EX_001;3;',
       '',
       'Список вправ: Таблиця 1',
-      'Назва вправи;М’язова група;ID вправи;Повторення;',
-      'Присідання;Сідниці;EX_001;10-12;',
+      'Назва вправи;М’язова група;ID вправи;Повторення;Назва англійською;',
+      'Присідання;Сідниці;EX_001;10-12;Squat;',
     ].join('\n');
 
     expect(() => parseProgramCsv(source)).toThrow(
@@ -202,12 +203,39 @@ describe('parseProgramCsv', () => {
       'День 2;1;Присідання;Сідниці;EX_001;3;',
       '',
       'Список вправ: Таблиця 1',
-      'Назва вправи;М’язова група;ID вправи;Повторення;',
-      'Присідання;Сідниці;EX_001;10-12;',
+      'Назва вправи;М’язова група;ID вправи;Повторення;Назва англійською;',
+      'Присідання;Сідниці;EX_001;10-12;Squat;',
     ].join('\n');
 
     expect(() => parseProgramCsv(source)).toThrow(
       /WB2 day 1 repeats an exercise order/,
     );
+  });
+
+  it('rejects a library exercise without an English name', () => {
+    const source = [
+      'WB2: Таблиця 1',
+      'WB2 — Жінки · Початковий рівень · 2 тренування на тиждень · Без акценту',
+      ';;;;;;',
+      'День;№;Вправа;М’язова група;ID вправи;Підходи;',
+      'День 1;1;Присідання;Сідниці;EX_001;3;',
+      'День 2;1;Присідання;Сідниці;EX_001;3;',
+      '',
+      'Список вправ: Таблиця 1',
+      'Назва вправи;М’язова група;ID вправи;Повторення;Назва англійською;',
+      'Присідання;Сідниці;EX_001;10-12;',
+    ].join('\n');
+
+    expect(() => parseProgramCsv(source)).toThrow(
+      /Exercise library row is incomplete/,
+    );
+  });
+
+  it('gives every exercise in the female file a distinct English name', async () => {
+    const parsed = parseProgramCsv(await readFile(csvPath, 'utf8'));
+    const names = parsed.exercises.map((exercise) => exercise.nameEn);
+
+    expect(names.every((name) => name.length > 0)).toBe(true);
+    expect(new Set(names).size).toBe(names.length);
   });
 });

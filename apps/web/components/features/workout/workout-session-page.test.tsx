@@ -4,7 +4,7 @@ import type {
 } from '@repo/shared-types';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
 import { WorkoutSessionPage } from './workout-session-page';
 
@@ -37,6 +37,7 @@ const program: AssignedProgramResponse = {
             id: '66666666-6666-4666-8666-666666666666',
             code: 'EX_001',
             name: 'Не сьогодні',
+            nameEn: 'Not today',
             muscleGroups: ['CHEST'],
             repsMin: 8,
             repsMax: 10,
@@ -55,6 +56,7 @@ const program: AssignedProgramResponse = {
             id: rowId,
             code: 'EX_039',
             name: 'Тяга вертикального блоку',
+            nameEn: 'Lat pulldown',
             muscleGroups: ['BACK'],
             repsMin: 10,
             repsMax: 12,
@@ -68,6 +70,7 @@ const program: AssignedProgramResponse = {
             id: pressId,
             code: 'EX_070',
             name: 'Скручування',
+            nameEn: 'Crunch',
             muscleGroups: ['ABS'],
             repsMin: 15,
             repsMax: 20,
@@ -125,6 +128,11 @@ function renderSession() {
 }
 
 describe('WorkoutSessionPage', () => {
+  beforeEach(() => {
+    // jsdom has no layout; completing an exercise scrolls the page.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
   afterEach(() => {
     cleanup();
     logs.current = { logs: [], total: 0 };
@@ -303,6 +311,35 @@ describe('WorkoutSessionPage', () => {
     expect(
       screen.getByText('Optional, after the last exercise'),
     ).toBeInTheDocument();
+  });
+
+  it('names exercises in English in the session and the summary', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nTestProvider locale="en">
+        <WorkoutSessionPage />
+      </I18nTestProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Lat pulldown/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Crunch/ })).toBeInTheDocument();
+    expect(
+      screen.queryByText('Тяга вертикального блоку'),
+    ).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Reps 1'), '12');
+    await user.type(screen.getByLabelText('Reps 2'), '10');
+    await user.click(screen.getByRole('button', { name: /Crunch/ }));
+    await user.type(screen.getByLabelText('Reps 1'), '15');
+    await user.click(screen.getByRole('button', { name: 'Finish workout' }));
+
+    expect(await screen.findByText(/01 — Lat pulldown/)).toBeInTheDocument();
+    expect(screen.getByText(/02 — Crunch/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Тяга вертикального блоку/),
+    ).not.toBeInTheDocument();
   });
 
   it('does not log the fixed cards', async () => {
@@ -629,5 +666,88 @@ describe('WorkoutSessionPage', () => {
     expect(screen.queryByText('Варто збільшити вагу')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Вага 1')).toHaveValue('');
     expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+  });
+
+  describe('scrolling to the next exercise', () => {
+    const headerHeight = 120;
+    const cardTop = 500;
+    let scrollTo: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(
+        headerHeight,
+      );
+      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+        function (this: Element) {
+          return {
+            top: this.tagName === 'ARTICLE' ? cardTop : 0,
+          } as DOMRect;
+        },
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    it('puts the next exercise just under the sticky header', async () => {
+      const user = userEvent.setup();
+      renderSession();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Завершити вправу' }),
+      );
+
+      expect(screen.getByLabelText('Повтори 1')).toBeInTheDocument();
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(scrollTo).toHaveBeenCalledWith({
+        top: cardTop - headerHeight - 8,
+        behavior: 'smooth',
+      });
+    });
+
+    it('skips the animation when the user prefers reduced motion', async () => {
+      vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+      const user = userEvent.setup();
+      renderSession();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Завершити вправу' }),
+      );
+
+      expect(scrollTo).toHaveBeenCalledWith(
+        expect.objectContaining({ behavior: 'auto' }),
+      );
+    });
+
+    it('does not scroll when a card is opened by hand', async () => {
+      const user = userEvent.setup();
+      renderSession();
+
+      await user.click(screen.getByRole('button', { name: /Скручування/ }));
+      await user.click(
+        screen.getByRole('button', { name: /Тяга вертикального блоку/ }),
+      );
+
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('does not scroll after the last exercise', async () => {
+      const user = userEvent.setup();
+      renderSession();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Завершити вправу' }),
+      );
+      scrollTo.mockClear();
+      await user.click(
+        screen.getByRole('button', { name: 'Завершити вправу' }),
+      );
+
+      expect(scrollTo).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText(/^Вага/)).not.toBeInTheDocument();
+    });
   });
 });

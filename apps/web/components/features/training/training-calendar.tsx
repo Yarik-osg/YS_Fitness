@@ -15,6 +15,7 @@ import {
   startOfMonth,
   weekDays,
 } from '@/lib/calendar';
+import { exerciseName } from '@/lib/exercise-name';
 import { useWorkoutCalendar } from '@/lib/hooks/use-workouts';
 import { isRecommendedDay } from '@/lib/training-schedule';
 
@@ -313,14 +314,14 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
 
   const exercises: {
     key: string;
-    name: string;
+    exercise: WorkoutLogResponse['sets'][number]['exercise'];
     sets: WorkoutLogResponse['sets'];
   }[] = [];
   for (const set of log.sets) {
     const key = `${set.exerciseId}:${set.order}`;
     const existing = exercises.find((entry) => entry.key === key);
     if (existing) existing.sets.push(set);
-    else exercises.push({ key, name: set.exercise.name, sets: [set] });
+    else exercises.push({ key, exercise: set.exercise, sets: [set] });
   }
 
   const panelId = `calendar-log-${log.id}`;
@@ -357,7 +358,7 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
               className="flex items-baseline justify-between gap-3"
             >
               <span className="min-w-0 text-xs font-medium text-white/70">
-                {exercise.name}
+                {exerciseName(exercise.exercise, locale)}
               </span>
               <span className="shrink-0 text-[11px] font-semibold text-white/40">
                 {exercise.sets

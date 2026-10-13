@@ -149,6 +149,7 @@ function toWorkoutLog(log: WorkoutLogRecord): WorkoutLogResponse {
         id: set.exercise.id,
         code: set.exercise.code,
         name: set.exercise.name,
+        nameEn: set.exercise.nameEn,
         muscleGroups: set.exercise.muscleGroups,
         repsMin: set.exercise.repsMin,
         repsMax: set.exercise.repsMax,

@@ -41,6 +41,7 @@ function assignedProgram() {
                 id: 'exercise-1',
                 code: 'EX_039',
                 name: 'Тяга вертикального блоку',
+                nameEn: 'Lat pulldown',
                 muscleGroups: ['BACK', 'BICEPS'],
                 repsMin: 10,
                 repsMax: 12,
@@ -114,7 +115,12 @@ describe('ProgramsService', () => {
             {
               sets: 3,
               allowsAbsAddon: true,
-              exercise: { repsMin: 10, repsMax: 12 },
+              exercise: {
+                name: 'Тяга вертикального блоку',
+                nameEn: 'Lat pulldown',
+                repsMin: 10,
+                repsMax: 12,
+              },
             },
           ],
         },

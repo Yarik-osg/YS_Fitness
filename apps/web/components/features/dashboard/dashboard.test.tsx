@@ -33,6 +33,7 @@ function programExercise(
       id: code,
       code,
       name,
+      nameEn: name,
       muscleGroups,
       repsMin,
       repsMax,
