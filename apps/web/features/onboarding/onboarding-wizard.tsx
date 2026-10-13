@@ -12,6 +12,7 @@ import {
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
+import { BirthDateField } from './birth-date-field';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -841,15 +842,10 @@ export function OnboardingWizard() {
                 id="dateOfBirth"
                 label={t('steps.metrics.dateOfBirth')}
               >
-                <input
+                <BirthDateField
                   id="dateOfBirth"
-                  type="date"
-                  max={new Date().toISOString().slice(0, 10)}
-                  value={draft.dateOfBirth ?? ''}
-                  className={`${metricInputClass} [color-scheme:dark]`}
-                  onChange={(event) =>
-                    draft.setAnswer({ dateOfBirth: event.target.value })
-                  }
+                  value={draft.dateOfBirth}
+                  onChange={(dateOfBirth) => draft.setAnswer({ dateOfBirth })}
                 />
               </MetricField>
               {dateImplausible ? (

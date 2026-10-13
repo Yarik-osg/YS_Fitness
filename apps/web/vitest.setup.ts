@@ -24,6 +24,20 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
+class IntersectionObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+
+if (!globalThis.IntersectionObserver) {
+  globalThis.IntersectionObserver =
+    IntersectionObserverMock as unknown as typeof IntersectionObserver;
+}
+
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
