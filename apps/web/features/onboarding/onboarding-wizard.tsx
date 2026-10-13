@@ -14,6 +14,7 @@ import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import { getUserFacingError } from '@/lib/api/errors';
@@ -916,9 +917,15 @@ function DraftLoading() {
   return (
     <main
       aria-busy="true"
-      className="grid min-h-screen place-items-center px-6"
+      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[#0b0b0b] px-5 pt-6"
     >
-      <div className="h-0.5 w-24 animate-pulse bg-white/30" />
+      <Skeleton className="mb-8 h-8 w-full" />
+      <Skeleton className="mb-3 h-3 w-16" />
+      <Skeleton className="mb-6 h-9 w-56" />
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
     </main>
   );
 }

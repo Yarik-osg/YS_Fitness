@@ -13,6 +13,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { buttonVariants } from '@/components/ui/button';
 import { Collapse } from '@/components/ui/collapse';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import {
   Sheet,
@@ -61,21 +62,33 @@ type SavedSession = {
   exercises: CompletedExercise[];
 };
 
+function WorkoutLoading({ label }: { label: string }) {
+  return (
+    <main
+      aria-busy="true"
+      aria-label={label}
+      className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] px-4 pt-8"
+    >
+      <div className="mb-6 flex flex-col gap-2 border-b border-white/5 pb-4">
+        <Skeleton className="h-2 w-16" />
+        <Skeleton className="h-8 w-44" />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    </main>
+  );
+}
+
 export function WorkoutSessionPage() {
   const programQuery = useMyProgram();
   const logsQuery = useWorkoutLogs();
   const t = useTranslations('workouts');
 
   if (programQuery.isPending && !programQuery.data) {
-    return (
-      <main
-        aria-busy="true"
-        aria-label={t('loading')}
-        className="mx-auto grid min-h-screen w-full max-w-[430px] place-items-center bg-[#0b0b0b]"
-      >
-        <div className="h-0.5 w-24 animate-pulse bg-white/30" />
-      </main>
-    );
+    return <WorkoutLoading label={t('loading')} />;
   }
 
   const program = programQuery.data;

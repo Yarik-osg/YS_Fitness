@@ -93,6 +93,7 @@ const logs = vi.hoisted(() => ({
 
 const logWorkout = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
+const programQueryState = vi.hoisted(() => ({ pending: false }));
 
 vi.mock('sonner', () => ({
   toast: { error: toastError, success: vi.fn(), dismiss: vi.fn() },
@@ -100,9 +101,9 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/lib/hooks/use-programs', () => ({
   useMyProgram: () => ({
-    data: program,
-    isPending: false,
-    isFetched: true,
+    data: programQueryState.pending ? undefined : program,
+    isPending: programQueryState.pending,
+    isFetched: !programQueryState.pending,
   }),
 }));
 
@@ -150,6 +151,19 @@ describe('WorkoutSessionPage', () => {
     logWorkout.mockReset();
     logWorkout.mockResolvedValue({ id: 'log-1' });
     toastError.mockReset();
+    programQueryState.pending = false;
+  });
+
+  it('shows a skeleton instead of the session while the program loads', () => {
+    programQueryState.pending = true;
+    renderSession();
+
+    expect(
+      screen.getByRole('main', { name: 'Завантажуємо тренування' }),
+    ).toHaveAttribute('aria-busy', 'true');
+    expect(
+      screen.queryByRole('heading', { name: 'Тренування 01' }),
+    ).not.toBeInTheDocument();
   });
 
   it('logs every prescribed set and leaves extra rows out', async () => {

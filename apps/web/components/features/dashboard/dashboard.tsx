@@ -9,6 +9,7 @@ import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
@@ -35,9 +36,21 @@ function HomeLoading() {
   return (
     <main
       aria-busy="true"
-      className="mx-auto grid min-h-screen w-full max-w-[430px] place-items-center bg-[#0b0b0b] px-6"
+      className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] px-4 pt-7 pb-24"
     >
-      <div className="h-0.5 w-24 animate-pulse bg-white/30" />
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-2 w-24" />
+          <Skeleton className="h-8 w-36" />
+        </div>
+        <Skeleton className="h-8 w-16" />
+      </div>
+      <Skeleton className="mb-3 h-44 w-full" />
+      <div className="grid grid-cols-2 gap-2.5">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+      <ClientNav active="home" />
     </main>
   );
 }

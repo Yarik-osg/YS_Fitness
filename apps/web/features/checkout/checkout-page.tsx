@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { getMySubscription } from '@/lib/api/subscriptions';
@@ -116,9 +117,10 @@ function CheckoutFlow() {
   if (plansQuery.isPending || plansQuery.isLoading) {
     return (
       <CheckoutFrame>
-        <p className="font-label text-[10px] uppercase tracking-[0.2em] text-accent">
-          {t('loadingPlans')}
-        </p>
+        <div aria-busy="true" aria-label={t('loadingPlans')} className="mt-8">
+          <Skeleton className="mb-3 h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+        </div>
       </CheckoutFrame>
     );
   }

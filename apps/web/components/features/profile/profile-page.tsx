@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import {
   Select,
@@ -80,7 +81,20 @@ export function ProfilePage() {
   if (loading) {
     return (
       <Shell>
-        <p className="px-5 py-10 text-sm text-white/50">{t('loading')}</p>
+        <main aria-busy="true" aria-label={t('loading')} className="px-5 pt-8">
+          <div className="mb-8 flex items-center gap-4">
+            <Skeleton className="size-14 shrink-0" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </main>
       </Shell>
     );
   }

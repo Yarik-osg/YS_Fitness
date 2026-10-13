@@ -6,6 +6,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Collapse } from '@/components/ui/collapse';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   addMonths,
   dayRange,
@@ -242,7 +243,12 @@ export function TrainingCalendar({
           </div>
         ) : selectedLogs.length > 0 ? (
           selectedLogs.map((log) => <LoggedWorkout key={log.id} log={log} />)
-        ) : activeQuery.isPending || selectedInFuture ? null : (
+        ) : activeQuery.isPending ? (
+          <div className="flex flex-col gap-2 border-t border-white/5 px-4 py-3">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : selectedInFuture ? null : (
           <p className="border-t border-white/5 px-4 py-3 text-xs text-white/40">
             {t('empty')}
           </p>
