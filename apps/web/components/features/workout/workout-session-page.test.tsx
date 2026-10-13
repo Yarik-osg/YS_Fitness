@@ -2,7 +2,13 @@ import type {
   AssignedProgramResponse,
   WorkoutLogListResponse,
 } from '@repo/shared-types';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
@@ -367,6 +373,43 @@ describe('WorkoutSessionPage', () => {
     expect(Math.max(...submitted.sets.map((set) => set.order))).toBe(2);
     expect(screen.getByText('2/2')).toBeInTheDocument();
     expect(screen.queryByText('Суглобова розминка')).not.toBeInTheDocument();
+  });
+
+  it('asks before finishing with nothing recorded and keeps editing on dismiss', async () => {
+    const user = userEvent.setup();
+    renderSession();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Результати не записано',
+    });
+    expect(dialog.parentElement).toBe(document.body);
+    expect(
+      within(dialog).getByRole('link', { name: 'Завершити без запису' }),
+    ).toHaveAttribute('href', '/dashboard');
+    expect(logWorkout).not.toHaveBeenCalled();
+
+    // Escape (like "keep filling in") returns to the session.
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Продовжити заповнення',
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(logWorkout).not.toHaveBeenCalled();
   });
 
   it('logs a bodyweight set entered as 0 kg as reps only', async () => {
