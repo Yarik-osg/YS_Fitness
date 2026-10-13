@@ -1,10 +1,12 @@
 import {
   checkoutSchema,
+  forgotPasswordSchema,
   grantSubscriptionSchema,
   isPlausibleDateOfBirth,
   logWorkoutSchema,
   onboardingSchema,
   registerSchema,
+  resetPasswordSchema,
   workoutCalendarQuerySchema,
 } from '@repo/validation';
 
@@ -360,5 +362,47 @@ describe('shared API contracts', () => {
       expect(parseSet({ weightKg: 999.01 })).toBe(false);
       expect(parseSet({ weightKg: 35.555 })).toBe(false);
     });
+  });
+});
+
+describe('password reset contracts', () => {
+  const token = 't'.repeat(43);
+
+  it('normalizes the email and accepts only known locales when asking for a link', () => {
+    expect(
+      forgotPasswordSchema.parse({
+        email: ' Olena@Example.COM ',
+        locale: 'en',
+      }),
+    ).toEqual({ email: 'olena@example.com', locale: 'en' });
+    expect(forgotPasswordSchema.safeParse({ email: 'nope' }).success).toBe(
+      false,
+    );
+    expect(
+      forgotPasswordSchema.safeParse({ email: 'a@b.co', locale: 'de' }).success,
+    ).toBe(false);
+  });
+
+  it('applies the registration password rule and bounds the token when resetting', () => {
+    expect(
+      resetPasswordSchema.safeParse({ token, password: 'long-enough' }).success,
+    ).toBe(true);
+    expect(
+      resetPasswordSchema.safeParse({ token, password: 'short' }).success,
+    ).toBe(false);
+    expect(
+      resetPasswordSchema.safeParse({ token, password: 'x'.repeat(129) })
+        .success,
+    ).toBe(false);
+    expect(
+      resetPasswordSchema.safeParse({ token: 'short', password: 'long-enough' })
+        .success,
+    ).toBe(false);
+    expect(
+      resetPasswordSchema.safeParse({
+        token: 't'.repeat(129),
+        password: 'long-enough',
+      }).success,
+    ).toBe(false);
   });
 });

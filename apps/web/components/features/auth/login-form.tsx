@@ -61,6 +61,14 @@ export function LoginForm() {
         </>
       }
     >
+      {searchParams.get('reset') === '1' && (
+        <p
+          role="status"
+          className="mb-5 border-l-2 border-accent bg-accent/8 px-4 py-3 text-xs text-ink"
+        >
+          {t('login.resetDone')}
+        </p>
+      )}
       <form className="space-y-5" onSubmit={onSubmit} noValidate>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -93,6 +101,14 @@ export function LoginForm() {
               {t('validation.passwordMin')}
             </p>
           )}
+          <p className="text-right">
+            <Link
+              className="text-xs font-semibold text-accent underline underline-offset-4"
+              href="/forgot-password"
+            >
+              {t('login.forgotLink')}
+            </Link>
+          </p>
         </div>
 
         {login.error && (

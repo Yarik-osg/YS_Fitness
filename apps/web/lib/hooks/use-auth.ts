@@ -1,7 +1,12 @@
 'use client';
 
 import type { AuthResponse, MeResponse } from '@repo/shared-types';
-import type { LoginInput, RegisterInput } from '@repo/validation';
+import type {
+  ForgotPasswordInput,
+  LoginInput,
+  RegisterInput,
+  ResetPasswordInput,
+} from '@repo/validation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   bindOnboardingDraftToUser,
@@ -108,6 +113,25 @@ export function useLogin() {
   return useMutation({
     mutationFn: async (input: Omit<LoginInput, 'clientType'>) =>
       hydrateAuthenticatedUser(await authApi.login(input)),
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (input: ForgotPasswordInput) => authApi.forgotPassword(input),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: async (input: ResetPasswordInput) => {
+      await authApi.resetPassword(input);
+      // The API signed every session out; drop the local copy so the login
+      // page is not bounced back to the dashboard by a stale hint.
+      useAuthStore.getState().clearSession();
+      clearSessionHint();
+      clearCsrfToken();
+    },
   });
 }
 

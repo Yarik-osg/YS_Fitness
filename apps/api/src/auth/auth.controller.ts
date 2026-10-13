@@ -13,7 +13,15 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { AuthResponse } from '@repo/shared-types';
 import { AuthService, type IssuedAuthResponse } from './auth.service.js';
-import { LoginDto, LogoutDto, RefreshDto, RegisterDto } from './auth.dto.js';
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  LogoutDto,
+  RefreshDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './auth.dto.js';
+import { PasswordResetService } from './password-reset.service.js';
 import { CsrfService } from './csrf.service.js';
 import { CookieCsrfGuard } from './cookie-csrf.guard.js';
 
@@ -21,6 +29,7 @@ import { CookieCsrfGuard } from './cookie-csrf.guard.js';
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly passwordReset: PasswordResetService,
     private readonly csrf: CsrfService,
   ) {}
 
@@ -47,6 +56,29 @@ export class AuthController {
     this.validateTransport(input.clientType, request);
     const result = await this.auth.login(input, request);
     return this.applyTransport(result, input.clientType, response);
+  }
+
+  /** Always 204, so the response never says whether the email has an account. */
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  async forgotPassword(
+    @Body() input: ForgotPasswordDto,
+    @Req() request: Request,
+  ): Promise<void> {
+    this.assertTrustedOriginIfBrowser(request);
+    await this.passwordReset.requestReset(input);
+  }
+
+  @Post('password/reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async resetPassword(
+    @Body() input: ResetPasswordDto,
+    @Req() request: Request,
+  ): Promise<void> {
+    this.assertTrustedOriginIfBrowser(request);
+    await this.passwordReset.resetPassword(input);
   }
 
   @Post('refresh')
@@ -128,6 +160,12 @@ export class AuthController {
     }
 
     if (clientType === 'WEB' && hasBrowserOrigin) {
+      this.csrf.assertTrustedBrowserRequest(request);
+    }
+  }
+
+  private assertTrustedOriginIfBrowser(request: Request): void {
+    if (request.get('origin') ?? request.get('referer')) {
       this.csrf.assertTrustedBrowserRequest(request);
     }
   }

@@ -93,10 +93,16 @@ A successful registration sends one plain-text "account created" email with a li
 
 Sending uses Nodemailer over SMTP. Set `SMTP_HOST`, `SMTP_PORT`, and, for a real provider, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_SECURE` in `apps/api/.env`, plus `MAIL_FROM`. Leave `SMTP_HOST` empty to disable email. Links use `APP_URL`, or the first `WEB_ORIGINS` entry when it is unset. Use `127.0.0.1` rather than `localhost` for local Mailpit: `localhost` tries IPv6 first and the Docker port mapping can stall for several seconds.
 
+## Password reset
+
+The login page links to `/forgot-password`. The user enters their email and always sees the same message ("if an account exists, we sent a link"), whether or not the account exists. If it does, they get a plain-text email with a link to `/reset-password?token=...`. The link works once and expires after 30 minutes; asking again replaces the earlier link, and the same account gets at most one link per minute. On the reset page the user chooses a new password (8–128 characters), is signed out on every device, receives a "password changed" email, and lands on `/login` with a notice. Only a hash of the token is stored (`password_reset_tokens`). Mail follows the same SMTP settings as the welcome email, and a missing SMTP host means no link can be delivered. Copy lives in `apps/api/src/mail/password-emails.ts` (uk and en).
+
 ## Authentication endpoints
 
 - `POST /api/v1/auth/register` — optional `locale` (`uk` or `en`, default `uk`) picks the language of the welcome email
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/password/forgot` — `{ email, locale? }`; always `204`, throttled to 3 a minute
+- `POST /api/v1/auth/password/reset` — `{ token, password, locale? }`; `204`, or `400 RESET_TOKEN_INVALID` for an unknown, used, or expired token; throttled to 10 a minute
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/users/me`
