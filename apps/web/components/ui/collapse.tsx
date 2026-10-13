@@ -5,19 +5,9 @@ import type { ReactNode } from 'react';
 
 const DURATION = 0.22;
 
-// `custom` carries `instant`, because an exiting child can no longer receive
-// new props once it has been removed.
 const variants: Variants = {
-  closed: (instant: boolean) => ({
-    height: 0,
-    opacity: 0,
-    transition: { duration: instant ? 0 : DURATION, ease: 'easeOut' },
-  }),
-  open: (instant: boolean) => ({
-    height: 'auto',
-    opacity: 1,
-    transition: { duration: instant ? 0 : DURATION, ease: 'easeOut' },
-  }),
+  closed: { height: 0, opacity: 0 },
+  open: { height: 'auto', opacity: 1 },
 };
 
 /**
@@ -26,7 +16,12 @@ const variants: Variants = {
  * motion is honoured by the app-wide `MotionConfig`.
  *
  * Pass `instant` for a change that must not animate, e.g. when the page is
- * about to scroll to a position that depends on the final layout.
+ * about to scroll to a position that depends on the final layout. It is
+ * synchronous: closing removes the content in the same commit and opening
+ * renders it at full height at once. (An exit animation, even a zero-length
+ * one, would keep the old panel in the layout for a frame, and an enter
+ * animation starts at height 0, so a scroll measured right after the change
+ * would land in the wrong place.)
  */
 export function Collapse({
   open,
@@ -41,18 +36,26 @@ export function Collapse({
   className?: string;
   children: ReactNode;
 }) {
+  if (instant) {
+    return open ? (
+      <div id={id} className={className}>
+        {children}
+      </div>
+    ) : null;
+  }
+
   return (
-    <AnimatePresence initial={false} custom={instant}>
+    <AnimatePresence initial={false}>
       {open ? (
         <m.div
           key="panel"
           id={id}
           className={className}
-          custom={instant}
           variants={variants}
           initial="closed"
           animate="open"
           exit="closed"
+          transition={{ duration: DURATION, ease: 'easeOut' }}
           style={{ overflow: 'hidden' }}
         >
           {children}

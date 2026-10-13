@@ -95,17 +95,27 @@ describe('Collapse', () => {
       );
     });
 
-    it('closes without waiting when instant', async () => {
+    it('closes in the same commit when instant, with no exit animation', async () => {
       const user = userEvent.setup();
       render(<Harness instant />);
       const toggle = screen.getByRole('button', { name: 'Toggle' });
       await user.click(toggle);
+      expect(screen.getByText('Details')).toBeInTheDocument();
+
       await user.click(toggle);
 
-      await waitFor(
-        () => expect(screen.queryByText('Details')).not.toBeInTheDocument(),
-        { timeout: 120 },
-      );
+      // No waiting: a scroll measured right after the change must already
+      // see the final layout.
+      expect(screen.queryByText('Details')).not.toBeInTheDocument();
+    });
+
+    it('opens at once when instant', async () => {
+      const user = userEvent.setup();
+      render(<Harness instant />);
+
+      await user.click(screen.getByRole('button', { name: 'Toggle' }));
+
+      expect(screen.getByText('Details')).toBeInTheDocument();
     });
   });
 });
