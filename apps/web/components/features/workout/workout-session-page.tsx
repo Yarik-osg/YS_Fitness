@@ -10,8 +10,10 @@ import type {
 import type { LogWorkoutInput } from '@repo/validation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { buttonVariants } from '@/components/ui/button';
 import { Collapse } from '@/components/ui/collapse';
+import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import {
   Sheet,
   SheetContent,
@@ -194,7 +196,7 @@ function SessionForm({
         ),
       });
     } catch {
-      setError(t('saveError'));
+      toast.error(t('saveError'), { duration: ERROR_DURATION_MS });
     }
   }
 

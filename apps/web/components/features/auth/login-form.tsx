@@ -4,7 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@repo/validation';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +33,13 @@ export function LoginForm() {
     resolver: zodResolver(loginFormSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  const announcedReset = useRef(false);
+  useEffect(() => {
+    if (searchParams.get('reset') !== '1' || announcedReset.current) return;
+    announcedReset.current = true;
+    toast.success(t('login.resetDone'));
+  }, [searchParams, t]);
 
   const onSubmit = handleSubmit(async (input) => {
     try {
@@ -61,14 +70,6 @@ export function LoginForm() {
         </>
       }
     >
-      {searchParams.get('reset') === '1' && (
-        <p
-          role="status"
-          className="mb-5 border-l-2 border-accent bg-accent/8 px-4 py-3 text-xs text-ink"
-        >
-          {t('login.resetDone')}
-        </p>
-      )}
       <form className="space-y-5" onSubmit={onSubmit} noValidate>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>

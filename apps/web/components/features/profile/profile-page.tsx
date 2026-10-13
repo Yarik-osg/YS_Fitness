@@ -21,9 +21,11 @@ import {
 import { User } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
+import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import {
   Select,
   SelectContent,
@@ -294,14 +296,16 @@ function ParametersCard({
   }
 
   function submit(input: ProfileUpdateInput) {
+    const programChange = confirming !== null;
     update.mutate(input, {
       onSuccess: () => {
         setConfirming(null);
         setEditing(false);
+        toast.success(programChange ? t('programChanged') : t('saved'));
       },
       onError: () => {
         setConfirming(null);
-        setError(t('saveError'));
+        toast.error(t('saveError'), { duration: ERROR_DURATION_MS });
       },
     });
   }
@@ -581,14 +585,12 @@ function SubscriptionCard({
   const [planId, setPlanId] = useState<string | null>(
     subscription?.planId ?? null,
   );
-  const [error, setError] = useState<string | null>(null);
   const plans = usePlans(open);
   const renew = useRenewSubscription();
   const selectedId = planId ?? plans.data?.[0]?.id ?? '';
 
   function confirm() {
     if (!selectedId) return;
-    setError(null);
     renew.mutate(selectedId, {
       onSuccess: (response) => {
         if (response.checkoutUrl) {
@@ -596,8 +598,10 @@ function SubscriptionCard({
           return;
         }
         setOpen(false);
+        toast.success(t('renewed'));
       },
-      onError: () => setError(t('renewError')),
+      onError: () =>
+        toast.error(t('renewError'), { duration: ERROR_DURATION_MS }),
     });
   }
 
@@ -644,11 +648,6 @@ function SubscriptionCard({
               onSelect={() => setPlanId(plan.id)}
             />
           ))}
-          {error ? (
-            <p role="alert" className="text-xs text-red-300">
-              {error}
-            </p>
-          ) : null}
           <Button
             className="mt-2 w-full"
             disabled={!selectedId || renew.isPending}

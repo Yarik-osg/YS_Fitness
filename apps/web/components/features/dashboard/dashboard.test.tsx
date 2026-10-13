@@ -307,6 +307,7 @@ describe('Dashboard program', () => {
       screen.getByRole('button', { name: 'Призначити мою програму' }),
     );
 
+    expect(await screen.findByText('Програму призначено.')).toBeInTheDocument();
     expect(
       await screen.findByRole('heading', { name: 'Головна' }),
     ).toBeInTheDocument();
@@ -595,6 +596,9 @@ describe('Dashboard program', () => {
 
     expect(
       await screen.findByText('Програму не вдалося призначити.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Признач програму за відповідями квізу.'),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Призначити мою програму' }),
