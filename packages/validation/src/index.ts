@@ -21,6 +21,17 @@ export const loginSchema = registerSchema.pick({
   deviceName: true,
 });
 
+export const forgotPasswordSchema = registerSchema.pick({
+  email: true,
+  locale: true,
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(32).max(128),
+  password: registerSchema.shape.password,
+  locale: registerSchema.shape.locale,
+});
+
 export const refreshSchema = z.object({
   refreshToken: z.string().min(1).optional(),
   clientType: clientTypeSchema.default('WEB'),
@@ -276,6 +287,8 @@ export const onboardingSchema = onboardingProfileSchema
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;
 export type LogoutInput = z.infer<typeof logoutSchema>;
 export type OnboardingInput = z.infer<typeof onboardingSchema>;

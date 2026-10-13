@@ -177,7 +177,36 @@
       "passwordLabel": "Password",
       "passwordPlaceholder": "Enter password",
       "submit": "Log in →",
-      "pending": "Signing in…"
+      "pending": "Signing in…",
+      "forgotLink": "Forgot your password?",
+      "resetDone": "Password changed. Log in with your new password."
+    },
+    "forgot": {
+      "eyebrow": "Account recovery",
+      "title": "Reset your",
+      "highlighted": "password",
+      "description": "Enter your account email and we will send you a link to choose a new password.",
+      "submit": "Send reset link →",
+      "pending": "Sending…",
+      "sent": "If an account exists for this email, we sent a link. It is valid for 30 minutes.",
+      "footerPrompt": "Remembered it?",
+      "footerLink": "Log in"
+    },
+    "reset": {
+      "eyebrow": "New password",
+      "title": "Choose a new",
+      "highlighted": "password",
+      "description": "Use at least 8 characters. After the change you will be signed out on all devices.",
+      "passwordLabel": "New password",
+      "passwordPlaceholder": "Minimum 8 characters",
+      "confirmLabel": "Confirm password",
+      "confirmPlaceholder": "Repeat password",
+      "submit": "Save password →",
+      "pending": "Saving…",
+      "invalidLink": "This link is invalid or has expired.",
+      "requestNew": "Request a new link",
+      "footerPrompt": "Remembered it?",
+      "footerLink": "Log in"
     },
     "register": {
       "eyebrow": "Registration",
@@ -202,6 +231,7 @@
       "EMAIL_ALREADY_REGISTERED": "An account already exists for this email.",
       "INVALID_CREDENTIALS": "The email or password is incorrect.",
       "INVALID_DATE_OF_BIRTH": "Enter a valid date of birth.",
+      "RESET_TOKEN_INVALID": "This link is invalid or has expired. Request a new one.",
       "INVALID_TIMEZONE": "Your browser timezone could not be recognized.",
       "REFRESH_TOKEN_REQUIRED": "Your session has expired. Please sign in again.",
       "REFRESH_TOKEN_INVALID": "Your session has expired. Please sign in again.",

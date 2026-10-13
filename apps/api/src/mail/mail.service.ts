@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
 import { AppConfigService } from '../config/app-config.service.js';
+import {
+  buildPasswordChangedEmail,
+  buildPasswordResetEmail,
+} from './password-emails.js';
 import { buildWelcomeEmail, type MailLocale } from './welcome-email.js';
 
 @Injectable()
@@ -40,19 +44,61 @@ export class MailService {
    * affect registration, so failures are only logged.
    */
   async sendWelcome(to: string, locale: MailLocale = 'uk'): Promise<void> {
-    if (!this.transport) return;
+    await this.send(
+      to,
+      buildWelcomeEmail({
+        locale,
+        email: to,
+        loginUrl: `${this.appUrl}/${locale}/login`,
+      }),
+      'Welcome email',
+    );
+  }
 
-    const { subject, text } = buildWelcomeEmail({
-      locale,
-      email: to,
-      loginUrl: `${this.appUrl}/${locale}/login`,
-    });
+  /** Sends the reset link. Never throws, so the caller's answer cannot reveal delivery. */
+  async sendPasswordReset(
+    to: string,
+    token: string,
+    locale: MailLocale = 'uk',
+  ): Promise<void> {
+    await this.send(
+      to,
+      buildPasswordResetEmail({
+        locale,
+        resetUrl: `${this.appUrl}/${locale}/reset-password?token=${encodeURIComponent(token)}`,
+      }),
+      'Password reset email',
+    );
+  }
+
+  /** Tells the owner their password changed. Never throws. */
+  async sendPasswordChanged(
+    to: string,
+    locale: MailLocale = 'uk',
+  ): Promise<void> {
+    await this.send(
+      to,
+      buildPasswordChangedEmail({
+        locale,
+        email: to,
+        forgotUrl: `${this.appUrl}/${locale}/forgot-password`,
+      }),
+      'Password changed email',
+    );
+  }
+
+  private async send(
+    to: string,
+    { subject, text }: { subject: string; text: string },
+    label: string,
+  ): Promise<void> {
+    if (!this.transport) return;
 
     try {
       await this.transport.sendMail({ from: this.from, to, subject, text });
     } catch (error) {
       this.logger.warn(
-        `Welcome email failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+        `${label} failed: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
     }
   }

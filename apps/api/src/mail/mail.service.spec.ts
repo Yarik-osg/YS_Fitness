@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MailService } from './mail.service.js';
+import {
+  buildPasswordChangedEmail,
+  buildPasswordResetEmail,
+} from './password-emails.js';
 import { buildWelcomeEmail } from './welcome-email.js';
 
 const mailer = vi.hoisted(() => ({
@@ -107,6 +111,93 @@ describe('buildWelcomeEmail', () => {
       expect(subject.length).toBeGreaterThan(0);
       expect(text).toContain('olena@example.com');
       expect(text).toContain(`http://localhost:3000/${locale}/login`);
+    }
+  });
+});
+
+describe('MailService password emails', () => {
+  beforeEach(() => {
+    mailer.sendMail.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('mails an encoded reset link in the chosen language', async () => {
+    await createService().sendPasswordReset(
+      'olena@example.com',
+      'a+b/c=',
+      'en',
+    );
+
+    expect(mailer.sendMail).toHaveBeenCalledWith({
+      from: 'YS Fitness <no-reply@localhost>',
+      to: 'olena@example.com',
+      subject: 'Reset your YS Fitness password',
+      text: expect.stringContaining(
+        'http://localhost:3000/en/reset-password?token=a%2Bb%2Fc%3D',
+      ),
+    });
+  });
+
+  it('defaults the reset email to Ukrainian', async () => {
+    await createService().sendPasswordReset('olena@example.com', 'token');
+
+    expect(mailer.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: 'Скидання пароля YS Fitness',
+        text: expect.stringContaining(
+          'http://localhost:3000/uk/reset-password',
+        ),
+      }),
+    );
+  });
+
+  it('notifies about a changed password with a link to reset it again', async () => {
+    await createService().sendPasswordChanged('olena@example.com', 'en');
+
+    expect(mailer.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'olena@example.com',
+        subject: 'Your YS Fitness password was changed',
+        text: expect.stringContaining(
+          'http://localhost:3000/en/forgot-password',
+        ),
+      }),
+    );
+  });
+
+  it('never throws and sends nothing without SMTP', async () => {
+    await expect(
+      createService({ SMTP_HOST: undefined }).sendPasswordReset('a@b.co', 't'),
+    ).resolves.toBeUndefined();
+    expect(mailer.sendMail).not.toHaveBeenCalled();
+
+    mailer.sendMail.mockRejectedValue(new Error('down'));
+    await expect(
+      createService().sendPasswordChanged('a@b.co'),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('password email builders', () => {
+  it('state the link and the 30 minute limit in both languages', () => {
+    for (const locale of ['uk', 'en'] as const) {
+      const reset = buildPasswordResetEmail({
+        locale,
+        resetUrl: `https://x.test/${locale}/reset-password?token=t`,
+      });
+      expect(reset.text).toContain(
+        `https://x.test/${locale}/reset-password?token=t`,
+      );
+      expect(reset.text).toContain('30');
+
+      const changed = buildPasswordChangedEmail({
+        locale,
+        email: 'olena@example.com',
+        forgotUrl: `https://x.test/${locale}/forgot-password`,
+      });
+      expect(changed.text).toContain('olena@example.com');
+      expect(changed.text).toContain(
+        `https://x.test/${locale}/forgot-password`,
+      );
     }
   });
 });
