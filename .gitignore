@@ -18,7 +18,7 @@ coverage
 # Turbo
 .turbo
 
-# Graphify knowledge graph (rebuild with /graphify or `graphify update`)
+# Graphify knowledge graph (gitignored). Rebuild with scripts/graphify.sh
 graphify-out/
 
 # Vercel
