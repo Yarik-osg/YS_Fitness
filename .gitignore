@@ -47,7 +47,6 @@ design-reference/
 # Impeccable machine-specific binaries
 .agents/skills/impeccable/scripts/bin/
 .cursor/skills/impeccable/scripts/bin/
-.github/skills/impeccable/scripts/bin/
 
 # Per-developer Impeccable overrides
 .impeccable/config.local.json
