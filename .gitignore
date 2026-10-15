@@ -18,6 +18,9 @@ coverage
 # Turbo
 .turbo
 
+# Graphify knowledge graph (rebuild with /graphify or `graphify update`)
+graphify-out/
+
 # Vercel
 .vercel
 
