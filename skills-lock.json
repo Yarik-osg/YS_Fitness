@@ -7,6 +7,12 @@
       "skillPath": "SKILL.md",
       "computedHash": "b4d7f9ac724de8b6df3ffbbc584a69f4af20db001d1e0b5960c5b672333372b2"
     },
+    "hallmark": {
+      "source": "nutlope/hallmark",
+      "sourceType": "github",
+      "skillPath": "skills/hallmark/SKILL.md",
+      "computedHash": "579f86b27cdd7eb972107f7aecedd537f472891c5fd7c7c821bea15f64e0fe86"
+    },
     "ponytail": {
       "source": "DietrichGebert/ponytail",
       "sourceType": "github",
