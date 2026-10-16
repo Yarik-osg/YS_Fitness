@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "sh scripts/cursor-impeccable-hook.sh",
+        "timeout": 5
+      }
+    ]
+  }
+}

@@ -18,6 +18,9 @@ coverage
 # Turbo
 .turbo
 
+# Graphify knowledge graph (gitignored). Rebuild with scripts/graphify.sh
+graphify-out/
+
 # Vercel
 .vercel
 
@@ -40,3 +43,22 @@ yarn-error.log*
 
 # Local design export used only as a porting reference
 design-reference/
+
+# Hive local memory generated inside vendored skill
+.agents/skills/code-review-skill/.hive/
+
+# Impeccable machine-specific binaries
+.agents/skills/impeccable/scripts/bin/
+.cursor/skills/impeccable/scripts/bin/
+
+# Per-developer Impeccable overrides
+.impeccable/config.local.json
+
+# Agent copies not shared in this repo
+.codex/
+.github/agents/
+.github/hooks/
+.github/skills/
+
+# Local editor settings
+.vscode/
