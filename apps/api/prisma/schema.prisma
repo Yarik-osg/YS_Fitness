@@ -251,12 +251,19 @@ enum MuscleGroup {
   CHEST
   SHOULDERS
   ABS
+  REAR_DELTOIDS
+  CALVES
 }
 
 enum ProgramAccent {
   NONE
   UPPER
   LOWER
+  BACK
+  CHEST
+  SHOULDERS
+  ARMS
+  LEGS
 }
 
 model Exercise {
@@ -314,6 +321,8 @@ model ProgramTemplateExercise {
   exerciseId     String  @map("exercise_id") @db.Uuid
   order          Int
   sets           Int
+  repsMin        Int     @map("reps_min")
+  repsMax        Int     @map("reps_max")
   allowsAbsAddon Boolean @default(false) @map("allows_abs_addon")
 
   templateDay ProgramTemplateDay @relation(fields: [templateDayId], references: [id], onDelete: Cascade)

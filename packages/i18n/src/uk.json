@@ -579,7 +579,9 @@
         "TRICEPS": "Трицепс",
         "CHEST": "Груди",
         "SHOULDERS": "Плечі",
-        "ABS": "Прес"
+        "ABS": "Прес",
+        "REAR_DELTOIDS": "Задня дельта",
+        "CALVES": "Литкові м’язи"
       }
     },
     "nutrition": {

@@ -8,12 +8,15 @@ export const MUSCLE_GROUPS = [
   'CHEST',
   'SHOULDERS',
   'ABS',
+  'REAR_DELTOIDS',
+  'CALVES',
 ] as const;
 
 export type ParsedMuscleGroup = (typeof MUSCLE_GROUPS)[number];
 export type ParsedGender = 'FEMALE' | 'MALE';
 export type ParsedLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
-export type ParsedAccent = 'NONE' | 'UPPER' | 'LOWER';
+export type ParsedAccent =
+  'NONE' | 'UPPER' | 'LOWER' | 'BACK' | 'CHEST' | 'SHOULDERS' | 'ARMS' | 'LEGS';
 
 const MUSCLE_LABELS: Record<string, ParsedMuscleGroup> = {
   Сідниці: 'GLUTES',
@@ -25,6 +28,8 @@ const MUSCLE_LABELS: Record<string, ParsedMuscleGroup> = {
   Груди: 'CHEST',
   Плечі: 'SHOULDERS',
   Прес: 'ABS',
+  'Задня дельта': 'REAR_DELTOIDS',
+  'Литкові м’язи': 'CALVES',
 };
 
 const LEVEL_LABELS: Record<string, ParsedLevel> = {
@@ -43,12 +48,26 @@ const ACCENT_LABELS: Record<string, ParsedAccent> = {
   'Без акценту': 'NONE',
   'Акцент на верх': 'UPPER',
   'Акцент на низ': 'LOWER',
+  'Акцент на спину': 'BACK',
+  'Акцент на груди': 'CHEST',
+  'Акцент на плечі': 'SHOULDERS',
+  'Акцент на руки': 'ARMS',
+  'Акцент на ноги': 'LEGS',
 };
 
-const ACCENT_LETTERS: Record<string, ParsedAccent> = {
+const FEMALE_ACCENT_LETTERS: Record<string, ParsedAccent> = {
   '': 'NONE',
   U: 'UPPER',
   L: 'LOWER',
+};
+
+const MALE_ACCENT_LETTERS: Record<string, ParsedAccent> = {
+  '': 'NONE',
+  B: 'BACK',
+  C: 'CHEST',
+  S: 'SHOULDERS',
+  A: 'ARMS',
+  L: 'LEGS',
 };
 
 const GENDER_LABELS: Record<string, ParsedGender> = {
@@ -70,6 +89,8 @@ export interface ParsedTemplateExercise {
   name: string;
   order: number;
   sets: number;
+  repsMin: number;
+  repsMax: number;
   allowsAbsAddon: boolean;
 }
 
@@ -108,33 +129,14 @@ export function parseProgramCsv(source: string): ParsedProgramFile {
     if (title.includes('Таблиця 1')) programSections.push(section);
   }
 
-  for (const section of programSections) {
-    templates.push(parseTemplate(section));
-  }
-
   if (exercises.length === 0) {
     throw new Error('Program CSV is missing the exercise library');
   }
 
   const library = indexExercises(exercises);
   const problems: string[] = [];
-  for (const template of templates) {
-    for (const day of template.days) {
-      for (const row of day.exercises) {
-        const known = library.get(row.exerciseCode);
-        if (!known) {
-          problems.push(
-            `${template.code} uses unknown exercise ${row.exerciseCode}`,
-          );
-          continue;
-        }
-        if (known.name !== row.name) {
-          problems.push(
-            `${template.code} day ${day.dayNumber} ${row.exerciseCode} is named "${row.name}" but the library says "${known.name}"`,
-          );
-        }
-      }
-    }
+  for (const section of programSections) {
+    templates.push(parseTemplate(section, library, problems));
   }
   if (problems.length > 0) {
     throw new Error(problems.join('\n'));
@@ -172,28 +174,43 @@ function rowsAfterHeader(lines: string[]): string[] {
 }
 
 function parseLibrary(section: string[]): ParsedExercise[] {
-  return rowsAfterHeader(section.slice(1)).map((line) => {
+  const exercises: ParsedExercise[] = [];
+  const seen = new Set<string>();
+
+  for (const line of rowsAfterHeader(section.slice(1))) {
     const [name, muscles, code, reps, nameEn] = cells(line);
     if (!name || !code || !reps || !nameEn) {
       throw new Error(`Exercise library row is incomplete: ${line}`);
     }
+    if (seen.has(code)) continue;
+    seen.add(code);
     const range = parseRepRange(reps, code);
-    return {
+    exercises.push({
       code,
       name,
       nameEn,
       muscleGroups: parseMuscles(muscles ?? '', code),
       ...range,
-    };
-  });
+    });
+  }
+
+  return exercises;
 }
 
-function parseTemplate(section: string[]): ParsedTemplate {
+function parseTemplate(
+  section: string[],
+  library: Map<string, ParsedExercise>,
+  problems: string[],
+): ParsedTemplate {
   const title = section[0] ?? '';
   const code = title.split(':')[0]?.trim() ?? '';
   const subtitle = section[1] ?? '';
   const identity = parseIdentity(code, subtitle);
-  const days = new Map<number, ParsedTemplateExercise[]>();
+  const structure = new Map<
+    number,
+    { order: number; allowsAbsAddon: boolean }[]
+  >();
+  const resolved = new Map<number, ParsedTemplateExercise[]>();
 
   for (const line of rowsAfterHeader(section.slice(2))) {
     const [dayLabel, orderText, name, , exerciseCode, setsText, marker] =
@@ -212,19 +229,36 @@ function parseTemplate(section: string[]): ParsedTemplate {
     ) {
       throw new Error(`${code} has an unreadable exercise row: ${line}`);
     }
-    const row: ParsedTemplateExercise = {
+    const allowsAbsAddon = (marker ?? '').startsWith('Прес');
+    const slots = structure.get(dayNumber) ?? [];
+    slots.push({ order, allowsAbsAddon });
+    structure.set(dayNumber, slots);
+
+    const known = library.get(exerciseCode);
+    if (!known) {
+      problems.push(`${code} uses unknown exercise ${exerciseCode}`);
+      continue;
+    }
+    if (known.name !== name) {
+      problems.push(
+        `${code} day ${dayNumber} ${exerciseCode} is named "${name}" but the library says "${known.name}"`,
+      );
+      continue;
+    }
+    const day = resolved.get(dayNumber) ?? [];
+    day.push({
       exerciseCode,
       name,
       order,
       sets,
-      allowsAbsAddon: (marker ?? '').startsWith('Прес'),
-    };
-    const day = days.get(dayNumber) ?? [];
-    day.push(row);
-    days.set(dayNumber, day);
+      repsMin: known.repsMin,
+      repsMax: known.repsMax,
+      allowsAbsAddon,
+    });
+    resolved.set(dayNumber, day);
   }
 
-  const dayNumbers = [...days.keys()].sort((left, right) => left - right);
+  const dayNumbers = [...structure.keys()].sort((left, right) => left - right);
   const expectedDays = Array.from(
     { length: identity.frequencyPerWeek },
     (_, index) => index + 1,
@@ -238,10 +272,16 @@ function parseTemplate(section: string[]): ParsedTemplate {
     );
   }
 
-  for (const [dayNumber, exercises] of days) {
+  for (const [dayNumber, exercises] of structure) {
     const orders = exercises.map((row) => row.order);
     if (new Set(orders).size !== orders.length) {
       throw new Error(`${code} day ${dayNumber} repeats an exercise order`);
+    }
+    const contiguous = [...orders].sort((left, right) => left - right);
+    if (contiguous.some((order, index) => order !== index + 1)) {
+      throw new Error(
+        `${code} day ${dayNumber} has exercise orders ${contiguous.join(', ')} instead of 1..${contiguous.length}`,
+      );
     }
     const sorted = [...exercises].sort(
       (left, right) => left.order - right.order,
@@ -257,7 +297,7 @@ function parseTemplate(section: string[]): ParsedTemplate {
 
   return {
     ...identity,
-    days: [...days.entries()]
+    days: [...resolved.entries()]
       .sort(([left], [right]) => left - right)
       .map(([dayNumber, exercises]) => ({
         dayNumber,
@@ -267,13 +307,12 @@ function parseTemplate(section: string[]): ParsedTemplate {
 }
 
 function parseIdentity(code: string, subtitle: string) {
-  const match = code.match(/^([A-Z])([BMP])([234])([UL])?$/);
+  const match = code.match(/^([WM])([BMP])([234])([A-Z])?$/);
   if (!match) {
     throw new Error(`Program code ${code} does not match the template pattern`);
   }
-  const [, , levelLetter, frequencyText, accentLetter = ''] = match;
+  const [, genderLetter, levelLetter, frequencyText, accentLetter = ''] = match;
   const levelFromCode = levelLetter ? LEVEL_LETTERS[levelLetter] : undefined;
-  const accentFromCode = ACCENT_LETTERS[accentLetter];
   const frequencyFromCode = Number(frequencyText);
 
   const parts = subtitle.split('·').map((part) => part.trim());
@@ -284,9 +323,18 @@ function parseIdentity(code: string, subtitle: string) {
   const frequency = frequencyMatch ? Number(frequencyMatch[1]) : undefined;
   const accentLabel = parts[3]?.replace(/;+$/, '').trim() ?? '';
   const accent = ACCENT_LABELS[accentLabel];
+  const accentLetters =
+    gender === 'MALE' ? MALE_ACCENT_LETTERS : FEMALE_ACCENT_LETTERS;
+  const accentFromCode = accentLetters[accentLetter];
+  const genderLetterMatches =
+    (gender === 'FEMALE' && genderLetter === 'W') ||
+    (gender === 'MALE' && genderLetter === 'M');
 
   if (!gender || !level || !frequency || !accent || !parts[0]) {
     throw new Error(`Program ${code} has an unreadable subtitle: ${subtitle}`);
+  }
+  if (!genderLetterMatches || accentFromCode === undefined) {
+    throw new Error(`Program code ${code} does not match the template pattern`);
   }
   if (
     levelFromCode !== level ||
@@ -336,5 +384,9 @@ function parseMuscles(value: string, code: string): ParsedMuscleGroup[] {
 }
 
 function indexExercises(exercises: ParsedExercise[]) {
-  return new Map(exercises.map((exercise) => [exercise.code, exercise]));
+  const library = new Map<string, ParsedExercise>();
+  for (const exercise of exercises) {
+    if (!library.has(exercise.code)) library.set(exercise.code, exercise);
+  }
+  return library;
 }

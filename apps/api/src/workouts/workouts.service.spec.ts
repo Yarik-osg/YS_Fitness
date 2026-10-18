@@ -60,6 +60,14 @@ function logRecord(
     templateId,
     dayNumber: 1,
     completedAt: new Date('2026-10-01T12:00:00.000Z'),
+    template: {
+      days: [
+        {
+          dayNumber: 1,
+          exercises: [{ order: 1, exerciseId, repsMin: 10, repsMax: 12 }],
+        },
+      ],
+    },
     sets: [
       {
         id: '77777777-7777-4777-8777-777777777777',
@@ -386,5 +394,131 @@ describe('WorkoutsService.list', () => {
     expect(
       sets.find((set) => set.exerciseId === otherExerciseId)?.recommendation,
     ).toBe('decrease');
+  });
+
+  it('uses the male template range for an exact EX_008 match', async () => {
+    const record = logRecord();
+    record.template.days[0]!.exercises[0]!.repsMin = 8;
+    record.template.days[0]!.exercises[0]!.repsMax = 12;
+    record.sets[0]!.repsCompleted = 9;
+    record.sets[0]!.exercise.code = 'EX_008';
+    record.sets[0]!.exercise.repsMin = 10;
+    record.sets[0]!.exercise.repsMax = 12;
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+
+    expect(result.logs[0]?.sets[0]?.recommendation).toBeNull();
+    expect(result.logs[0]?.sets[0]?.exercise).toMatchObject({
+      code: 'EX_008',
+      repsMin: 8,
+      repsMax: 12,
+    });
+  });
+
+  it('uses the same-day template range after EX_008 moves to another order', async () => {
+    const record = logRecord();
+    record.template.days[0]!.exercises = [
+      { order: 1, exerciseId: otherExerciseId, repsMin: 15, repsMax: 20 },
+      { order: 3, exerciseId, repsMin: 8, repsMax: 12 },
+    ];
+    record.sets[0]!.order = 1;
+    record.sets[0]!.repsCompleted = 9;
+    record.sets[0]!.exercise.code = 'EX_008';
+    record.sets[0]!.exercise.repsMin = 10;
+    record.sets[0]!.exercise.repsMax = 12;
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+
+    expect(result.logs[0]?.sets[0]?.recommendation).toBeNull();
+    expect(result.logs[0]?.sets[0]?.exercise).toMatchObject({
+      repsMin: 8,
+      repsMax: 12,
+    });
+  });
+
+  it('does not use EX_008 reps from a different day', async () => {
+    const record = logRecord();
+    record.template.days = [
+      {
+        dayNumber: 1,
+        exercises: [
+          { order: 1, exerciseId: otherExerciseId, repsMin: 15, repsMax: 20 },
+        ],
+      },
+      {
+        dayNumber: 2,
+        exercises: [{ order: 1, exerciseId, repsMin: 8, repsMax: 12 }],
+      },
+    ];
+    record.sets[0]!.order = 1;
+    record.sets[0]!.repsCompleted = 9;
+    record.sets[0]!.exercise.code = 'EX_008';
+    record.sets[0]!.exercise.repsMin = 10;
+    record.sets[0]!.exercise.repsMax = 12;
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+
+    expect(result.logs[0]?.sets[0]?.recommendation).toBe('decrease');
+    expect(result.logs[0]?.sets[0]?.exercise).toMatchObject({
+      repsMin: 10,
+      repsMax: 12,
+    });
+  });
+
+  it('uses the catalog range when the exercise is gone from the template', async () => {
+    const record = logRecord();
+    record.template.days[0]!.exercises[0]!.exerciseId = otherExerciseId;
+    record.template.days[0]!.exercises[0]!.repsMin = 8;
+    record.sets[0]!.repsCompleted = 9;
+    record.sets[0]!.exercise.code = 'EX_008';
+    record.sets[0]!.exercise.repsMin = 10;
+    record.sets[0]!.exercise.repsMax = 12;
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+
+    expect(result.logs[0]?.sets[0]?.recommendation).toBe('decrease');
+    expect(result.logs[0]?.sets[0]?.exercise.repsMin).toBe(10);
+  });
+
+  it('uses the lowest order when EX_008 remains twice on the same day', async () => {
+    const record = logRecord();
+    record.template.days[0]!.exercises = [
+      { order: 4, exerciseId, repsMin: 6, repsMax: 10 },
+      { order: 1, exerciseId: otherExerciseId, repsMin: 15, repsMax: 20 },
+      { order: 2, exerciseId, repsMin: 8, repsMax: 12 },
+    ];
+    record.sets[0]!.order = 1;
+    record.sets[0]!.repsCompleted = 11;
+    record.sets[0]!.exercise.code = 'EX_008';
+    record.sets[0]!.exercise.repsMin = 10;
+    record.sets[0]!.exercise.repsMax = 12;
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+
+    expect(result.logs[0]?.sets[0]?.recommendation).toBeNull();
+    expect(result.logs[0]?.sets[0]?.exercise).toMatchObject({
+      repsMin: 8,
+      repsMax: 12,
+    });
   });
 });

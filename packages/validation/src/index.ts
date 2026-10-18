@@ -81,6 +81,8 @@ export const MUSCLE_GROUPS = [
   'CHEST',
   'SHOULDERS',
   'ABS',
+  'REAR_DELTOIDS',
+  'CALVES',
 ] as const;
 
 export const listExercisesQuerySchema = z.object({
