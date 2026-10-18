@@ -130,30 +130,50 @@ function toWorkoutLog(log: WorkoutLogRecord): WorkoutLogResponse {
     templateId: log.templateId,
     dayNumber: log.dayNumber,
     completedAt: log.completedAt.toISOString(),
-    sets: log.sets.map((set) => ({
-      id: set.id,
-      exerciseId: set.exerciseId,
-      order: set.order,
-      setNumber: set.setNumber,
-      repsCompleted: set.repsCompleted,
-      weightKg: set.weightKg?.toNumber() ?? null,
-      recommendation:
-        set.setNumber === lastSetNumber.get(set.exerciseId)
-          ? weightRecommendation(
-              set.repsCompleted,
-              set.exercise.repsMin,
-              set.exercise.repsMax,
-            )
-          : null,
-      exercise: {
-        id: set.exercise.id,
-        code: set.exercise.code,
-        name: set.exercise.name,
-        nameEn: set.exercise.nameEn,
-        muscleGroups: set.exercise.muscleGroups,
-        repsMin: set.exercise.repsMin,
-        repsMax: set.exercise.repsMax,
-      },
-    })),
+    sets: log.sets.map((set) => {
+      const prescribed = prescribedReps(log, set.order, set.exerciseId);
+      const repsMin = prescribed?.repsMin ?? set.exercise.repsMin;
+      const repsMax = prescribed?.repsMax ?? set.exercise.repsMax;
+      return {
+        id: set.id,
+        exerciseId: set.exerciseId,
+        order: set.order,
+        setNumber: set.setNumber,
+        repsCompleted: set.repsCompleted,
+        weightKg: set.weightKg?.toNumber() ?? null,
+        recommendation:
+          set.setNumber === lastSetNumber.get(set.exerciseId)
+            ? weightRecommendation(set.repsCompleted, repsMin, repsMax)
+            : null,
+        exercise: {
+          id: set.exercise.id,
+          code: set.exercise.code,
+          name: set.exercise.name,
+          nameEn: set.exercise.nameEn,
+          muscleGroups: set.exercise.muscleGroups,
+          repsMin,
+          repsMax,
+        },
+      };
+    }),
   };
+}
+
+function prescribedReps(
+  log: WorkoutLogRecord,
+  order: number,
+  exerciseId: string,
+) {
+  const day = log.template.days.find(
+    (entry) => entry.dayNumber === log.dayNumber,
+  );
+  if (!day) return undefined;
+  const exact = day.exercises.find(
+    (entry) => entry.order === order && entry.exerciseId === exerciseId,
+  );
+  if (exact) return exact;
+  // Same exercise can sit on several orders. The logged order moved, so use the lowest remaining order on this day.
+  return day.exercises
+    .filter((entry) => entry.exerciseId === exerciseId)
+    .sort((left, right) => left.order - right.order)[0];
 }

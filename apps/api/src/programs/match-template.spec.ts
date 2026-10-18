@@ -103,6 +103,13 @@ describe('matchProgramTemplate', () => {
       });
       expect(match).not.toBeNull();
       if (!match) return;
+      if (
+        match.accent !== 'NONE' &&
+        match.accent !== 'UPPER' &&
+        match.accent !== 'LOWER'
+      ) {
+        throw new Error(`unexpected female accent ${match.accent}`);
+      }
       const code = `W${LEVEL_LETTER[match.level]}${match.frequencyPerWeek}${ACCENT_LETTER[match.accent]}`;
       expect(
         programs.templates.find((template) => template.code === code),
@@ -117,14 +124,75 @@ describe('matchProgramTemplate', () => {
     },
   );
 
-  it('returns no match for the male track', () => {
+  it('returns no match for a focus the male track cannot express', () => {
     expect(
       matchProgramTemplate({
         programTrack: 'male',
         experience: 'beginner',
         trainingFrequency: '2',
-        focusArea: 'glutes',
+        focusArea: 'abs',
       }),
     ).toBeNull();
   });
+});
+
+const maleFocus = {
+  chest: 'CHEST',
+  back: 'BACK',
+  shoulders: 'SHOULDERS',
+  arms: 'ARMS',
+  legs: 'LEGS',
+  glutes: 'LEGS',
+  full_body: 'NONE',
+} as const;
+
+const MALE_ACCENT_LETTER = {
+  NONE: '',
+  BACK: 'B',
+  CHEST: 'C',
+  SHOULDERS: 'S',
+  ARMS: 'A',
+  LEGS: 'L',
+} as const;
+
+describe('matchProgramTemplate male track', () => {
+  let programs: ParsedProgramFile;
+
+  beforeAll(async () => {
+    const csvPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../prisma/seed-data/Ys_men.csv',
+    );
+    programs = parseProgramCsv(await readFile(csvPath, 'utf8'));
+  });
+
+  it.each(
+    experiences.flatMap((experience) =>
+      frequencies.flatMap((trainingFrequency) =>
+        Object.keys(maleFocus).map((focusArea) => ({
+          experience,
+          trainingFrequency,
+          focusArea,
+        })),
+      ),
+    ),
+  )(
+    'selects the male template for $experience / $trainingFrequency / $focusArea',
+    ({ experience, trainingFrequency, focusArea }) => {
+      const match = matchProgramTemplate({
+        programTrack: 'male',
+        experience,
+        trainingFrequency,
+        focusArea,
+      });
+      expect(match).not.toBeNull();
+      if (!match) return;
+      expect(match.gender).toBe('MALE');
+      expect(match.accent).toBe(maleFocus[focusArea as keyof typeof maleFocus]);
+      const code = `M${LEVEL_LETTER[match.level]}${match.frequencyPerWeek}${MALE_ACCENT_LETTER[match.accent as keyof typeof MALE_ACCENT_LETTER]}`;
+      expect(
+        programs.templates.find((template) => template.code === code),
+      ).toMatchObject(match);
+    },
+  );
 });

@@ -5,6 +5,23 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 const logWithSets = {
   include: {
+    template: {
+      select: {
+        days: {
+          select: {
+            dayNumber: true,
+            exercises: {
+              select: {
+                order: true,
+                exerciseId: true,
+                repsMin: true,
+                repsMax: true,
+              },
+            },
+          },
+        },
+      },
+    },
     sets: {
       orderBy: [{ order: 'asc' as const }, { setNumber: 'asc' as const }],
       include: { exercise: true },

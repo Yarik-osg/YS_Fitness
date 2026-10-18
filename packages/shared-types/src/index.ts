@@ -152,9 +152,12 @@ export type MuscleGroup =
   | 'TRICEPS'
   | 'CHEST'
   | 'SHOULDERS'
-  | 'ABS';
+  | 'ABS'
+  | 'REAR_DELTOIDS'
+  | 'CALVES';
 
-export type ProgramAccent = 'NONE' | 'UPPER' | 'LOWER';
+export type ProgramAccent =
+  'NONE' | 'UPPER' | 'LOWER' | 'BACK' | 'CHEST' | 'SHOULDERS' | 'ARMS' | 'LEGS';
 
 export interface ExerciseResponse {
   id: string;

@@ -10,7 +10,7 @@ const LEVELS = {
   advanced: 'ADVANCED',
 } as const satisfies Record<string, TrainingExperience>;
 
-const ACCENTS = {
+const FEMALE_ACCENTS = {
   glutes: 'LOWER',
   legs: 'LOWER',
   shoulders: 'UPPER',
@@ -18,6 +18,16 @@ const ACCENTS = {
   arms: 'UPPER',
   chest: 'UPPER',
   abs: 'NONE',
+  full_body: 'NONE',
+} as const satisfies Record<string, ProgramAccent>;
+
+const MALE_ACCENTS = {
+  chest: 'CHEST',
+  back: 'BACK',
+  shoulders: 'SHOULDERS',
+  arms: 'ARMS',
+  legs: 'LEGS',
+  glutes: 'LEGS',
   full_body: 'NONE',
 } as const satisfies Record<string, ProgramAccent>;
 
@@ -34,18 +44,18 @@ export function matchProgramTemplate(input: {
   trainingFrequency: string;
   focusArea: string | undefined;
 }): TemplateMatch | null {
-  if (input.programTrack !== 'female') return null;
-
   const level = LEVELS[input.experience as keyof typeof LEVELS];
   const frequencyPerWeek = Number(input.trainingFrequency);
   const accent = input.focusArea
-    ? ACCENTS[input.focusArea as keyof typeof ACCENTS]
+    ? input.programTrack === 'male'
+      ? MALE_ACCENTS[input.focusArea as keyof typeof MALE_ACCENTS]
+      : FEMALE_ACCENTS[input.focusArea as keyof typeof FEMALE_ACCENTS]
     : undefined;
 
   if (!level || ![2, 3, 4].includes(frequencyPerWeek) || !accent) return null;
 
   return {
-    gender: 'FEMALE',
+    gender: input.programTrack === 'male' ? 'MALE' : 'FEMALE',
     level,
     frequencyPerWeek,
     accent,

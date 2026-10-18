@@ -36,6 +36,8 @@ function assignedProgram() {
             {
               order: 1,
               sets: 3,
+              repsMin: 10,
+              repsMax: 12,
               allowsAbsAddon: true,
               exercise: {
                 id: 'exercise-1',
@@ -128,20 +130,44 @@ describe('ProgramsService', () => {
     });
   });
 
-  it('refuses a male track without assigning another template', async () => {
+  it('assigns the male template for the selected focus', async () => {
     const { prisma, service } = createService();
     prisma.onboardingResponses.findUnique.mockResolvedValue(
-      onboarding({ programTrack: 'MALE' }),
+      onboarding({ programTrack: 'MALE', focusAreas: ['glutes'] }),
     );
+    prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
+    prisma.workoutProgram.upsert.mockResolvedValue(assignedProgram());
 
-    await expect(service.assign(userId)).rejects.toMatchObject({
-      response: {
-        code: 'PROGRAM_NOT_AVAILABLE',
-        message: 'No program is available for this track yet',
+    await service.assign(userId);
+
+    expect(prisma.programTemplate.findFirst).toHaveBeenCalledWith({
+      where: {
+        gender: 'MALE',
+        level: 'BEGINNER',
+        frequencyPerWeek: 2,
+        accent: 'LEGS',
+        active: true,
       },
     });
-    expect(prisma.programTemplate.findFirst).not.toHaveBeenCalled();
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+  });
+
+  it('returns the template prescription when it differs from the catalog', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    const row = record.template.days[0]?.exercises[0];
+    if (!row) throw new Error('missing row');
+    row.repsMin = 8;
+    row.repsMax = 12;
+    row.exercise.repsMin = 10;
+    row.exercise.repsMax = 12;
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+
+    const result = await service.getMine(userId);
+
+    expect(result.program?.days[0]?.exercises[0]?.exercise).toMatchObject({
+      repsMin: 8,
+      repsMax: 12,
+    });
   });
 
   it('throws PROGRAM_NOT_AVAILABLE when the template is missing', async () => {

@@ -582,7 +582,9 @@
         "TRICEPS": "Triceps",
         "CHEST": "Chest",
         "SHOULDERS": "Shoulders",
-        "ABS": "Abs"
+        "ABS": "Abs",
+        "REAR_DELTOIDS": "Rear delts",
+        "CALVES": "Calves"
       }
     },
     "nutrition": {

@@ -1,16 +1,13 @@
 import 'dotenv/config';
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient, UserRole } from '@prisma/client';
 import { hash } from 'argon2';
 import { readSeedEnvironment } from '../src/config/seed-environment.js';
 import { CATALOG_PLANS } from './catalog-plans.js';
-import {
-  parseProgramCsv,
-  type ParsedExercise,
-  type ParsedTemplate,
-} from './parse-program-csv.js';
+import { mergeProgramFiles } from './merge-program-files.js';
+import { parseProgramCsv } from './parse-program-csv.js';
 
 const prisma = new PrismaClient();
 
@@ -63,43 +60,24 @@ async function main(): Promise<void> {
   console.log(`Trainer account is ready: ${email}`);
 }
 
+const PROGRAM_FILES = ['Ys_women.csv', 'Ys_men.csv'] as const;
+
 async function seedPrograms(): Promise<void> {
   const directory = path.join(
     path.dirname(fileURLToPath(import.meta.url)),
     'seed-data',
   );
-  const files = (await readdir(directory))
-    .filter((name) => name.endsWith('.csv'))
-    .sort();
-  const exercises = new Map<string, ParsedExercise>();
-  const templates: ParsedTemplate[] = [];
-
-  for (const file of files) {
-    const parsed = parseProgramCsv(
-      await readFile(path.join(directory, file), 'utf8'),
+  const parsed = [];
+  for (const file of PROGRAM_FILES) {
+    parsed.push(
+      parseProgramCsv(await readFile(path.join(directory, file), 'utf8')),
     );
-    for (const exercise of parsed.exercises) {
-      const existing = exercises.get(exercise.code);
-      if (
-        existing &&
-        (existing.name !== exercise.name ||
-          existing.nameEn !== exercise.nameEn ||
-          existing.muscleGroups.join() !== exercise.muscleGroups.join() ||
-          existing.repsMin !== exercise.repsMin ||
-          existing.repsMax !== exercise.repsMax)
-      ) {
-        throw new Error(
-          `${file} disagrees with an earlier library row for ${exercise.code}`,
-        );
-      }
-      exercises.set(exercise.code, exercise);
-    }
-    templates.push(...parsed.templates);
   }
+  const { exercises, templates } = mergeProgramFiles(parsed);
 
   await prisma.$transaction(async (transaction) => {
     const exerciseIds = new Map<string, string>();
-    for (const exercise of exercises.values()) {
+    for (const exercise of exercises) {
       const saved = await transaction.exercise.upsert({
         where: { code: exercise.code },
         create: exercise,
@@ -151,6 +129,8 @@ async function seedPrograms(): Promise<void> {
                 ),
                 order: exercise.order,
                 sets: exercise.sets,
+                repsMin: exercise.repsMin,
+                repsMax: exercise.repsMax,
                 allowsAbsAddon: exercise.allowsAbsAddon,
               })),
             },
