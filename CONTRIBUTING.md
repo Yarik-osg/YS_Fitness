@@ -66,7 +66,7 @@ export class CalculateNutritionDto implements CalculateNutritionInput {
 
 ## Next.js App Router
 
-The web app uses locale-prefixed routes and keeps product UI in `components/features/`. The browser API base URL is centralized in `lib/env.ts`; server-only rewrite configuration remains in `next.config.js`.
+The web app uses locale-prefixed routes. App screens live in `components/features/`. Marketing, onboarding, and checkout already live in `features/`. The browser API base URL is centralized in `lib/env.ts`; server-only rewrite configuration remains in `next.config.js`.
 
 ```text
 apps/web/
@@ -80,6 +80,10 @@ apps/web/
 │   ├── features/
 │   ├── layout/
 │   └── ui/
+├── features/
+│   ├── checkout/
+│   ├── marketing/
+│   └── onboarding/
 └── lib/
     ├── api/
     │   └── client.ts
@@ -90,7 +94,7 @@ apps/web/
 Rules:
 
 1. `app/` files define routes, layouts, loading/error states, and composition—not domain logic.
-2. Keep product components in `components/features/<domain>/`; do not introduce a parallel `features/<domain>/actions/` tree unless a concrete Server Action use case requires it.
+2. Put new app screens in `components/features/<domain>/`. Leave marketing, onboarding, and checkout in `features/<domain>/`. Do not add a `features/<domain>/actions/` tree unless a concrete Server Action needs it.
 3. Client components include `"use client"` only at the smallest interactive boundary.
 4. The API client and API-calling utilities live in `lib/api/`; API hooks live in `lib/hooks/`.
 5. Use `@repo/validation` for form/request schemas and `@repo/shared-types` for API responses. Do not recreate contracts in the web app.

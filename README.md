@@ -14,6 +14,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for domain boundaries and [CONTRIBUTING.
 - `packages/i18n` — shared internationalization messages and locale utilities
 - `packages/ui` — optional shared React components
 - `packages/eslint-config` — shared ESLint configurations
+- `packages/typescript-config` — shared TypeScript configs for base, Next.js, and React packages
 
 ## Local setup
 
