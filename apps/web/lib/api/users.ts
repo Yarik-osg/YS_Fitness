@@ -14,7 +14,7 @@ import type {
   OnboardingInput,
   ProfileUpdateInput,
 } from '@repo/validation';
-import { apiRequest } from './client';
+import { apiBlob, apiRequest } from './client';
 
 export function getMe() {
   return apiRequest<MeResponse>('/users/me');
@@ -45,6 +45,16 @@ export function createProgressPhoto(input: CreateProgressPhotoInput) {
   return apiRequest<ProgressPhoto>('/users/me/progress-photos', {
     method: 'POST',
     body: input,
+  });
+}
+
+export function getProgressPhotoBlob(id: string) {
+  return apiBlob(`/users/me/progress-photos/${id}`);
+}
+
+export function deleteProgressPhoto(id: string) {
+  return apiRequest<void>(`/users/me/progress-photos/${id}`, {
+    method: 'DELETE',
   });
 }
 

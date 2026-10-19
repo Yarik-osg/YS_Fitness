@@ -859,10 +859,21 @@
     "photos": "Фото прогресу",
     "photoStart": "Старт",
     "photoNow": "Зараз",
-    "photoEmpty": "Фото",
+    "photoEmpty": "Фото ще немає.",
     "addPhoto": "Додати фото",
     "photoInvalid": "Не вдалося прочитати фото. Потрібне JPEG, PNG, WebP або HEIC.",
     "photoLimit": "Можна зберегти не більше 8 фото.",
-    "photoLoadError": "Не вдалося завантажити фото."
+    "photoLoadError": "Не вдалося завантажити фото.",
+    "photoImageError": "Не вдалося завантажити це фото.",
+    "compare": "Порівняти",
+    "comparePick": "Оберіть два різні фото",
+    "photoBefore": "До",
+    "photoAfter": "Після",
+    "chooseDifferent": "Обрати інші фото",
+    "deletePhoto": "Видалити фото",
+    "deleteConfirm": "Видалити фото від {date}?",
+    "deleting": "Видаляємо",
+    "photoDeleteError": "Не вдалося видалити фото.",
+    "close": "Закрити"
   }
 }

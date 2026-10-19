@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import {
   createProgressPhoto,
+  deleteProgressPhoto,
   getMe,
   getMeasurements,
   getOnboardingResponses,
@@ -164,6 +165,17 @@ export function useCreateProgressPhoto() {
 
   return useMutation({
     mutationFn: (input: CreateProgressPhotoInput) => createProgressPhoto(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: progressPhotosQueryKey });
+    },
+  });
+}
+
+export function useDeleteProgressPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteProgressPhoto(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: progressPhotosQueryKey });
     },

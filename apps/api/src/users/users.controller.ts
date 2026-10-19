@@ -1,11 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Header,
   HttpCode,
+  Param,
   Patch,
   Post,
   Put,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -55,6 +59,25 @@ export class UsersController {
     @Body() input: CreateProgressPhotoDto,
   ) {
     return this.users.createProgressPhoto(user.sub, input.imageBase64);
+  }
+
+  @Get('me/progress-photos/:photoId')
+  @Header('Cache-Control', 'private, no-store')
+  async readProgressPhoto(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('photoId') photoId: string,
+  ) {
+    const image = await this.users.readProgressPhoto(user.sub, photoId);
+    return new StreamableFile(image, { type: 'image/jpeg' });
+  }
+
+  @Delete('me/progress-photos/:photoId')
+  @HttpCode(204)
+  deleteProgressPhoto(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('photoId') photoId: string,
+  ) {
+    return this.users.deleteProgressPhoto(user.sub, photoId);
   }
 
   @Put('me/onboarding')

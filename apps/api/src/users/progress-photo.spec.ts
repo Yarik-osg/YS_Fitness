@@ -1,7 +1,11 @@
+import { mkdtemp, readdir, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { decodeProgressPhoto } from './progress-photo.js';
+import { LocalProgressPhotoStorage } from './progress-photo-storage.js';
 import { UsersService } from './users.service.js';
 
 function solid(width: number, height: number) {
@@ -56,7 +60,17 @@ describe('decodeProgressPhoto', () => {
 });
 
 describe('UsersService progress photos', () => {
-  it('locks the user row and refuses an eighth photo', async () => {
+  const userId = '11111111-1111-4111-8111-111111111111';
+
+  function storage() {
+    return {
+      save: vi.fn().mockResolvedValue(undefined),
+      read: vi.fn(),
+      remove: vi.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it('locks the user row and removes the file when the eighth photo is refused', async () => {
     const image = (await solid(2, 2).jpeg().toBuffer()).toString('base64');
     const prisma = {
       progressPhoto: {
@@ -69,12 +83,101 @@ describe('UsersService progress photos', () => {
     prisma.$transaction.mockImplementation(
       async (work: (tx: typeof prisma) => unknown) => work(prisma),
     );
-    const service = new UsersService(prisma as never, {} as never, {} as never);
+    const files = storage();
+    const service = new UsersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      files,
+    );
 
     await expect(
-      service.createProgressPhoto('user', image),
+      service.createProgressPhoto(userId, image),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.$queryRaw).toHaveBeenCalled();
     expect(prisma.progressPhoto.create).not.toHaveBeenCalled();
+    expect(files.save).toHaveBeenCalledOnce();
+    expect(files.remove).toHaveBeenCalledWith(files.save.mock.calls[0]?.[0]);
+  });
+
+  it('removes the saved file when the database insert fails', async () => {
+    const image = (await solid(2, 2).jpeg().toBuffer()).toString('base64');
+    const prisma = {
+      progressPhoto: {
+        count: vi.fn().mockResolvedValue(0),
+        create: vi.fn().mockRejectedValue(new Error('insert failed')),
+      },
+      $queryRaw: vi.fn(),
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: typeof prisma) => unknown) => work(prisma),
+    );
+    const files = storage();
+    const service = new UsersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      files,
+    );
+
+    await expect(service.createProgressPhoto(userId, image)).rejects.toThrow(
+      'insert failed',
+    );
+    expect(files.remove).toHaveBeenCalledWith(files.save.mock.calls[0]?.[0]);
+  });
+
+  it('deletes the row before the file and still succeeds if the file is already gone', async () => {
+    const photoId = '22222222-2222-4222-8222-222222222222';
+    const prisma = {
+      progressPhoto: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: photoId,
+          storageKey: `${userId}/${photoId}.jpg`,
+        }),
+        delete: vi.fn().mockResolvedValue({}),
+      },
+    };
+    const files = storage();
+    const order: string[] = [];
+    prisma.progressPhoto.delete.mockImplementation(async () => {
+      order.push('delete');
+    });
+    files.remove.mockImplementation(async () => {
+      order.push('remove');
+      throw new Error('disk');
+    });
+    const service = new UsersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      files,
+    );
+
+    await expect(
+      service.deleteProgressPhoto(userId, photoId),
+    ).resolves.toBeUndefined();
+    expect(order).toEqual(['delete', 'remove']);
+  });
+});
+
+describe('LocalProgressPhotoStorage', () => {
+  it('stores a generated key and rejects a path outside the directory', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'photo-store-'));
+    const storage = new LocalProgressPhotoStorage({
+      get: () => root,
+    } as never);
+    const key =
+      '11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg';
+
+    await storage.save(key, Buffer.from([0xff, 0xd8]));
+    expect(await storage.read(key)).toEqual(Buffer.from([0xff, 0xd8]));
+    expect((await stat(path.join(root, key))).mode & 0o777).toBe(0o600);
+    await storage.remove(key);
+    expect(await storage.read(key)).toBeNull();
+    await expect(
+      storage.save('../outside.jpg', Buffer.from('no')),
+    ).rejects.toThrow('Invalid progress photo key');
+    expect(await readdir(path.join(root, key.split('/')[0]!))).toEqual([]);
   });
 });

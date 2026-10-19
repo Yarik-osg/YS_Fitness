@@ -15,6 +15,8 @@ export class ProgressPhotoError extends Error {
 export async function decodeProgressPhoto(imageBase64: string): Promise<{
   contentType: 'image/jpeg';
   image: Buffer;
+  width: number;
+  height: number;
 }> {
   const input = Buffer.from(imageBase64, 'base64');
   if (input.length === 0 || input.length > MAX_BYTES || !sniff(input)) {
@@ -57,7 +59,7 @@ export async function decodeProgressPhoto(imageBase64: string): Promise<{
     if (image.length === 0 || image.length > MAX_BYTES) {
       throw new ProgressPhotoError('PHOTO_INVALID');
     }
-    return { contentType: 'image/jpeg', image };
+    return { contentType: 'image/jpeg', image, width, height };
   } catch (error) {
     if (error instanceof ProgressPhotoError) throw error;
     throw new ProgressPhotoError('PHOTO_INVALID');

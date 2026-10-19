@@ -70,8 +70,9 @@ export interface WeightMeasurementsResponse {
 export interface ProgressPhoto {
   id: string;
   createdAt: string;
-  contentType: 'image/jpeg' | 'image/png' | 'image/webp';
-  imageBase64: string;
+  contentType: 'image/jpeg';
+  width: number;
+  height: number;
 }
 
 export interface ProgressPhotosResponse {

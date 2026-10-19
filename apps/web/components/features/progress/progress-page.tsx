@@ -11,18 +11,16 @@ import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { createMeasurementSchema, WEIGHT_KG } from '@repo/validation';
 import { ArrowRight, Check, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import Image from 'next/image';
 import { useMemo, useState } from 'react';
+import { ProgressPhotos } from '@/components/features/progress/progress-photos';
 import { NumberField } from '@/components/features/profile/number-field';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
 import { Collapse } from '@/components/ui/collapse';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ApiClientError } from '@/lib/api/client';
 import { getUserFacingError } from '@/lib/api/errors';
 import { exerciseName } from '@/lib/exercise-name';
-import { readProgressPhoto } from '@/lib/progress-photo';
 import {
   formatDelta,
   formatWeight,
@@ -32,7 +30,6 @@ import {
 import { inPeriod, type WeightPeriod } from '@/lib/weight-period';
 import {
   useCreateMeasurement,
-  useCreateProgressPhoto,
   useMeasurements,
   useProgressPhotos,
 } from '@/lib/hooks/use-users';
@@ -40,6 +37,7 @@ import { useAssignedProgram } from '@/lib/hooks/use-programs';
 import { useStrengthChanges } from '@/lib/hooks/use-workouts';
 
 const PERIODS: WeightPeriod[] = ['30d', '3m', 'all'];
+const EMPTY_PHOTOS: ProgressPhoto[] = [];
 
 export function ProgressPage() {
   const t = useTranslations('progress');
@@ -83,10 +81,10 @@ export function ProgressPage() {
           error={strength.isError}
           changes={strength.data?.changes ?? []}
         />
-        <PhotosCard
+        <ProgressPhotos
           loading={photos.isPending && !photos.data}
           error={photos.isError}
-          photos={photos.data?.photos ?? []}
+          photos={photos.data?.photos ?? EMPTY_PHOTOS}
         />
       </div>
       <ClientNav active="progress" />
@@ -570,146 +568,9 @@ function StrengthRow({ change }: { change: StrengthChange }) {
   );
 }
 
-function PhotosCard({
-  loading,
-  error,
-  photos,
-}: {
-  loading: boolean;
-  error: boolean;
-  photos: ProgressPhoto[];
-}) {
-  const t = useTranslations('progress');
-  const create = useCreateProgressPhoto();
-  const [reading, setReading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const start = photos.length > 1 ? (photos[0] ?? null) : null;
-  const current = photos.length > 0 ? photos[photos.length - 1]! : null;
-  const busy = reading || create.isPending;
-
-  async function onFile(file: File | undefined) {
-    if (!file || busy) return;
-    setReading(true);
-    setUploadError(null);
-    try {
-      const imageBase64 = await readProgressPhoto(file);
-      create.mutate(
-        { imageBase64 },
-        {
-          onError: (cause) => {
-            setUploadError(
-              cause instanceof ApiClientError && cause.code === 'PHOTO_LIMIT'
-                ? t('photoLimit')
-                : t('photoInvalid'),
-            );
-          },
-          onSettled: () => setReading(false),
-        },
-      );
-    } catch {
-      setUploadError(t('photoInvalid'));
-      setReading(false);
-    }
-  }
-
-  return (
-    <section>
-      <h2 className="mb-2 text-sm text-muted">{t('photos')}</h2>
-      {loading ? (
-        <Skeleton className="h-40 w-full" />
-      ) : error ? (
-        <p role="alert" className="text-sm text-amber">
-          {t('photoLoadError')}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2.5">
-            <PhotoFrame
-              label={t('photoStart')}
-              photo={start}
-              empty={t('photoEmpty')}
-            />
-            <PhotoFrame
-              label={t('photoNow')}
-              photo={current}
-              empty={t('photoEmpty')}
-              accent
-            />
-          </div>
-          {photos.length >= 8 ? null : (
-            <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 border border-line font-label text-[9px] font-bold tracking-[0.14em] text-muted uppercase has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent">
-              <Plus aria-hidden="true" className="size-3.5" />
-              {busy ? t('saving') : t('addPhoto')}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-                className="sr-only"
-                disabled={busy}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = '';
-                  void onFile(file);
-                }}
-              />
-            </label>
-          )}
-          {uploadError ? (
-            <p role="alert" className="text-xs text-amber">
-              {uploadError}
-            </p>
-          ) : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function PhotoFrame({
-  label,
-  photo,
-  empty,
-  accent = false,
-}: {
-  label: string;
-  photo: ProgressPhoto | null;
-  empty: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`overflow-hidden border bg-panel ${accent ? 'border-teal/30' : 'border-line'}`}
-    >
-      {photo ? (
-        <Image
-          unoptimized
-          alt={label}
-          width={480}
-          height={640}
-          src={`data:${photo.contentType};base64,${photo.imageBase64}`}
-          className="aspect-3/4 w-full object-cover"
-        />
-      ) : (
-        <div className="flex aspect-3/4 items-center justify-center px-3 text-center text-xs text-muted">
-          {empty}
-        </div>
-      )}
-      <div className="border-t border-line px-3 py-2">
-        <p className="text-sm text-ink">{label}</p>
-        <p className="text-[10px] text-muted tabular-nums">
-          {photo ? formatPhotoDate(photo.createdAt) : '—'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function formatDayMonth(value: string) {
   const date = new Date(value);
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   return `${day}.${month}`;
-}
-
-function formatPhotoDate(value: string) {
-  return `${formatDayMonth(value)}.${new Date(value).getFullYear()}`;
 }
