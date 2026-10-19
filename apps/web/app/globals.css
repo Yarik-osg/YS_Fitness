@@ -9,13 +9,18 @@
   --color-muted: #9c9d9f;
   --color-panel: #17191c;
   --color-line: #34373b;
+  --color-background: #0b0b0b;
+  --color-lime: #c8ff2e;
+  --color-teal: #35f5e8;
+  --color-cyan: #00c7c8;
+  --color-amber: #ffb15a;
   --color-accent: var(--accent);
 }
 
 :root {
   color-scheme: dark;
-  --accent: #35f5e8;
-  --background: #0b0b0b;
+  --accent: var(--color-teal);
+  --background: var(--color-background);
   --foreground: #f5f4ef;
 }
 
@@ -67,13 +72,13 @@ a {
 }
 
 .track-female {
-  --accent: #35f5e8;
-  --color-accent: #35f5e8;
+  --accent: var(--color-teal);
+  --color-accent: var(--color-teal);
 }
 
 .track-male {
-  --accent: #c8ff2e;
-  --color-accent: #c8ff2e;
+  --accent: var(--color-lime);
+  --color-accent: var(--color-lime);
 }
 
 .noise-overlay::before {

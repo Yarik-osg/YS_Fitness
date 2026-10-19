@@ -58,7 +58,6 @@ export function ResetPasswordForm() {
 
   return (
     <AuthShell
-      eyebrow={t('reset.eyebrow')}
       title={t('reset.title')}
       highlighted={t('reset.highlighted')}
       description={t('reset.description')}

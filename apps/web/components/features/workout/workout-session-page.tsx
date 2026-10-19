@@ -67,7 +67,7 @@ function WorkoutLoading({ label }: { label: string }) {
     <main
       aria-busy="true"
       aria-label={label}
-      className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] px-4 pt-8"
+      className="mx-auto min-h-screen w-full max-w-[430px] bg-background px-4 pt-8"
     >
       <div className="mb-6 flex flex-col gap-2 border-b border-white/5 pb-4">
         <Skeleton className="h-2 w-16" />
@@ -97,7 +97,7 @@ export function WorkoutSessionPage() {
     program?.days[0];
   if (!program || !day) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center gap-6 bg-[#0b0b0b] px-6 text-center">
+      <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center gap-6 bg-background px-6 text-center">
         <p className="text-sm text-white/50">{t('noProgram')}</p>
         <Link
           href="/dashboard"
@@ -214,10 +214,10 @@ function SessionForm({
   }
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] text-white">
+    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background text-white">
       <header
         ref={headerRef}
-        className="sticky top-0 z-10 border-b border-white/5 bg-[#0b0b0b] px-5 pt-8 pb-4"
+        className="sticky top-0 z-10 border-b border-white/5 bg-background px-5 pt-8 pb-4"
       >
         <Link
           href="/dashboard"
@@ -227,9 +227,6 @@ function SessionForm({
         </Link>
         <div className="mb-3.5 flex items-start justify-between gap-3">
           <div>
-            <p className="mb-1 font-label text-[8px] font-semibold tracking-[0.18em] text-[#35f5e8] uppercase">
-              {t('eyebrow')}
-            </p>
             <h1 className="font-heading text-[26px] leading-none text-white uppercase">
               {t('title', { number: dayNumber })}
             </h1>
@@ -246,13 +243,13 @@ function SessionForm({
         <div className="flex items-center gap-2.5">
           <div className="h-0.5 flex-1 bg-white/5">
             <div
-              className="h-full bg-[#35f5e8]"
+              className="h-full bg-teal"
               style={{
                 width: `${exercises.length === 0 ? 0 : (completedCount / exercises.length) * 100}%`,
               }}
             />
           </div>
-          <span className="font-label text-[9px] font-bold tracking-[0.1em] text-[#35f5e8] uppercase">
+          <span className="font-label text-[9px] font-bold tracking-[0.1em] text-teal uppercase">
             {t('progress', { done: completedCount, total: exercises.length })}
           </span>
         </div>
@@ -321,7 +318,7 @@ function SessionForm({
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 bg-linear-to-t from-[#0b0b0b] from-75% to-transparent px-3.5 pt-4 pb-8">
+      <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 bg-linear-to-t from-background from-75% to-transparent px-3.5 pt-4 pb-8">
         {error ? (
           <p className="mb-2 text-center text-xs text-red-300" role="alert">
             {error}
@@ -330,8 +327,7 @@ function SessionForm({
         <button
           type="button"
           className={buttonVariants({
-            className:
-              'w-full bg-[#c8ff2e] text-[#0b0b0b] shadow-[0_0_24px_rgba(200,255,46,0.2)]',
+            className: 'w-full bg-lime text-background',
           })}
           disabled={logWorkout.isPending}
           onClick={() => void finish()}
@@ -398,7 +394,7 @@ function ExerciseCard({
         expanded
           ? 'border-white/15 bg-white/[0.015]'
           : filled
-            ? 'border-[#35f5e8]/30 bg-[#35f5e8]/[0.02]'
+            ? 'border-teal/30 bg-teal/[0.02]'
             : 'border-white/6'
       }`}
     >
@@ -452,7 +448,7 @@ function ExerciseCard({
                   .join(' • ')}
               </p>
               {previous.recommendation ? (
-                <p className="mt-2 text-sm font-semibold text-[#ffb15a]">
+                <p className="mt-2 text-sm font-semibold text-amber">
                   {t(
                     previous.recommendation === 'increase'
                       ? 'recommendIncrease'
@@ -482,7 +478,7 @@ function ExerciseCard({
               <span className="grid h-[42px] place-items-center border border-white/10 font-heading text-base text-white/30">
                 {index + 1}
               </span>
-              <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-[#35f5e8]">
+              <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-teal">
                 <input
                   aria-label={t('weightInput', { set: index + 1 })}
                   inputMode="decimal"
@@ -501,7 +497,7 @@ function ExerciseCard({
                   {t('kg')}
                 </span>
               </label>
-              <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-[#35f5e8]">
+              <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-teal">
                 <input
                   aria-label={t('repsInput', { set: index + 1 })}
                   inputMode="numeric"
@@ -560,10 +556,8 @@ function FixedCard({
 
 function Prescribed({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex-1 border border-[#c8ff2e]/10 bg-[#c8ff2e]/[0.07] px-2.5 py-3 text-center">
-      <p className="font-heading text-[26px] leading-none text-[#c8ff2e]">
-        {value}
-      </p>
+    <div className="flex-1 border border-lime/10 bg-lime/[0.07] px-2.5 py-3 text-center">
+      <p className="font-heading text-[26px] leading-none text-lime">{value}</p>
       <p className="mt-1 font-label text-[7px] font-semibold tracking-[0.14em] text-white/30 uppercase">
         {label}
       </p>
@@ -583,18 +577,15 @@ function Completion({
   const t = useTranslations('workouts');
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-[#0b0b0b] px-5 pt-14 pb-10 text-white">
+    <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-background px-5 pt-14 pb-10 text-white">
       <div className="mb-9 flex flex-col items-center text-center">
-        <div className="mb-6 grid size-20 place-items-center rounded-full border-2 border-[#c8ff2e] bg-[#c8ff2e]/[0.07] shadow-[0_0_40px_rgba(200,255,46,0.22)]">
-          <span className="font-heading text-3xl text-[#c8ff2e]">✓</span>
+        <div className="mb-6 grid size-20 place-items-center rounded-full border-2 border-lime bg-lime/[0.07]">
+          <span className="font-heading text-3xl text-lime">✓</span>
         </div>
-        <p className="mb-2.5 font-label text-[8px] font-semibold tracking-[0.2em] text-[#35f5e8] uppercase">
-          {t('completion.brand')}
-        </p>
         <h1 className="font-heading text-[30px] leading-none text-white uppercase">
           {t('completion.title')}
         </h1>
-        <div className="my-3 h-px w-14 bg-[#c8ff2e]" />
+        <div className="my-3 h-px w-14 bg-lime" />
         <p className="text-xs font-medium text-white/50">
           {t('completion.saved')}
         </p>
@@ -611,12 +602,12 @@ function Completion({
         <Stat
           value={`${exerciseCount}/${totalExercises}`}
           label={t('completion.exercises')}
-          tone="text-[#35f5e8]"
+          tone="text-teal"
         />
         <Stat
           value={String(setCount)}
           label={t('completion.sets')}
-          tone="text-[#c8ff2e]"
+          tone="text-lime"
         />
       </div>
       <div className="mb-8 border border-white/[0.07] bg-white/[0.015] px-4 py-1">
@@ -650,15 +641,14 @@ function Completion({
       <Link
         href="/dashboard"
         className={buttonVariants({
-          className:
-            'w-full bg-[#c8ff2e] text-[#0b0b0b] shadow-[0_0_24px_rgba(200,255,46,0.2)]',
+          className: 'w-full bg-lime text-background',
         })}
       >
         {t('completion.back')}
       </Link>
       <p className="mt-5 text-center font-label text-[8px] font-medium tracking-[0.12em] text-white/20">
         {t('completion.mottoLead')}{' '}
-        <span className="text-[#c8ff2e]">{t('completion.mottoAccent')}</span>
+        <span className="text-lime">{t('completion.mottoAccent')}</span>
       </p>
     </main>
   );

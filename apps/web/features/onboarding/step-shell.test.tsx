@@ -21,7 +21,6 @@ function Harness() {
     <StepShell
       step={step}
       total={3}
-      eyebrow="Eyebrow"
       title={`Title ${step}`}
       canContinue
       onBack={() => setStep((value) => Math.max(0, value - 1))}

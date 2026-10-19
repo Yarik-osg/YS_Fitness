@@ -124,11 +124,11 @@ export function ProfilePage() {
       <header className="border-b border-white/5 px-5 pt-7 pb-5">
         <Link
           href="/dashboard"
-          className="font-label text-[8px] font-semibold tracking-[0.2em] text-white/30 uppercase"
+          className="font-label text-sm font-medium text-muted hover:text-ink"
         >
           {t('brand')}
         </Link>
-        <h1 className="mt-1.5 font-heading text-[30px] leading-none text-white uppercase">
+        <h1 className="mt-3 font-heading text-[30px] leading-none text-white uppercase">
           {t('title')}
         </h1>
       </header>
@@ -341,7 +341,7 @@ function ParametersCard({
         ) : (
           <button
             type="button"
-            className="font-label text-[9px] font-bold tracking-[0.12em] text-[#35f5e8] uppercase"
+            className="font-label text-[9px] font-bold tracking-[0.12em] text-teal uppercase"
             onClick={beginEdit}
           >
             {t('edit')}
@@ -537,7 +537,7 @@ function ProgramCard({
   const male = track === 'male';
 
   return (
-    <section className="border border-[rgba(53,245,232,0.18)] bg-[rgba(53,245,232,0.04)] px-4 py-4">
+    <section className="border border-teal/18 bg-teal/4 px-4 py-4">
       <h2 className="mb-3 font-label text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">
         {t('program')}
       </h2>
@@ -548,11 +548,11 @@ function ProgramCard({
       ) : program ? (
         <>
           <div className="mb-3 flex items-start justify-between gap-3">
-            <p className="font-heading text-lg leading-tight break-words text-[#35f5e8]">
+            <p className="font-heading text-lg leading-tight break-words text-teal">
               {program.templateName}
             </p>
             {active ? (
-              <span className="shrink-0 bg-[#c8ff2e] px-2 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
+              <span className="shrink-0 bg-lime px-2 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-background uppercase">
                 {t('programStatus')}
               </span>
             ) : null}
@@ -694,7 +694,7 @@ function PlanOption({
       aria-pressed={selected}
       onClick={onSelect}
       className={`flex w-full items-center justify-between border px-3 py-3 text-left ${
-        selected ? 'border-[#35f5e8] bg-[#35f5e8]/8' : 'border-white/10'
+        selected ? 'border-teal bg-teal/8' : 'border-white/10'
       }`}
     >
       <span className="text-sm text-white">{plan.name}</span>
@@ -711,7 +711,7 @@ function StatusBadge({ status }: { status: SubscriptionResponse['status'] }) {
   return (
     <span
       className={`shrink-0 px-2 py-1 font-label text-[8px] font-bold tracking-[0.12em] uppercase ${
-        active ? 'bg-[#c8ff2e] text-[#0b0b0b]' : 'bg-white/10 text-white/60'
+        active ? 'bg-lime text-background' : 'bg-white/10 text-white/60'
       }`}
     >
       {t(`statuses.${status}`)}
@@ -812,7 +812,7 @@ function InertRow({ label }: { label: string }) {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] pb-24 text-white">
+    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-24 text-white">
       {children}
       <ClientNav active="profile" />
     </div>

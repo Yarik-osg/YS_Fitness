@@ -159,7 +159,6 @@ function CheckoutFlow() {
   if (step === 'pay') {
     return (
       <CheckoutFrame
-        eyebrow={t('payEyebrow')}
         title={t.rich('payTitle', {
           accent: (chunks) => <span className="text-accent">{chunks}</span>,
         })}
@@ -185,7 +184,6 @@ function CheckoutFlow() {
 
   return (
     <CheckoutFrame
-      eyebrow={t('selectEyebrow')}
       title={t.rich('selectTitle', {
         accent: (chunks) => <span className="text-accent">{chunks}</span>,
       })}
@@ -233,7 +231,7 @@ function PlanSelectStep({
           const isProgress = kind === '3_MONTHS';
           const isFull = kind === 'FULL_ACCESS';
           const accent = isProgress
-            ? 'text-[#c8ff2e]'
+            ? 'text-lime'
             : isFull
               ? 'text-accent'
               : 'text-white/50';
@@ -247,7 +245,7 @@ function PlanSelectStep({
               onClick={() => onSelect(plan.id)}
               className={cn(
                 'w-full overflow-hidden border text-left transition',
-                active && isProgress && 'border-[#c8ff2e]/33 bg-[#c8ff2e]/4',
+                active && isProgress && 'border-lime/33 bg-lime/4',
                 active && isFull && 'border-accent/25 bg-accent/3',
                 active &&
                   !isProgress &&
@@ -257,7 +255,7 @@ function PlanSelectStep({
               )}
             >
               {active && isProgress ? (
-                <div className="h-0.5 bg-linear-to-r from-[#c8ff2e] to-transparent" />
+                <div className="h-0.5 bg-linear-to-r from-lime to-transparent" />
               ) : null}
               {active && isFull ? (
                 <div className="h-0.5 bg-linear-to-r from-accent/80 to-transparent" />
@@ -266,7 +264,7 @@ function PlanSelectStep({
                 <span
                   className={cn(
                     'grid size-4 shrink-0 place-items-center rounded-full border',
-                    active && isProgress && 'border-[#c8ff2e]',
+                    active && isProgress && 'border-lime',
                     active && isFull && 'border-accent',
                     active && !isProgress && !isFull && 'border-white/50',
                     !active && 'border-white/20',
@@ -276,7 +274,7 @@ function PlanSelectStep({
                     <span
                       className={cn(
                         'size-2 rounded-full',
-                        isProgress && 'bg-[#c8ff2e]',
+                        isProgress && 'bg-lime',
                         isFull && 'bg-accent',
                         !isProgress && !isFull && 'bg-white/50',
                       )}
@@ -297,7 +295,7 @@ function PlanSelectStep({
                       {copy.period}
                     </span>
                     {isProgress ? (
-                      <span className="text-[10px] font-semibold text-[#c8ff2e]">
+                      <span className="text-[10px] font-semibold text-lime">
                         {tPricing('pricing.perMonth', {
                           amount: formatHryvniaAmount(monthlyHryvnia(plan)),
                         })}
@@ -321,7 +319,7 @@ function PlanSelectStep({
                     <span className="ml-0.5 text-[10px] text-white/30">₴</span>
                   </p>
                   {isProgress ? (
-                    <span className="mt-1 inline-block bg-[#c8ff2e] px-1.5 py-0.5 font-label text-[6.5px] font-bold tracking-[0.1em] text-[#0b0b0b] uppercase">
+                    <span className="mt-1 inline-block bg-lime px-1.5 py-0.5 font-label text-[6.5px] font-bold tracking-[0.1em] text-background uppercase">
                       {tPricing('pricing.featuredBadge')}
                     </span>
                   ) : null}
@@ -462,7 +460,7 @@ function PaymentStep({
           )}
         >
           {agreed ? (
-            <Check size={9} strokeWidth={3} className="text-[#0b0b0b]" />
+            <Check size={9} strokeWidth={3} className="text-background" />
           ) : null}
         </span>
         <span className="text-[11px] leading-5 text-white/40">
@@ -507,12 +505,9 @@ function CheckoutSuccess() {
   return (
     <CheckoutFrame hideIntro>
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="mb-8 grid size-28 place-items-center rounded-full border-2 border-accent bg-accent/8 shadow-[0_0_56px_color-mix(in_srgb,var(--accent)_28%,transparent)]">
+        <div className="mb-8 grid size-28 place-items-center rounded-full border-2 border-accent bg-accent/8">
           <Check size={44} strokeWidth={2.2} className="text-accent" />
         </div>
-        <p className="font-label text-[10px] font-semibold uppercase tracking-[0.22em] text-[#00c7c8]">
-          {t('eyebrow')}
-        </p>
         <h1 className="mt-4 font-heading text-[34px] font-normal uppercase leading-10 tracking-[-0.02em]">
           {t.rich('successTitle', {
             accent: (chunks) => <span className="text-accent">{chunks}</span>,
@@ -541,7 +536,7 @@ function CheckoutSuccess() {
         </Link>
         <p className="mt-8 font-label text-[8px] font-medium tracking-[0.12em] text-white/35">
           TRAIN.&nbsp;&nbsp;DISCIPLINE.&nbsp;&nbsp;
-          <span className="text-[#c8ff2e]">EVOLVE</span>
+          <span className="text-lime">EVOLVE</span>
         </p>
       </div>
     </CheckoutFrame>
@@ -563,13 +558,11 @@ function SuccessStat({ value, label }: { value: string; label: string }) {
 
 function CheckoutFrame({
   children,
-  eyebrow,
   title,
   onBack,
   hideIntro = false,
 }: {
   children: React.ReactNode;
-  eyebrow?: string;
   title?: React.ReactNode;
   onBack?: () => void;
   hideIntro?: boolean;
@@ -581,7 +574,7 @@ function CheckoutFrame({
   return (
     <main
       className={cn(
-        'relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden border-x border-white/5 bg-[#0b0b0b] px-5 pb-10 pt-4',
+        'relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden border-x border-white/5 bg-background px-5 pb-10 pt-4',
         male ? 'track-male' : 'track-female',
       )}
     >
@@ -603,17 +596,10 @@ function CheckoutFrame({
       <div className="h-px bg-white/8" />
       {hideIntro ? null : (
         <>
-          <p className="relative mt-7 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
-            {eyebrow ?? t('title')}
-          </p>
-          {title ? (
-            <>
-              <h1 className="relative mt-2.5 font-heading text-[28px] font-normal uppercase leading-8 tracking-[-0.02em]">
-                {title}
-              </h1>
-              <div className="relative my-2.5 h-px w-15 bg-accent" />
-            </>
-          ) : null}
+          <h1 className="relative mt-7 font-heading text-[28px] font-normal uppercase leading-8 tracking-[-0.02em]">
+            {title ?? t('title')}
+          </h1>
+          <div className="relative my-2.5 h-px w-15 bg-accent" />
         </>
       )}
       <div

@@ -11,9 +11,6 @@ export function FaqSection() {
 
   return (
     <section className="border-t border-white/6 px-5 py-[52px]">
-      <p className="mb-2.5 font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-        {t('faq.eyebrow')}
-      </p>
       <h2 className="font-heading text-[30px] font-normal uppercase leading-[1.1] tracking-[-0.02em]">
         {t('faq.heading')}
       </h2>
@@ -42,11 +39,11 @@ export function FaqSection() {
                     height="10"
                     viewBox="0 0 10 10"
                     fill="none"
-                    className={`transition-transform duration-200 ${isOpen ? 'rotate-45' : ''}`}
+                    className={`transition-transform duration-200 ${isOpen ? 'rotate-45 text-teal' : 'text-white/40'}`}
                   >
                     <path
                       d="M5 1v8M1 5h8"
-                      stroke={isOpen ? '#35f5e8' : 'rgba(255,255,255,0.4)'}
+                      stroke="currentColor"
                       strokeWidth="1.4"
                       strokeLinecap="round"
                     />

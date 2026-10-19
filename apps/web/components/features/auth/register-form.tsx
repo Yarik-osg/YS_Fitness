@@ -53,7 +53,6 @@ export function RegisterForm() {
 
   return (
     <AuthShell
-      eyebrow={t('register.eyebrow')}
       title={t('register.title')}
       highlighted={t('register.highlighted')}
       description={t('register.description')}

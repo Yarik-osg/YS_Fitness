@@ -1,92 +1,175 @@
 'use client';
 
-import { enUS, uk } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
-import { useState, type CSSProperties } from 'react';
-import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/style.css';
+import { useState } from 'react';
 
-function parseIso(value: string | undefined) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return undefined;
-  return new Date(year, month - 1, day);
+type Part = 'day' | 'month' | 'year';
+type Parts = Record<Part, string>;
+
+const NAMES = {
+  en: { day: 'Day', month: 'Month', year: 'Year' },
+  uk: { day: 'День', month: 'Місяць', year: 'Рік' },
+} as const;
+
+function split(value?: string): Parts {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? '');
+  if (!match) return { year: '', month: '', day: '' };
+  return {
+    year: String(Number(match[1])),
+    month: String(Number(match[2])),
+    day: String(Number(match[3])),
+  };
 }
 
-function toIso(date: Date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+function utcParts(date: Date) {
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+  };
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function dayCount(
+  year: number,
+  month: number,
+  latest: { year: number; month: number; day: number },
+) {
+  const length = daysInMonth(year, month);
+  if (year === latest.year && month === latest.month) {
+    return Math.min(length, latest.day);
+  }
+  return length;
+}
+
+function range(from: number, to: number) {
+  const values: number[] = [];
+  for (let value = from; value <= to; value += 1) values.push(value);
+  return values;
 }
 
 /**
- * Date of birth control. The calendar is react-day-picker so the dark theme
- * and the 120-year limit stay the same in every browser.
+ * Birthday is three numbers, so this is three native selects rather than a
+ * month grid. The limits match isPlausibleDateOfBirth, which reads the date
+ * as UTC midnight.
  */
 export function BirthDateField({
   id,
+  label,
   value,
   onChange,
 }: {
   id: string;
+  label: string;
   value?: string;
   onChange: (value: string) => void;
 }) {
   const locale = useLocale();
-  const selected = parseIso(value);
-  const [open, setOpen] = useState(false);
-  const today = new Date();
-  const earliest = new Date(
-    today.getFullYear() - 120,
-    today.getMonth(),
-    today.getDate(),
+  const names = locale === 'en' ? NAMES.en : NAMES.uk;
+  const now = new Date();
+  const latest = utcParts(now);
+  const oldest = utcParts(
+    new Date(Date.UTC(latest.year - 120, latest.month - 1, latest.day)),
   );
-  const shown = selected
-    ? new Intl.DateTimeFormat(locale, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }).format(selected)
-    : '—';
+  const [source, setSource] = useState(value);
+  const [draft, setDraft] = useState(() => split(value));
+  if (value !== source) {
+    setSource(value);
+    setDraft(split(value));
+  }
+
+  const monthStart = Number(draft.year) === oldest.year ? oldest.month : 1;
+  const monthEnd = Number(draft.year) === latest.year ? latest.month : 12;
+  const dayStart =
+    Number(draft.year) === oldest.year && Number(draft.month) === oldest.month
+      ? oldest.day
+      : 1;
+  const dayEnd = dayCount(
+    Number(draft.year) || latest.year,
+    Number(draft.month) || 1,
+    latest,
+  );
+
+  const months = range(monthStart, monthEnd).map((month) => ({
+    value: String(month),
+    label: new Intl.DateTimeFormat(locale, {
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(2020, month - 1, 1))),
+  }));
+  const days = range(dayStart, dayEnd).map(String);
+  const years = range(oldest.year, latest.year).reverse().map(String);
+  const order: Part[] =
+    locale === 'en' ? ['month', 'day', 'year'] : ['day', 'month', 'year'];
+
+  function choose(part: Part, nextValue: string) {
+    if (!nextValue) return;
+    const next = { ...draft, [part]: nextValue };
+    const year = Number(next.year);
+    const month = Number(next.month);
+    const day = Number(next.day);
+    if (year === latest.year && month > latest.month)
+      next.month = String(latest.month);
+    if (year === oldest.year && month && month < oldest.month) {
+      next.month = String(oldest.month);
+    }
+    const chosenMonth = Number(next.month);
+    const lengthYear = year || latest.year;
+    const maxDay = chosenMonth ? dayCount(lengthYear, chosenMonth, latest) : 0;
+    if (chosenMonth && day > maxDay) {
+      next.day = String(maxDay);
+    }
+    if (
+      year === oldest.year &&
+      chosenMonth === oldest.month &&
+      Number(next.day) &&
+      Number(next.day) < oldest.day
+    ) {
+      next.day = String(oldest.day);
+    }
+    setDraft(next);
+    if (next.year && next.month && next.day) {
+      onChange(
+        `${next.year}-${next.month.padStart(2, '0')}-${next.day.padStart(2, '0')}`,
+      );
+    }
+  }
+
+  const options: Record<Part, { value: string; label: string }[]> = {
+    day: days.map((day) => ({ value: day, label: day })),
+    month: months,
+    year: years.map((year) => ({ value: year, label: year })),
+  };
 
   return (
     <div>
-      <button
+      <span
         id={id}
-        type="button"
-        aria-expanded={open}
-        className="w-full text-left font-heading text-[18px] text-white"
-        onClick={() => setOpen((current) => !current)}
+        className="mb-2 block font-label text-[9px] font-semibold tracking-[0.16em] text-white/50 uppercase"
       >
-        <span className={selected ? undefined : 'text-white/25'}>{shown}</span>
-      </button>
-      {open ? (
-        <DayPicker
-          mode="single"
-          selected={selected}
-          defaultMonth={selected ?? new Date(today.getFullYear() - 25, 0)}
-          onSelect={(day) => {
-            if (!day) return;
-            onChange(toIso(day));
-            setOpen(false);
-          }}
-          locale={locale === 'uk' ? uk : enUS}
-          weekStartsOn={locale === 'uk' ? 1 : 0}
-          captionLayout="dropdown"
-          startMonth={earliest}
-          endMonth={today}
-          disabled={{ before: earliest, after: today }}
-          className="mt-3"
-          style={
-            {
-              '--rdp-accent-color': '#c8ff2e',
-              '--rdp-accent-background-color': 'rgba(200, 255, 46, 0.16)',
-              '--rdp-today-color': '#35f5e8',
-              color: '#fff',
-            } as CSSProperties
-          }
-        />
-      ) : null}
+        {label}
+      </span>
+      <div role="group" aria-labelledby={id} className="flex gap-2">
+        {order.map((part) => (
+          <select
+            key={part}
+            aria-label={names[part]}
+            value={draft[part]}
+            onChange={(event) => choose(part, event.target.value)}
+            className={`border border-white/12 bg-white/4 px-2 py-3 font-heading text-[16px] scheme-dark accent-accent focus:border-accent focus:outline-none ${draft[part] ? 'text-white' : 'text-white/35'} ${part === 'month' ? 'min-w-0 flex-1' : 'w-[4.75rem]'}`}
+          >
+            <option value="">—</option>
+            {options[part].map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ))}
+      </div>
     </div>
   );
 }

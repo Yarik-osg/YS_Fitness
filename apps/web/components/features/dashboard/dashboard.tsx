@@ -36,7 +36,7 @@ function HomeLoading() {
   return (
     <main
       aria-busy="true"
-      className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] px-4 pt-7 pb-24"
+      className="mx-auto min-h-screen w-full max-w-[430px] bg-background px-4 pt-7 pb-24"
     >
       <div className="mb-6 flex items-start justify-between gap-3">
         <div className="flex flex-col gap-2">
@@ -79,7 +79,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
   }
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] pb-24">
+    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-24">
       <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 pt-7 pb-5">
         <div>
           <p className="font-label text-[8px] font-semibold tracking-[0.2em] text-white/30 uppercase">
@@ -103,11 +103,11 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
       </header>
 
       <div className="flex flex-col gap-3 px-4 pt-4">
-        <section className="border-[1.5px] border-[rgba(53,245,232,0.12)] bg-[rgba(53,245,232,0.04)] px-[18px] py-[18px]">
+        <section className="border-[1.5px] border-teal/12 bg-teal/4 px-[18px] py-[18px]">
           <p className="mb-3 font-label text-[7px] font-semibold tracking-[0.18em] text-white/30 uppercase">
             {t('home.today')}
           </p>
-          <p className="mb-3.5 font-heading text-xl tracking-[0.04em] break-words text-[#35f5e8]">
+          <p className="mb-3.5 font-heading text-xl tracking-[0.04em] break-words text-teal">
             {program.templateName}
           </p>
           <div className="mb-4 flex flex-col gap-1.5">
@@ -143,10 +143,10 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
         <div className="grid grid-cols-2 gap-2.5">
           <Link
             href="/training"
-            className="relative block min-h-[130px] overflow-hidden border-[1.5px] border-[rgba(200,255,46,0.2)] px-4 py-[18px]"
+            className="relative block min-h-[130px] overflow-hidden border-[1.5px] border-lime/20 px-4 py-[18px]"
           >
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-[#c8ff2e] to-transparent" />
-            <p className="mb-2 font-label text-[7px] font-bold tracking-[0.16em] text-[rgba(200,255,46,0.7)] uppercase">
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-lime to-transparent" />
+            <p className="mb-2 font-label text-[7px] font-bold tracking-[0.16em] text-lime/70 uppercase">
               {t('home.training')}
             </p>
             <p className="font-heading text-[17px] leading-tight tracking-[0.02em] text-white uppercase">
@@ -155,7 +155,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             <p className="mt-3 text-[10px] font-medium text-white/35">
               {t('home.summary', { exercises: exerciseCount, sets: setCount })}
             </p>
-            <Chevron className="absolute right-3.5 bottom-3.5 text-[#c8ff2e]" />
+            <Chevron className="absolute right-3.5 bottom-3.5 text-lime" />
           </Link>
 
           <Link
@@ -229,10 +229,7 @@ function UnassignedDashboard({
       </nav>
 
       <header className="pt-14 pb-10">
-        <p className="font-label text-[10px] tracking-[0.2em] text-accent uppercase">
-          {t('eyebrow')}
-        </p>
-        <h1 className="mt-3 max-w-lg font-heading text-5xl leading-none uppercase">
+        <h1 className="max-w-lg font-heading text-5xl leading-none uppercase">
           {t('title')} <span className="text-accent">{t('titleAccent')}</span>
         </h1>
         <p className="mt-5 text-sm text-muted">{user?.name ?? user?.email}</p>

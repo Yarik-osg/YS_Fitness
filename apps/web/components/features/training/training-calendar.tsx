@@ -29,7 +29,7 @@ const fadeIn = {
   transition: { duration: 0.18 },
 } as const;
 
-const LIME = 'bg-[#c8ff2e]';
+const LIME = 'bg-lime';
 
 export function TrainingCalendar({
   frequencyPerWeek,
@@ -144,7 +144,7 @@ export function TrainingCalendar({
         <button
           type="button"
           aria-expanded={monthOpen}
-          className="font-label text-[8px] font-bold tracking-[0.14em] text-[#35f5e8] uppercase"
+          className="font-label text-[8px] font-bold tracking-[0.14em] text-teal uppercase"
           onClick={toggleMonth}
         >
           {monthOpen ? t('showWeek') : t('showMonth')}
@@ -224,7 +224,7 @@ export function TrainingCalendar({
             }).format(selected)}
           </p>
           {selectedRecommended ? (
-            <span className="shrink-0 font-label text-[7px] font-semibold tracking-[0.16em] text-[#35f5e8] uppercase">
+            <span className="shrink-0 font-label text-[7px] font-semibold tracking-[0.16em] text-teal uppercase">
               {t('recommended')}
             </span>
           ) : null}
@@ -235,7 +235,7 @@ export function TrainingCalendar({
             <button
               type="button"
               disabled={activeQuery.isFetching}
-              className="font-label text-[8px] font-bold tracking-[0.14em] text-[#35f5e8] uppercase disabled:opacity-40"
+              className="font-label text-[8px] font-bold tracking-[0.14em] text-teal uppercase disabled:opacity-40"
               onClick={() => void activeQuery.refetch()}
             >
               {t('retry')}
@@ -278,18 +278,18 @@ function DayButton({
   children: React.ReactNode;
 }) {
   const tone = isToday
-    ? 'text-[#c8ff2e]'
+    ? 'text-lime'
     : dimmed
       ? 'text-white/20'
       : isRecommended
         ? 'text-white/75'
         : 'text-white/45';
   const frame = isSelected
-    ? 'border-[rgba(200,255,46,0.6)] bg-[rgba(200,255,46,0.08)]'
+    ? 'border-lime/60 bg-lime/8'
     : isToday
-      ? 'border-[rgba(200,255,46,0.3)] bg-[rgba(200,255,46,0.04)]'
+      ? 'border-lime/30 bg-lime/4'
       : isRecommended
-        ? 'border-[rgba(53,245,232,0.28)] bg-[rgba(53,245,232,0.03)]'
+        ? 'border-teal/28 bg-teal/3'
         : 'border-white/[0.06] bg-white/[0.02]';
 
   return (
@@ -308,7 +308,7 @@ function DayButton({
           hasWorkout
             ? LIME
             : isRecommended
-              ? 'border border-[#35f5e8]/70'
+              ? 'border border-teal/70'
               : dimmed
                 ? 'bg-white/[0.04]'
                 : 'bg-white/[0.08]'
@@ -352,14 +352,14 @@ function LoggedWorkout({ log }: { log: WorkoutLogResponse }) {
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
         onClick={() => setExpanded((open) => !open)}
       >
-        <span className="font-label text-[8px] font-bold tracking-[0.14em] text-[#35f5e8] uppercase">
+        <span className="font-label text-[8px] font-bold tracking-[0.14em] text-teal uppercase">
           {t('workout', {
             number: String(log.dayNumber).padStart(2, '0'),
             time,
           })}
         </span>
         <span className="text-right">
-          <span className="block font-heading text-[18px] leading-none text-[#c8ff2e]">
+          <span className="block font-heading text-[18px] leading-none text-lime">
             {exercises.length}
           </span>
           <span className="mt-1 block font-label text-[7px] font-semibold tracking-[0.1em] text-white/25 uppercase">
