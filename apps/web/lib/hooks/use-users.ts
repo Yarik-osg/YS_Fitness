@@ -2,15 +2,18 @@
 
 import type {
   CreateMeasurementInput,
+  CreateProgressPhotoInput,
   OnboardingInput,
   ProfileUpdateInput,
 } from '@repo/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import {
+  createProgressPhoto,
   getMe,
   getMeasurements,
   getOnboardingResponses,
+  getProgressPhotos,
   saveOnboarding,
   updateProfile,
   createMeasurement,
@@ -23,6 +26,11 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 
 export const meQueryKey = ['users', 'me'] as const;
 export const measurementsQueryKey = ['users', 'me', 'measurements'] as const;
+export const progressPhotosQueryKey = [
+  'users',
+  'me',
+  'progress-photos',
+] as const;
 export const onboardingResponsesQueryKey = [
   'users',
   'me',
@@ -140,6 +148,24 @@ export function useCreateMeasurement() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: measurementsQueryKey });
       await queryClient.invalidateQueries({ queryKey: meQueryKey });
+    },
+  });
+}
+
+export function useProgressPhotos() {
+  return useQuery({
+    queryKey: progressPhotosQueryKey,
+    queryFn: getProgressPhotos,
+  });
+}
+
+export function useCreateProgressPhoto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateProgressPhotoInput) => createProgressPhoto(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: progressPhotosQueryKey });
     },
   });
 }

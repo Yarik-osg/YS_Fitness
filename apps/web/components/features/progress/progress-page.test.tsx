@@ -1,16 +1,25 @@
-import type { WeightMeasurement } from '@repo/shared-types';
+import type { WeightMeasurement, WorkoutLogResponse } from '@repo/shared-types';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiClientError } from '@/lib/api/client';
 import { Providers } from '@/components/providers';
 import { I18nTestProvider } from '@/test/i18n';
 import { periodStart } from '@/lib/weight-period';
 import { ProgressPage } from './progress-page';
 
+const readProgressPhoto = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/progress-photo', () => ({
+  readProgressPhoto,
+}));
+
 const usersApi = vi.hoisted(() => ({
   getMe: vi.fn(),
   getMeasurements: vi.fn(),
+  getProgressPhotos: vi.fn(),
   createMeasurement: vi.fn(),
+  createProgressPhoto: vi.fn(),
   getOnboardingResponses: vi.fn(),
   saveOnboarding: vi.fn(),
   updateProfile: vi.fn(),
@@ -20,9 +29,16 @@ const programsApi = vi.hoisted(() => ({
   getMyProgram: vi.fn(),
   assignProgram: vi.fn(),
 }));
+const workoutsApi = vi.hoisted(() => ({
+  listWorkoutLogs: vi.fn(),
+}));
 
 vi.mock('@/lib/api/users', () => usersApi);
 vi.mock('@/lib/api/programs', () => programsApi);
+vi.mock('@/lib/api/workouts', () => workoutsApi);
+vi.mock('next/image', () => ({
+  default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} />,
+}));
 vi.mock('@/i18n/navigation', () => ({
   Link: ({
     href,
@@ -71,7 +87,14 @@ describe('ProgressPage', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(now);
     usersApi.getMeasurements.mockReset();
+    usersApi.getProgressPhotos.mockReset().mockResolvedValue({ photos: [] });
+    readProgressPhoto.mockReset().mockResolvedValue('aGVsbG8=');
     usersApi.createMeasurement.mockReset();
+    usersApi.createProgressPhoto.mockReset();
+    workoutsApi.listWorkoutLogs.mockReset().mockResolvedValue({
+      logs: [],
+      total: 0,
+    });
     programsApi.getAssignedProgram.mockReset().mockResolvedValue(null);
   });
 
@@ -162,7 +185,7 @@ describe('ProgressPage', () => {
     renderPage();
 
     expect(await screen.findByText('Ще немає вимірювань.')).toBeInTheDocument();
-    expect(screen.getAllByText('—')).toHaveLength(3);
+    expect(screen.getAllByText('—')).toHaveLength(5);
   });
 
   it('appends a weight, keeps the input after a failure, and cancels without saving', async () => {
@@ -223,6 +246,7 @@ describe('ProgressPage', () => {
       'aria-valuenow',
       '100',
     );
+    expect(screen.getAllByRole('listitem')).toHaveLength(24);
     expect(screen.getByText('100%')).toBeInTheDocument();
 
     view.unmount();
@@ -254,4 +278,100 @@ describe('ProgressPage', () => {
       await screen.findByText('Не вдалося завантажити програму.'),
     ).toBeInTheDocument();
   });
+
+  it('ranks a gain above a loss and shows one photo as now', async () => {
+    usersApi.getMeasurements.mockResolvedValue({
+      measurements: [],
+      firstMeasurement: null,
+    });
+    workoutsApi.listWorkoutLogs.mockResolvedValue({
+      logs: [
+        strengthLog('a1', '2026-08-01T00:00:00.000Z', 'bridge', 'Міст', 100),
+        strengthLog('a2', '2026-08-02T00:00:00.000Z', 'bridge', 'Міст', 12),
+        strengthLog('b1', '2026-08-01T00:00:00.000Z', 'curl', 'Згинання', 3),
+        strengthLog('b2', '2026-08-02T00:00:00.000Z', 'curl', 'Згинання', 12),
+      ],
+      total: 4,
+    });
+    usersApi.getProgressPhotos.mockResolvedValue({
+      photos: [
+        {
+          id: 'photo-1',
+          createdAt: '2026-08-02T00:00:00.000Z',
+          contentType: 'image/jpeg',
+          imageBase64: 'aGVsbG8=',
+        },
+      ],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Згинання')).toBeInTheDocument();
+    const names = screen.getAllByText(/Згинання|Міст/);
+    expect(names[0]).toHaveTextContent('Згинання');
+    expect(screen.getByText('+9,0').className).toContain('text-teal');
+    expect(screen.getByText('−88,0').className).toContain('text-amber');
+    expect(screen.getByRole('img', { name: 'Зараз' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('img', { name: 'Старт' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the photo limit when the upload is refused', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    usersApi.getMeasurements.mockResolvedValue({
+      measurements: [],
+      firstMeasurement: null,
+    });
+    usersApi.createProgressPhoto.mockRejectedValue(
+      new ApiClientError(400, 'PHOTO_LIMIT', 'limit'),
+    );
+
+    renderPage();
+    await screen.findByText('Ще немає вимірювань.');
+    await user.upload(
+      screen.getByLabelText('Додати фото'),
+      new File(['photo'], 'photo.jpg', { type: 'image/jpeg' }),
+    );
+
+    expect(
+      await screen.findByText('Можна зберегти не більше 8 фото.'),
+    ).toBeInTheDocument();
+  });
 });
+
+function strengthLog(
+  id: string,
+  completedAt: string,
+  exerciseId: string,
+  name: string,
+  weightKg: number,
+): WorkoutLogResponse {
+  return {
+    id,
+    userId: 'user',
+    templateId: 'template',
+    dayNumber: 1,
+    completedAt,
+    sets: [
+      {
+        id: `${id}-set`,
+        exerciseId,
+        order: 1,
+        setNumber: 1,
+        repsCompleted: 8,
+        weightKg,
+        recommendation: null,
+        exercise: {
+          id: exerciseId,
+          code: exerciseId,
+          name,
+          nameEn: name,
+          muscleGroups: [],
+          repsMin: 8,
+          repsMax: 12,
+        },
+      },
+    ],
+  };
+}

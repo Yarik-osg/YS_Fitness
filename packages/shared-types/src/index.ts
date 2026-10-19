@@ -67,6 +67,17 @@ export interface WeightMeasurementsResponse {
   firstMeasurement: WeightMeasurement | null;
 }
 
+export interface ProgressPhoto {
+  id: string;
+  createdAt: string;
+  contentType: 'image/jpeg' | 'image/png' | 'image/webp';
+  imageBase64: string;
+}
+
+export interface ProgressPhotosResponse {
+  photos: ProgressPhoto[];
+}
+
 export interface MeResponse {
   id: string;
   email: string;

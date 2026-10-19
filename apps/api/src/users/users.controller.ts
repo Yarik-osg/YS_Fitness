@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { UsersService } from './users.service.js';
 import {
   CreateMeasurementDto,
+  CreateProgressPhotoDto,
   OnboardingDto,
   ProfileUpdateDto,
 } from './users.dto.js';
@@ -40,6 +41,20 @@ export class UsersController {
     @Body() input: CreateMeasurementDto,
   ) {
     return this.users.createMeasurement(user.sub, input.weightKg);
+  }
+
+  @Get('me/progress-photos')
+  listProgressPhotos(@CurrentUser() user: AuthenticatedUser) {
+    return this.users.listProgressPhotos(user.sub);
+  }
+
+  @Post('me/progress-photos')
+  @HttpCode(201)
+  createProgressPhoto(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: CreateProgressPhotoDto,
+  ) {
+    return this.users.createProgressPhoto(user.sub, input.imageBase64);
   }
 
   @Put('me/onboarding')

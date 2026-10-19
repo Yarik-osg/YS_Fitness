@@ -13,10 +13,10 @@ import {
 
 export const workoutLogsQueryKey = ['workouts', 'logs'] as const;
 
-export function useWorkoutLogs() {
+export function useWorkoutLogs(limit = 20) {
   return useQuery({
-    queryKey: workoutLogsQueryKey,
-    queryFn: () => listWorkoutLogs(),
+    queryKey: [...workoutLogsQueryKey, limit],
+    queryFn: () => listWorkoutLogs(limit),
   });
 }
 

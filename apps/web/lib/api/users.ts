@@ -3,11 +3,14 @@ import type {
   OnboardingResponse,
   OnboardingResponsesResponse,
   ProfileUpdateResponse,
+  ProgressPhoto,
+  ProgressPhotosResponse,
   WeightMeasurement,
   WeightMeasurementsResponse,
 } from '@repo/shared-types';
 import type {
   CreateMeasurementInput,
+  CreateProgressPhotoInput,
   OnboardingInput,
   ProfileUpdateInput,
 } from '@repo/validation';
@@ -29,6 +32,17 @@ export function getMeasurements() {
 
 export function createMeasurement(input: CreateMeasurementInput) {
   return apiRequest<WeightMeasurement>('/users/me/measurements', {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export function getProgressPhotos() {
+  return apiRequest<ProgressPhotosResponse>('/users/me/progress-photos');
+}
+
+export function createProgressPhoto(input: CreateProgressPhotoInput) {
+  return apiRequest<ProgressPhoto>('/users/me/progress-photos', {
     method: 'POST',
     body: input,
   });
