@@ -1,4 +1,4 @@
-import type { WeightMeasurement, WorkoutLogResponse } from '@repo/shared-types';
+import type { WeightMeasurement } from '@repo/shared-types';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,6 +30,7 @@ const programsApi = vi.hoisted(() => ({
   assignProgram: vi.fn(),
 }));
 const workoutsApi = vi.hoisted(() => ({
+  getStrengthChanges: vi.fn(),
   listWorkoutLogs: vi.fn(),
 }));
 
@@ -91,9 +92,8 @@ describe('ProgressPage', () => {
     readProgressPhoto.mockReset().mockResolvedValue('aGVsbG8=');
     usersApi.createMeasurement.mockReset();
     usersApi.createProgressPhoto.mockReset();
-    workoutsApi.listWorkoutLogs.mockReset().mockResolvedValue({
-      logs: [],
-      total: 0,
+    workoutsApi.getStrengthChanges.mockReset().mockResolvedValue({
+      changes: [],
     });
     programsApi.getAssignedProgram.mockReset().mockResolvedValue(null);
   });
@@ -284,14 +284,23 @@ describe('ProgressPage', () => {
       measurements: [],
       firstMeasurement: null,
     });
-    workoutsApi.listWorkoutLogs.mockResolvedValue({
-      logs: [
-        strengthLog('a1', '2026-08-01T00:00:00.000Z', 'bridge', 'Міст', 100),
-        strengthLog('a2', '2026-08-02T00:00:00.000Z', 'bridge', 'Міст', 12),
-        strengthLog('b1', '2026-08-01T00:00:00.000Z', 'curl', 'Згинання', 3),
-        strengthLog('b2', '2026-08-02T00:00:00.000Z', 'curl', 'Згинання', 12),
+    workoutsApi.getStrengthChanges.mockResolvedValue({
+      changes: [
+        {
+          exerciseId: 'curl',
+          name: 'Згинання',
+          nameEn: 'Curl',
+          fromKg: 3,
+          toKg: 12,
+        },
+        {
+          exerciseId: 'bridge',
+          name: 'Міст',
+          nameEn: 'Bridge',
+          fromKg: 100,
+          toKg: 12,
+        },
       ],
-      total: 4,
     });
     usersApi.getProgressPhotos.mockResolvedValue({
       photos: [
@@ -339,39 +348,3 @@ describe('ProgressPage', () => {
     ).toBeInTheDocument();
   });
 });
-
-function strengthLog(
-  id: string,
-  completedAt: string,
-  exerciseId: string,
-  name: string,
-  weightKg: number,
-): WorkoutLogResponse {
-  return {
-    id,
-    userId: 'user',
-    templateId: 'template',
-    dayNumber: 1,
-    completedAt,
-    sets: [
-      {
-        id: `${id}-set`,
-        exerciseId,
-        order: 1,
-        setNumber: 1,
-        repsCompleted: 8,
-        weightKg,
-        recommendation: null,
-        exercise: {
-          id: exerciseId,
-          code: exerciseId,
-          name,
-          nameEn: name,
-          muscleGroups: [],
-          repsMin: 8,
-          repsMax: 12,
-        },
-      },
-    ],
-  };
-}

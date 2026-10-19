@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { StrengthChange } from '@repo/shared-types';
 import type { ListWorkoutLogsQuery, LogWorkoutInput } from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -93,5 +94,48 @@ export class WorkoutsRepository {
 
   count(userId: string): Promise<number> {
     return this.prisma.workoutLog.count({ where: { userId } });
+  }
+
+  /** Earliest and latest loaded weight per exercise, across the whole history. */
+  strengthChanges(userId: string): Promise<StrengthChange[]> {
+    return this.prisma.$queryRaw<StrengthChange[]>`
+      WITH best AS (
+        SELECT
+          l.id AS log_id,
+          l.completed_at,
+          s.exercise_id,
+          MAX(s.weight_kg) AS kg
+        FROM workout_logs l
+        INNER JOIN workout_log_sets s ON s.workout_log_id = l.id
+        WHERE l.user_id = CAST(${userId} AS uuid)
+          AND s.weight_kg IS NOT NULL
+          AND s.weight_kg > 0
+        GROUP BY l.id, l.completed_at, s.exercise_id
+      ),
+      earliest AS (
+        SELECT DISTINCT ON (exercise_id)
+          exercise_id, log_id, kg
+        FROM best
+        ORDER BY exercise_id, completed_at ASC, log_id::text ASC
+      ),
+      latest AS (
+        SELECT DISTINCT ON (exercise_id)
+          exercise_id, log_id, kg
+        FROM best
+        ORDER BY exercise_id, completed_at DESC, log_id::text DESC
+      )
+      SELECT
+        earliest.exercise_id::text AS "exerciseId",
+        exercise.name AS name,
+        exercise.name_en AS "nameEn",
+        earliest.kg::float8 AS "fromKg",
+        latest.kg::float8 AS "toKg"
+      FROM earliest
+      INNER JOIN latest ON latest.exercise_id = earliest.exercise_id
+      INNER JOIN exercises exercise ON exercise.id = earliest.exercise_id
+      WHERE earliest.log_id <> latest.log_id
+        AND earliest.kg <> latest.kg
+      ORDER BY (latest.kg - earliest.kg) DESC, earliest.exercise_id::text ASC
+    `;
   }
 }

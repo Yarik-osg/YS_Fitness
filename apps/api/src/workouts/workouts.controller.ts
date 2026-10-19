@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type {
+  StrengthChangesResponse,
   WorkoutCalendarResponse,
   WorkoutLogListResponse,
   WorkoutLogResponse,
@@ -43,6 +44,13 @@ export class WorkoutsController {
     @Query() query: ListWorkoutLogsQueryDto,
   ): Promise<WorkoutLogListResponse> {
     return this.workouts.list(user.sub, query);
+  }
+
+  @Get('strength')
+  strength(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StrengthChangesResponse> {
+    return this.workouts.strength(user.sub);
   }
 
   @Get('calendar')

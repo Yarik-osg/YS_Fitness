@@ -1,6 +1,10 @@
 'use client';
 
-import type { ProgressPhoto, WeightMeasurement } from '@repo/shared-types';
+import type {
+  ProgressPhoto,
+  StrengthChange,
+  WeightMeasurement,
+} from '@repo/shared-types';
 import { areaY, defineChart, lineY } from '@tanstack/charts';
 import { Chart } from '@tanstack/charts/react';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
@@ -19,7 +23,6 @@ import { ApiClientError } from '@/lib/api/client';
 import { getUserFacingError } from '@/lib/api/errors';
 import { exerciseName } from '@/lib/exercise-name';
 import { readProgressPhoto } from '@/lib/progress-photo';
-import { strengthChanges } from '@/lib/strength-progress';
 import {
   formatDelta,
   formatWeight,
@@ -34,7 +37,7 @@ import {
   useProgressPhotos,
 } from '@/lib/hooks/use-users';
 import { useAssignedProgram } from '@/lib/hooks/use-programs';
-import { useWorkoutLogs } from '@/lib/hooks/use-workouts';
+import { useStrengthChanges } from '@/lib/hooks/use-workouts';
 
 const PERIODS: WeightPeriod[] = ['30d', '3m', 'all'];
 
@@ -42,7 +45,7 @@ export function ProgressPage() {
   const t = useTranslations('progress');
   const measurements = useMeasurements();
   const assigned = useAssignedProgram();
-  const logs = useWorkoutLogs(50);
+  const strength = useStrengthChanges();
   const photos = useProgressPhotos();
   const [now] = useState(() => new Date());
   const [period, setPeriod] = useState<WeightPeriod>('30d');
@@ -76,9 +79,9 @@ export function ProgressPage() {
           expected={assigned.data?.programProgress.expected}
         />
         <StrengthCard
-          loading={logs.isPending && !logs.data}
-          error={logs.isError}
-          changes={strengthChanges(logs.data?.logs ?? [])}
+          loading={strength.isPending && !strength.data}
+          error={strength.isError}
+          changes={strength.data?.changes ?? []}
         />
         <PhotosCard
           loading={photos.isPending && !photos.data}
@@ -485,7 +488,7 @@ function StrengthCard({
 }: {
   loading: boolean;
   error: boolean;
-  changes: ReturnType<typeof strengthChanges>;
+  changes: StrengthChange[];
 }) {
   const t = useTranslations('progress');
   const [open, setOpen] = useState(false);
@@ -535,11 +538,7 @@ function StrengthCard({
   );
 }
 
-function StrengthRow({
-  change,
-}: {
-  change: ReturnType<typeof strengthChanges>[number];
-}) {
+function StrengthRow({ change }: { change: StrengthChange }) {
   const t = useTranslations('progress');
   const locale = useLocale();
   const deltaKg = change.toKg - change.fromKg;

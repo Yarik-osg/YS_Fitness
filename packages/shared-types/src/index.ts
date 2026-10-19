@@ -78,6 +78,18 @@ export interface ProgressPhotosResponse {
   photos: ProgressPhoto[];
 }
 
+export interface StrengthChange {
+  exerciseId: string;
+  name: string;
+  nameEn: string;
+  fromKg: number;
+  toKg: number;
+}
+
+export interface StrengthChangesResponse {
+  changes: StrengthChange[];
+}
+
 export interface MeResponse {
   id: string;
   email: string;

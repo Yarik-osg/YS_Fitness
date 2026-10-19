@@ -1,4 +1,5 @@
 import type {
+  StrengthChangesResponse,
   WorkoutCalendarResponse,
   WorkoutLogListResponse,
   WorkoutLogResponse,
@@ -17,6 +18,10 @@ export function getWorkoutCalendar(from: string, to: string) {
   return apiRequest<WorkoutCalendarResponse>(
     `/workouts/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
   );
+}
+
+export function getStrengthChanges() {
+  return apiRequest<StrengthChangesResponse>('/workouts/strength');
 }
 
 export function listWorkoutLogs(limit = 20, offset = 0) {

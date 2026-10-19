@@ -200,9 +200,9 @@ export class UsersService {
     userId: string,
     imageBase64: string,
   ): Promise<ProgressPhoto> {
-    let decoded: ReturnType<typeof decodeProgressPhoto>;
+    let decoded: Awaited<ReturnType<typeof decodeProgressPhoto>>;
     try {
-      decoded = decodeProgressPhoto(imageBase64);
+      decoded = await decodeProgressPhoto(imageBase64);
     } catch (error) {
       if (error instanceof ProgressPhotoError) {
         throw new BadRequestException({
@@ -239,7 +239,7 @@ export class UsersService {
       id: created.id,
       createdAt: created.createdAt.toISOString(),
       contentType: decoded.contentType,
-      imageBase64,
+      imageBase64: Buffer.from(created.image).toString('base64'),
     };
   }
 
