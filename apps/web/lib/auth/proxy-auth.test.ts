@@ -172,4 +172,26 @@ describe('applyAuthRedirect', () => {
       }),
     ).toBe('/uk/onboarding');
   });
+
+  it('protects progress like the dashboard', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/progress',
+        locale: 'en',
+        fullPathname: '/en/progress',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Fprogress');
+  });
+
+  it('keeps an incomplete session away from progress', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/progress',
+        locale: 'uk',
+        fullPathname: '/uk/progress',
+        hint: 'onboarding',
+      }),
+    ).toBe('/uk/onboarding');
+  });
 });

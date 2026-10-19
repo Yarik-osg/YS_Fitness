@@ -259,6 +259,22 @@ describe('AuthGate', () => {
     expect(await screen.findByText('protected content')).toBeInTheDocument();
     expect(navigation.replace).not.toHaveBeenCalled();
   });
+
+  it('sends an incomplete user away from progress', async () => {
+    navigation.pathname = '/progress';
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue(meResponse(null));
+
+    renderGate();
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/onboarding');
+    });
+    expect(screen.queryByText('protected content')).not.toBeInTheDocument();
+  });
 });
 
 function renderGuestGate() {

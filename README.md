@@ -109,6 +109,8 @@ The login page links to `/forgot-password`. The user enters their email and alwa
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/users/me`
+- `GET /api/v1/users/me/measurements`
+- `POST /api/v1/users/me/measurements`
 - `PUT /api/v1/users/me/onboarding`
 - `GET /api/v1/users/me/onboarding-responses`
 - `PATCH /api/v1/users/me/profile`
@@ -126,6 +128,8 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 ## Profile
 
 `PATCH /api/v1/users/me/profile` is bearer-authenticated. It accepts any non-empty subset of height, weight, experience, design goal, and training frequency. Height updates `UserProfile`; a changed weight appends a `BodyMeasurement`; the quiz fields update `OnboardingResponses` (or create a stub row when those three quiz fields are sent together and no row exists). Name, date of birth, program track, and calculation sex are not editable here. The profile page shows the level next to its training years (under 6 months, 6–24 months, over 2 years; the years follow the level and are not stored separately), and offers level, goal, and frequency once onboarding answers exist. Saving a changed level or weekly frequency first asks for confirmation, because those answers can switch the program: if a different template matches, it starts from day 1 with the progress counter at 0, and workout history is kept. The same request reassigns or unassigns the workout template only when match-affecting answers changed and the user has active subscription access. Profile, measurements, onboarding answers, and program assign/unassign run in one serializable transaction.
+
+`GET /api/v1/users/me/measurements` and `POST /api/v1/users/me/measurements` are bearer-authenticated and do not require an active subscription. The list returns the latest 1000 rows as `measurements` (`measuredAt` ascending, `id` descending) plus `firstMeasurement`, the earliest row or `null`. `weightKg` on this response is a JSON number. `POST` accepts only `{ weightKg }` and rejects any other field, including `measuredAt`. The server sets the timestamp and always appends a row. `GET /users/me` still returns the single latest measurement, now chosen by `measuredAt` then `id`, with `weightKg` as a decimal string.
 
 `GET /api/v1/programs/assigned` (JWT + active subscription) returns `{ program }` with template metadata, including `ProgramTemplate.name` from the CSV subtitle, plus `nextDayNumber`, `programProgress`, and `dayLogCounts`. `/profile` reads that summary. The dashboard, `/training`, and `/workout` read the same cycle fields from `GET /api/v1/programs/me`.
 

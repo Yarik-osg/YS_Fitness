@@ -1,6 +1,8 @@
 import {
+  createMeasurementSchema,
   onboardingSchema,
   profileUpdateSchema,
+  type CreateMeasurementInput,
   type OnboardingInput,
   type ProfileUpdateInput,
 } from '@repo/validation';
@@ -34,6 +36,12 @@ export class OnboardingDto implements OnboardingInput {
   mealsPerDay!: OnboardingInput['mealsPerDay'];
   eatingHabits!: OnboardingInput['eatingHabits'];
   physiqueLevel!: OnboardingInput['physiqueLevel'];
+}
+
+export class CreateMeasurementDto implements CreateMeasurementInput {
+  static readonly schema = createMeasurementSchema;
+
+  weightKg!: number;
 }
 
 export class ProfileUpdateDto implements ProfileUpdateInput {

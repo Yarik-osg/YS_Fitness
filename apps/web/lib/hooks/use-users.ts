@@ -1,13 +1,19 @@
 'use client';
 
-import type { OnboardingInput, ProfileUpdateInput } from '@repo/validation';
+import type {
+  CreateMeasurementInput,
+  OnboardingInput,
+  ProfileUpdateInput,
+} from '@repo/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import {
   getMe,
+  getMeasurements,
   getOnboardingResponses,
   saveOnboarding,
   updateProfile,
+  createMeasurement,
 } from '@/lib/api/users';
 import {
   myProgramQueryKey,
@@ -16,6 +22,7 @@ import {
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 export const meQueryKey = ['users', 'me'] as const;
+export const measurementsQueryKey = ['users', 'me', 'measurements'] as const;
 export const onboardingResponsesQueryKey = [
   'users',
   'me',
@@ -114,6 +121,25 @@ export function useSaveOnboarding() {
         });
       }
       writeSessionHint('complete');
+    },
+  });
+}
+
+export function useMeasurements() {
+  return useQuery({
+    queryKey: measurementsQueryKey,
+    queryFn: getMeasurements,
+  });
+}
+
+export function useCreateMeasurement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: CreateMeasurementInput) => createMeasurement(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: measurementsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: meQueryKey });
     },
   });
 }

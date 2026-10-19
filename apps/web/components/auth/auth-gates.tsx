@@ -137,7 +137,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       const destination = getPostAuthPath(sessionUser);
       if (
         (pathname.startsWith('/dashboard') ||
-          pathname.startsWith('/profile')) &&
+          pathname.startsWith('/profile') ||
+          pathname.startsWith('/progress')) &&
         destination.startsWith('/onboarding')
       ) {
         router.replace(destination);

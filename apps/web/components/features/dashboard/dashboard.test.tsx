@@ -336,7 +336,10 @@ describe('Dashboard program', () => {
       'href',
       '/training',
     );
-    for (const name of ['Харчування', 'Прогрес', 'Бібліотека']) {
+    expect(
+      screen.getByRole('link', { name: /9 \/ 16 тренувань/ }),
+    ).toHaveAttribute('href', '/progress');
+    for (const name of ['Харчування', 'Бібліотека']) {
       const tab = screen.getByRole('button', { name });
       expect(tab).toBeDisabled();
       expect(tab.closest('a')).toBeNull();
@@ -368,6 +371,47 @@ describe('Dashboard program', () => {
     expect(
       screen.queryByRole('button', { name: 'Призначити мою програму' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the later equal-timestamp weight and the change from the first', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/me')) {
+          return json({ program: ASSIGNED_PROGRAM });
+        }
+        if (url.includes('/users/me/measurements')) {
+          return json({
+            measurements: [
+              {
+                id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                weightKg: 70,
+                measuredAt: '2026-09-28T12:00:00.000Z',
+              },
+              {
+                id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                weightKg: 80,
+                measuredAt: '2026-09-28T12:00:00.000Z',
+              },
+            ],
+            firstMeasurement: {
+              id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              weightKg: 60,
+              measuredAt: '2026-08-01T12:00:00.000Z',
+            },
+          });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(await screen.findByText('80,0 кг')).toBeInTheDocument();
+    expect(screen.getByText('+20,0 кг від старту')).toBeInTheDocument();
+    expect(screen.queryByText('70,0 кг')).not.toBeInTheDocument();
   });
 
   it('shows a neutral loader while the program is still loading', async () => {

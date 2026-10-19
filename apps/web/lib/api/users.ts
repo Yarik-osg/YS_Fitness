@@ -3,8 +3,14 @@ import type {
   OnboardingResponse,
   OnboardingResponsesResponse,
   ProfileUpdateResponse,
+  WeightMeasurement,
+  WeightMeasurementsResponse,
 } from '@repo/shared-types';
-import type { OnboardingInput, ProfileUpdateInput } from '@repo/validation';
+import type {
+  CreateMeasurementInput,
+  OnboardingInput,
+  ProfileUpdateInput,
+} from '@repo/validation';
 import { apiRequest } from './client';
 
 export function getMe() {
@@ -15,6 +21,17 @@ export function getOnboardingResponses() {
   return apiRequest<OnboardingResponsesResponse>(
     '/users/me/onboarding-responses',
   );
+}
+
+export function getMeasurements() {
+  return apiRequest<WeightMeasurementsResponse>('/users/me/measurements');
+}
+
+export function createMeasurement(input: CreateMeasurementInput) {
+  return apiRequest<WeightMeasurement>('/users/me/measurements', {
+    method: 'POST',
+    body: input,
+  });
 }
 
 export function updateProfile(input: ProfileUpdateInput) {

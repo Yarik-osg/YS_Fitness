@@ -613,6 +613,10 @@
       "training": "Training",
       "summary": "{exercises, plural, one {# exercise} other {# exercises}} · {sets, plural, one {# set} other {# sets}}",
       "profile": "Profile",
+      "kg": "kg",
+      "sinceStart": "{delta} kg from the start",
+      "sessionsLine": "{completed} / {expected} workouts",
+      "weightError": "Measurements could not be loaded.",
       "levels": {
         "beginner": "Beginner",
         "intermediate": "Intermediate",
@@ -824,5 +828,30 @@
       "loadError": "The calendar could not be loaded.",
       "retry": "Retry"
     }
+  },
+  "progress": {
+    "brand": "YS Fitness",
+    "title": "Progress",
+    "weight": "Weight",
+    "start": "Start",
+    "sinceStart": "{delta} kg from the start",
+    "add": "Add weight",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving",
+    "invalid": "Enter a weight from 25 to 500 kg with at most two decimal places.",
+    "empty": "No measurements yet.",
+    "chartEmpty": "No measurements in this period.",
+    "chartLabel": "Weight chart",
+    "kg": "kg",
+    "period": {
+      "30d": "30 days",
+      "3m": "3 mo",
+      "all": "All"
+    },
+    "training": "Training",
+    "completed": "Completed {completed} of {expected} for this program",
+    "trainingError": "The program could not be loaded.",
+    "loadError": "Measurements could not be loaded."
   }
 }

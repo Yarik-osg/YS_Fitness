@@ -16,6 +16,12 @@ import { ApiClientError } from '@/lib/api/client';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { useAssignProgram, useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
+import { useMeasurements } from '@/lib/hooks/use-users';
+import {
+  formatDelta,
+  formatWeight,
+  latestMeasurement,
+} from '@/lib/weight-chart';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 export function Dashboard() {
@@ -49,6 +55,7 @@ function HomeLoading() {
       <div className="grid grid-cols-2 gap-2.5">
         <Skeleton className="h-32" />
         <Skeleton className="h-32" />
+        <Skeleton className="h-24" />
       </div>
       <ClientNav active="home" />
     </main>
@@ -157,6 +164,11 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             </p>
             <Chevron className="absolute right-3.5 bottom-3.5 text-lime" />
           </Link>
+
+          <ProgressHomeCard
+            completed={program.programProgress?.completed}
+            expected={program.programProgress?.expected}
+          />
 
           <Link
             href="/profile"
@@ -332,6 +344,64 @@ export function AssignProgramCard({
         )}
       </div>
     </article>
+  );
+}
+
+function ProgressHomeCard({
+  completed,
+  expected,
+}: {
+  completed?: number;
+  expected?: number;
+}) {
+  const t = useTranslations('dashboard');
+  const locale = useLocale();
+  const measurements = useMeasurements();
+  const points = measurements.data?.measurements ?? [];
+  const current = latestMeasurement(points);
+  const first = measurements.data?.firstMeasurement ?? null;
+  const delta =
+    current && first && current.id !== first.id
+      ? current.weightKg - first.weightKg
+      : null;
+  const loading = measurements.isPending && !measurements.data;
+
+  return (
+    <Link
+      href="/progress"
+      className="relative block min-h-[100px] overflow-hidden border-[1.5px] border-teal/15 bg-teal/4 px-4 py-4"
+    >
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-teal to-transparent" />
+      <p className="mb-2 font-label text-[7px] font-bold tracking-[0.16em] text-teal/65 uppercase">
+        {t('home.nav.progress')}
+      </p>
+      {loading ? (
+        <Skeleton className="h-6 w-16" />
+      ) : measurements.isError ? (
+        <p role="alert" className="text-[9px] font-medium text-amber">
+          {t('home.weightError')}
+        </p>
+      ) : (
+        <>
+          <p className="font-heading text-xl leading-none text-white tabular-nums">
+            {current
+              ? `${formatWeight(locale, current.weightKg)} ${t('home.kg')}`
+              : '—'}
+          </p>
+          {delta === null ? null : (
+            <p className="mt-1 text-[9px] font-medium text-teal">
+              {t('home.sinceStart', { delta: formatDelta(locale, delta) })}
+            </p>
+          )}
+        </>
+      )}
+      {completed === undefined || expected === undefined ? null : (
+        <p className="mt-1.5 text-[9px] font-medium text-white/35">
+          {t('home.sessionsLine', { completed, expected })}
+        </p>
+      )}
+      <Chevron className="absolute right-3 bottom-3 text-teal" />
+    </Link>
   );
 }
 

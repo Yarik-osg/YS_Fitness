@@ -191,6 +191,14 @@ export function isPlausibleDateOfBirth(
 export const HEIGHT_CM = { min: 80, max: 250 } as const;
 export const WEIGHT_KG = { min: 25, max: 500 } as const;
 
+export function hasAtMostTwoDecimalPlaces(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-6;
+}
+
+const weightDecimalPlaces = {
+  message: 'weightKg allows at most two decimal places',
+} as const;
+
 export function isValidPersonName(value: string): boolean {
   const trimmed = value.trim();
   return (
@@ -348,9 +356,7 @@ const workoutLogSetSchema = z.object({
     .number()
     .positive()
     .max(999)
-    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, {
-      message: 'weightKg allows at most two decimal places',
-    })
+    .refine(hasAtMostTwoDecimalPlaces, weightDecimalPlaces)
     .optional(),
 });
 
@@ -390,7 +396,18 @@ export const workoutCalendarQuerySchema = z
     },
   );
 
+export const createMeasurementSchema = z
+  .object({
+    weightKg: z
+      .number()
+      .min(WEIGHT_KG.min)
+      .max(WEIGHT_KG.max)
+      .refine(hasAtMostTwoDecimalPlaces, weightDecimalPlaces),
+  })
+  .strict();
+
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export type CreateMeasurementInput = z.infer<typeof createMeasurementSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;
 export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
