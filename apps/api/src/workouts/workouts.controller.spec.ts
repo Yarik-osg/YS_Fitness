@@ -25,6 +25,12 @@ describe('WorkoutsController guards', () => {
     expect(controllerGuards).toEqual([JwtAuthGuard]);
     expect(logGuards).toEqual([SubscriptionGuard]);
     expect(listGuards).toBeUndefined();
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        WorkoutsController.prototype.strength,
+      ),
+    ).toBeUndefined();
   });
 
   it('lets the calendar read history with only a JWT', () => {

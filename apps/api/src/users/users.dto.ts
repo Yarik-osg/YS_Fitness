@@ -1,8 +1,10 @@
 import {
   createMeasurementSchema,
+  createProgressPhotoSchema,
   onboardingSchema,
   profileUpdateSchema,
   type CreateMeasurementInput,
+  type CreateProgressPhotoInput,
   type OnboardingInput,
   type ProfileUpdateInput,
 } from '@repo/validation';
@@ -42,6 +44,12 @@ export class CreateMeasurementDto implements CreateMeasurementInput {
   static readonly schema = createMeasurementSchema;
 
   weightKg!: number;
+}
+
+export class CreateProgressPhotoDto implements CreateProgressPhotoInput {
+  static readonly schema = createProgressPhotoSchema;
+
+  imageBase64!: string;
 }
 
 export class ProfileUpdateDto implements ProfileUpdateInput {

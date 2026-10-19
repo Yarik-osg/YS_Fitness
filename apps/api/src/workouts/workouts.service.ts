@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  StrengthChangesResponse,
   WorkoutCalendarResponse,
   WorkoutLogListResponse,
   WorkoutLogResponse,
@@ -100,6 +101,17 @@ export class WorkoutsService {
       this.workouts.count(userId),
     ]);
     return { logs: logs.map(toWorkoutLog), total };
+  }
+
+  async strength(userId: string): Promise<StrengthChangesResponse> {
+    const changes = await this.workouts.strengthChanges(userId);
+    return {
+      changes: changes.map((change) => ({
+        ...change,
+        fromKg: Number(change.fromKg),
+        toKg: Number(change.toKg),
+      })),
+    };
   }
 
   async calendar(

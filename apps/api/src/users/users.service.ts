@@ -7,6 +7,8 @@ import { Prisma } from '@prisma/client';
 import type {
   OnboardingResponsesResponse,
   ProfileUpdateResponse,
+  ProgressPhoto,
+  ProgressPhotosResponse,
   TrainingFrequency,
   WeightMeasurement,
 } from '@repo/shared-types';
@@ -21,6 +23,11 @@ import {
   toProgramSummary,
 } from '../programs/programs.service.js';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service.js';
+import {
+  decodeProgressPhoto,
+  ProgressPhotoError,
+  type ProgressPhotoContentType,
+} from './progress-photo.js';
 import {
   EXPERIENCE_FROM_PRISMA,
   EXPERIENCE_TO_PRISMA,
@@ -37,6 +44,7 @@ const PROFILE_INCOMPLETE = {
 };
 
 const CHART_MEASUREMENT_LIMIT = 1000;
+const PROGRESS_PHOTO_LIMIT = 8;
 
 const latestMeasurementOrder = [
   { measuredAt: 'desc' as const },
@@ -53,6 +61,17 @@ const weightMeasurementSelect = {
   weightKg: true,
   measuredAt: true,
 } as const;
+
+function asProgressPhotoType(value: string): ProgressPhotoContentType | null {
+  if (
+    value === 'image/jpeg' ||
+    value === 'image/png' ||
+    value === 'image/webp'
+  ) {
+    return value;
+  }
+  return null;
+}
 
 function toWeightMeasurement(row: {
   id: string;
@@ -153,6 +172,75 @@ export class UsersService {
     });
 
     return toWeightMeasurement(created);
+  }
+
+  async listProgressPhotos(userId: string): Promise<ProgressPhotosResponse> {
+    const rows = await this.prisma.progressPhoto.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return {
+      photos: rows.flatMap((row) => {
+        const contentType = asProgressPhotoType(row.contentType);
+        if (!contentType) return [];
+        return [
+          {
+            id: row.id,
+            createdAt: row.createdAt.toISOString(),
+            contentType,
+            imageBase64: Buffer.from(row.image).toString('base64'),
+          },
+        ];
+      }),
+    };
+  }
+
+  async createProgressPhoto(
+    userId: string,
+    imageBase64: string,
+  ): Promise<ProgressPhoto> {
+    let decoded: Awaited<ReturnType<typeof decodeProgressPhoto>>;
+    try {
+      decoded = await decodeProgressPhoto(imageBase64);
+    } catch (error) {
+      if (error instanceof ProgressPhotoError) {
+        throw new BadRequestException({
+          code: error.code,
+          message: 'Use a JPEG, PNG, or WebP under 400 KB.',
+        });
+      }
+      throw error;
+    }
+
+    const created = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`
+        SELECT id FROM users WHERE id = CAST(${userId} AS uuid) FOR UPDATE
+      `;
+      const count = await transaction.progressPhoto.count({
+        where: { userId },
+      });
+      if (count >= PROGRESS_PHOTO_LIMIT) {
+        throw new BadRequestException({
+          code: 'PHOTO_LIMIT',
+          message: 'Progress photo limit reached.',
+        });
+      }
+      return transaction.progressPhoto.create({
+        data: {
+          userId,
+          contentType: decoded.contentType,
+          image: decoded.image,
+        },
+      });
+    });
+
+    return {
+      id: created.id,
+      createdAt: created.createdAt.toISOString(),
+      contentType: decoded.contentType,
+      imageBase64: Buffer.from(created.image).toString('base64'),
+    };
   }
 
   async saveOnboarding(userId: string, input: OnboardingInput) {

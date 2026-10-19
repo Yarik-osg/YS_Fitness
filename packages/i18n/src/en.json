@@ -851,7 +851,21 @@
     },
     "training": "Training",
     "completed": "Completed {completed} of {expected} for this program",
+    "sessions": "Planned workouts",
     "trainingError": "The program could not be loaded.",
-    "loadError": "Measurements could not be loaded."
+    "loadError": "Measurements could not be loaded.",
+    "strength": "Strength",
+    "strengthEmpty": "No repeated strength entries yet.",
+    "showMore": "Show all",
+    "showLess": "Show less",
+    "strengthError": "Strength entries could not be loaded.",
+    "photos": "Progress photos",
+    "photoStart": "Start",
+    "photoNow": "Now",
+    "photoEmpty": "Photo",
+    "addPhoto": "Add photo",
+    "photoInvalid": "This photo could not be read. Use a JPEG, PNG, WebP, or HEIC.",
+    "photoLimit": "You can keep up to 8 photos.",
+    "photoLoadError": "Photos could not be loaded."
   }
 }

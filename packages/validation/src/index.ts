@@ -407,7 +407,19 @@ export const createMeasurementSchema = z
   .strict();
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
+export const createProgressPhotoSchema = z
+  .object({
+    imageBase64: z
+      .string()
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/)
+      .max(560_000),
+  })
+  .strict();
+
 export type CreateMeasurementInput = z.infer<typeof createMeasurementSchema>;
+export type CreateProgressPhotoInput = z.infer<
+  typeof createProgressPhotoSchema
+>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;
 export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
