@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Check } from 'lucide-react';
+import { ChartColumn, Check, Dumbbell, Medal, Utensils } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
@@ -32,7 +32,7 @@ export function LandingPage({
   const footerLinks = t.raw('footer.links') as string[];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md border-x border-white/5 bg-[#0b0b0b]">
+    <main className="mx-auto min-h-screen w-full max-w-md border-x border-white/5 bg-background">
       <nav className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <BrandMark />
@@ -42,7 +42,7 @@ export function LandingPage({
               <br />
               STAROSOTNIKOVA
             </p>
-            <p className="mt-px font-label text-[7px] font-semibold tracking-[0.08em] text-[#00c7c8]">
+            <p className="mt-px font-label text-[7px] font-semibold tracking-[0.08em] text-cyan">
               ONLINE FITNESS COACH
             </p>
           </div>
@@ -75,7 +75,6 @@ export function LandingPage({
             className="object-cover object-top [mask-image:linear-gradient(to_left,rgba(0,0,0,0.9)_50%,transparent)]"
           />
         </div>
-        <div className="pointer-events-none absolute right-[-40px] bottom-20 z-0 h-[240px] w-[260px] rounded-full bg-[#c8ff2e]/18 blur-[80px]" />
         <div className="relative z-10 max-w-[220px] px-4 pt-6">
           <h1 className="font-heading text-[42px] leading-[40px] font-normal tracking-[-0.04em] text-white uppercase">
             <span className="block">{t('hero.titleLine1')}</span>
@@ -86,28 +85,25 @@ export function LandingPage({
             </span>
             <span className="block text-accent">{t('hero.titleAccent2')}</span>
           </h1>
-          <div className="mt-4 mb-3 h-px w-[81px] bg-[#35F3E6]" />
-          <p className="max-w-[168px] text-[12px] leading-[1.55] font-medium text-[#d9d9d9]">
+          <div className="mt-4 mb-3 h-px w-[81px] bg-accent" />
+          <p className="max-w-[168px] text-[12px] leading-[1.55] font-medium text-muted">
             {t('hero.subtitle')}
           </p>
           <Link
             href="/onboarding"
-            className="mt-6 inline-block border-[1.5px] border-accent px-[22px] py-2.5 font-label text-[11px] font-semibold tracking-[0.12em] text-accent uppercase transition hover:bg-accent hover:text-[#0b0b0b]"
+            className="mt-6 inline-block border-[1.5px] border-accent px-[22px] py-2.5 font-label text-[11px] font-semibold tracking-[0.12em] text-accent uppercase transition hover:bg-accent hover:text-background"
           >
             {t('hero.cta')}
           </Link>
           <p className="mt-7 font-label text-[8px] font-medium tracking-[0.1em] text-white">
             TRAIN.&nbsp;&nbsp;DISCIPLINE.&nbsp;&nbsp;
-            <span className="text-[#c8ff2e]">EVOLVE</span>
+            <span className="text-lime">EVOLVE</span>
           </p>
         </div>
       </section>
 
       <section className="border-t border-white/6 py-12">
         <div className="px-5 pb-6">
-          <p className="mb-2.5 font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-            {t('why.eyebrow')}
-          </p>
           <h2 className="font-heading text-[26px] font-normal uppercase leading-[1.1] tracking-[-0.02em]">
             {t('why.heading')}
           </h2>
@@ -119,18 +115,18 @@ export function LandingPage({
               <article
                 key={card.label}
                 className={`relative min-w-[72%] shrink-0 snap-start overflow-hidden border bg-white/[0.015] px-[18px] pt-5 pb-[22px] md:min-w-[15rem] ${
-                  accent === 'lime' ? 'border-[#c8ff2e]/15' : 'border-accent/15'
+                  accent === 'lime' ? 'border-lime/15' : 'border-accent/15'
                 }`}
               >
                 <div
                   className={`absolute inset-x-0 top-0 h-0.5 bg-linear-to-r to-transparent ${
-                    accent === 'lime' ? 'from-[#c8ff2e]' : 'from-accent'
+                    accent === 'lime' ? 'from-lime' : 'from-accent'
                   }`}
                 />
                 <WhyCardIcon index={index} />
                 <p
                   className={`mb-2 font-label text-[9px] font-bold tracking-[0.16em] ${
-                    accent === 'lime' ? 'text-[#c8ff2e]' : 'text-accent'
+                    accent === 'lime' ? 'text-lime' : 'text-accent'
                   }`}
                 >
                   {card.label}
@@ -166,11 +162,6 @@ export function LandingPage({
       </section>
 
       <section className="border-t border-white/6">
-        <div className="px-5 pt-[52px] pb-5">
-          <p className="font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-            {t('coach.eyebrow')}
-          </p>
-        </div>
         <div className="relative aspect-3/4 max-h-[31rem] w-full overflow-hidden">
           <Image
             src="/marketing/coach.jpg"
@@ -178,7 +169,7 @@ export function LandingPage({
             fill
             className="object-cover object-center"
           />
-          <div className="absolute inset-0 bg-linear-to-b from-transparent from-30% via-[#0b0b0b]/70 via-70% to-[#0b0b0b]" />
+          <div className="absolute inset-0 bg-linear-to-b from-transparent from-30% via-background/70 via-70% to-background" />
           <div className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-accent/7 to-transparent" />
           <div className="absolute bottom-7 left-5">
             <h2 className="font-heading text-[32px] font-normal uppercase leading-[1.1] tracking-[-0.01em]">
@@ -211,9 +202,6 @@ export function LandingPage({
       <PricingSection />
 
       <section className="border-t border-white/6 px-5 py-[52px]">
-        <p className="mb-2.5 font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-          {t('included.eyebrow')}
-        </p>
         <h2 className="font-heading text-[30px] font-normal uppercase leading-[1.1] tracking-[-0.02em]">
           {t('included.heading')}
         </h2>
@@ -236,12 +224,8 @@ export function LandingPage({
 
       <FaqSection />
 
-      <section className="relative overflow-hidden border-t border-white/6 bg-accent/3 px-5 py-16 text-center">
-        <div className="pointer-events-none absolute top-1/2 left-1/2 size-[19rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-3xl" />
-        <div className="relative">
-          <p className="mb-4 font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-            {t('finalCta.eyebrow')}
-          </p>
+      <section className="border-t border-white/6 bg-accent/3 px-5 py-16 text-center">
+        <div>
           <h2 className="font-heading text-[30px] font-normal uppercase leading-[1.15] tracking-[-0.02em]">
             {t('finalCta.titleLine1')}
             <br />
@@ -264,7 +248,7 @@ export function LandingPage({
         </div>
       </section>
 
-      <footer className="border-t border-white/6 bg-[#080808] px-5 pt-9 pb-10">
+      <footer className="border-t border-white/6 bg-background px-5 pt-9 pb-10">
         <div className="mb-5 flex items-center gap-2.5">
           <BrandMark />
           <div>
@@ -295,65 +279,16 @@ export function LandingPage({
   );
 }
 
-function WhyCardIcon({ index }: { index: number }) {
-  const stroke = index < 2 ? '#35f5e8' : '#c8ff2e';
-  const icons = [
-    <svg
-      key="athlete"
-      width="22"
-      height="22"
-      viewBox="0 0 22 22"
-      fill="none"
-      stroke={stroke}
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="7" r="4" />
-      <path d="M4 19c0-3.866 3.134-7 7-7h0c3.866 0 7 3.134 7 7" />
-      <path d="M8 3.5 11 1l3 2.5" />
-    </svg>,
-    <svg
-      key="approach"
-      width="22"
-      height="22"
-      viewBox="0 0 22 22"
-      fill="none"
-      stroke={stroke}
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 5v12M18 5v12M2 9h3M17 9h3M2 15h3M17 15h3M7 11h8" />
-    </svg>,
-    <svg
-      key="nutrition"
-      width="22"
-      height="22"
-      viewBox="0 0 22 22"
-      fill="none"
-      stroke={stroke}
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M11 2C8 2 5.5 4.5 5.5 7.5c0 2 .8 3.8 2.2 5L9 18h4l1.3-5.5c1.4-1.2 2.2-3 2.2-5C16.5 4.5 14 2 11 2z" />
-      <path d="M9 18v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1" />
-    </svg>,
-    <svg
-      key="progress"
-      width="22"
-      height="22"
-      viewBox="0 0 22 22"
-      fill="none"
-      stroke={stroke}
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 19h16M5 19V12M8.5 19V8M12 19V4M15.5 19V10" />
-    </svg>,
-  ];
+const WHY_ICONS = [Medal, Dumbbell, Utensils, ChartColumn] as const;
 
-  return <div className="mb-4">{icons[index]}</div>;
+function WhyCardIcon({ index }: { index: number }) {
+  const Icon = WHY_ICONS[index] ?? Medal;
+  return (
+    <Icon
+      aria-hidden
+      size={22}
+      strokeWidth={1.4}
+      className={`mb-4 ${index < 2 ? 'text-accent' : 'text-lime'}`}
+    />
+  );
 }

@@ -587,9 +587,9 @@ export function OnboardingWizard() {
     continueLabel: step === 1 ? t('chooseForm') : undefined,
     continueClassName:
       step === 0 && male
-        ? 'bg-[#c8ff2e] text-[#0b0b0b] shadow-none'
+        ? 'bg-lime text-background shadow-none'
         : step === 0 && draft.programTrack === 'female'
-          ? 'bg-[#00c7c8] text-[#0b0b0b] shadow-none'
+          ? 'bg-cyan text-background shadow-none'
           : undefined,
   };
 
@@ -598,7 +598,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.program.eyebrow')}
           title={t.rich('steps.program.title', { accent })}
           description={t('steps.program.description')}
         >
@@ -636,7 +635,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.currentBody.eyebrow')}
           title={t.rich('steps.currentBody.title', { accent })}
           description={t('steps.currentBody.description')}
         >
@@ -652,7 +650,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.desiredBody.eyebrow')}
           title={t.rich('steps.desiredBody.title', { accent })}
           description={t('steps.desiredBody.description')}
         >
@@ -669,7 +666,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.mainGoal.eyebrow')}
           title={t.rich('steps.mainGoal.title', { accent })}
         >
           <ChoiceList
@@ -684,7 +680,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.experience.eyebrow')}
           title={t.rich('steps.experience.title', { accent })}
         >
           <ChoiceList
@@ -698,7 +693,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.frequency.eyebrow')}
           title={t.rich(
             male ? 'steps.frequency.titleMale' : 'steps.frequency.titleFemale',
             { accent },
@@ -718,7 +712,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.activity.eyebrow')}
           title={t.rich('steps.activity.title', { accent })}
           description={t('steps.activity.description')}
         >
@@ -736,7 +729,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.focus.eyebrow')}
           title={t.rich('steps.focus.title', { accent })}
           description={t('steps.focus.description')}
         >
@@ -752,7 +744,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.nutrition.eyebrow')}
           title={t.rich('steps.nutrition.title', { accent })}
         >
           <ChoiceList
@@ -768,7 +759,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.meals.eyebrow')}
           title={t.rich('steps.meals.title', { accent })}
           description={male ? t('steps.meals.descriptionMale') : undefined}
         >
@@ -784,7 +774,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.habits.eyebrow')}
           title={t.rich(
             male ? 'steps.habits.titleMale' : 'steps.habits.titleFemale',
             { accent },
@@ -806,7 +795,6 @@ export function OnboardingWizard() {
       return (
         <StepShell
           {...common}
-          eyebrow={t('steps.metrics.eyebrow')}
           title={t.rich('steps.metrics.title', { accent })}
           description={t('steps.metrics.description')}
           continueLabel={t('steps.metrics.build')}
@@ -838,16 +826,12 @@ export function OnboardingWizard() {
               ) : null}
             </div>
             <div>
-              <MetricField
+              <BirthDateField
                 id="dateOfBirth"
                 label={t('steps.metrics.dateOfBirth')}
-              >
-                <BirthDateField
-                  id="dateOfBirth"
-                  value={draft.dateOfBirth}
-                  onChange={(dateOfBirth) => draft.setAnswer({ dateOfBirth })}
-                />
-              </MetricField>
+                value={draft.dateOfBirth}
+                onChange={(dateOfBirth) => draft.setAnswer({ dateOfBirth })}
+              />
               {dateImplausible ? (
                 <p role="alert" className="mt-2 text-xs text-red-300">
                   {t('errors.dateOfBirth')}
@@ -913,7 +897,7 @@ function DraftLoading() {
   return (
     <main
       aria-busy="true"
-      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[#0b0b0b] px-5 pt-6"
+      className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background px-5 pt-6"
     >
       <Skeleton className="mb-8 h-8 w-full" />
       <Skeleton className="mb-3 h-3 w-16" />
@@ -949,11 +933,10 @@ function Analysis({ className }: { className?: string }) {
   return (
     <main
       className={cn(
-        'relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center border-x border-white/5 bg-[#0b0b0b] px-8 text-center',
+        'relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center border-x border-white/5 bg-background px-8 text-center',
         className,
       )}
     >
-      <div className="pointer-events-none absolute top-[30%] left-1/2 size-[19rem] -translate-x-1/2 rounded-full bg-accent/6 blur-3xl" />
       <div className="absolute top-8 right-6">
         <LocaleSwitcher />
       </div>
@@ -971,7 +954,7 @@ function Analysis({ className }: { className?: string }) {
         <div className="mb-9">
           <div className="relative h-0.5 w-full bg-white/10">
             <div
-              className="absolute inset-y-0 left-0 bg-accent shadow-[0_0_12px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-[width] duration-100"
+              className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-100"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -1005,7 +988,7 @@ function Analysis({ className }: { className?: string }) {
                     <Check
                       size={9}
                       strokeWidth={3}
-                      className="text-[#0b0b0b]"
+                      className="text-background"
                     />
                   ) : active ? (
                     <span className="size-1.5 rounded-full bg-accent" />
@@ -1130,7 +1113,6 @@ function Plan({
 
   return (
     <SummaryScreen
-      eyebrow={t('plan.eyebrow')}
       title={t.rich('plan.title', { accent })}
       onContinue={onContinue}
       button={t('plan.button')}
@@ -1145,7 +1127,7 @@ function Plan({
                 {t(`plan.preview.${programId}.name`)}
               </p>
             </div>
-            <span className="shrink-0 bg-accent px-2.5 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
+            <span className="shrink-0 bg-accent px-2.5 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-background uppercase">
               {t('plan.forYou')}
             </span>
           </div>
@@ -1197,7 +1179,6 @@ function Plan({
 }
 
 function SummaryScreen({
-  eyebrow,
   title,
   description,
   children,
@@ -1205,7 +1186,6 @@ function SummaryScreen({
   button,
   className,
 }: {
-  eyebrow: string;
   title: React.ReactNode;
   description?: string;
   children: React.ReactNode;
@@ -1216,30 +1196,24 @@ function SummaryScreen({
   return (
     <main
       className={cn(
-        'relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden border-x border-white/5 bg-[#0b0b0b] px-5 pb-10 pt-4',
+        'mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden border-x border-white/5 bg-background px-5 pb-10 pt-4',
         className,
       )}
     >
-      <div className="pointer-events-none absolute top-[15%] right-[-60px] size-[14rem] rounded-full bg-accent/7 blur-3xl" />
-      <header className="relative flex items-center justify-between pb-3">
+      <header className="flex items-center justify-between pb-3">
         <BrandMark />
         <LocaleSwitcher />
       </header>
       <div className="h-px bg-white/8" />
-      <p className="relative mt-7 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
-        {eyebrow}
-      </p>
-      <h1 className="relative mt-2.5 font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em]">
+      <h1 className="mt-7 font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em]">
         {title}
       </h1>
-      <div className="relative my-2.5 h-px w-15 bg-accent" />
+      <div className="my-2.5 h-px w-15 bg-accent" />
       {description ? (
-        <p className="relative mb-5 text-[11px] leading-5 text-[#d9d9d9]">
-          {description}
-        </p>
+        <p className="mb-5 text-[11px] leading-5 text-muted">{description}</p>
       ) : null}
-      <div className="relative flex-1">{children}</div>
-      <Button className="relative mt-8 w-full" onClick={onContinue}>
+      <div className="flex-1">{children}</div>
+      <Button className="mt-8 w-full" onClick={onContinue}>
         {button}
       </Button>
     </main>

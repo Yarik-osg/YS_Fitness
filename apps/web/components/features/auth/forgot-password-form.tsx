@@ -40,7 +40,6 @@ export function ForgotPasswordForm() {
 
   return (
     <AuthShell
-      eyebrow={t('forgot.eyebrow')}
       title={t('forgot.title')}
       highlighted={t('forgot.highlighted')}
       description={t('forgot.description')}

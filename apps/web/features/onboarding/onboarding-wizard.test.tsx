@@ -93,7 +93,7 @@ describe('OnboardingWizard', () => {
       biologicalSexForCalculation: 'MALE',
     });
     expect(screen.getByRole('button', { name: /Продовжити/i })).toHaveClass(
-      'bg-[#c8ff2e]',
+      'bg-lime',
     );
   });
 

@@ -85,9 +85,6 @@ export function PricingSection() {
 
   return (
     <section className="border-t border-white/6 px-5 py-[52px]">
-      <p className="mb-2.5 font-label text-[8px] font-semibold uppercase tracking-[0.22em] text-accent">
-        {t('pricing.eyebrow')}
-      </p>
       <h2 className="font-heading text-[30px] font-normal uppercase leading-[1.1] tracking-[-0.02em]">
         {t('pricing.heading')}
       </h2>
@@ -147,13 +144,13 @@ function PlanCard({
     <article
       className={cn(
         'relative overflow-hidden border-[1.5px]',
-        isProgress && 'border-[#c8ff2e]/27 bg-[#c8ff2e]/[0.025]',
+        isProgress && 'border-lime/27 bg-lime/[0.025]',
         isFull && 'border-accent/30 bg-accent/[0.02]',
         !isProgress && !isFull && 'border-white/9 bg-white/[0.01]',
       )}
     >
       {isProgress ? (
-        <div className="h-0.5 bg-linear-to-r from-[#c8ff2e] to-transparent" />
+        <div className="h-0.5 bg-linear-to-r from-lime to-transparent" />
       ) : null}
       {isFull ? (
         <div className="h-0.5 bg-linear-to-r from-accent/80 to-transparent" />
@@ -164,7 +161,7 @@ function PlanCard({
             <span
               className={cn(
                 'font-label text-[9px] font-bold tracking-[0.2em]',
-                isProgress && 'text-[#c8ff2e]',
+                isProgress && 'text-lime',
                 isFull && 'text-accent',
                 !isProgress && !isFull && 'text-white/55',
               )}
@@ -178,14 +175,14 @@ function PlanCard({
             {isProgress ? (
               <>
                 <span className="inline-block h-2.5 w-px bg-white/15" />
-                <span className="text-[10px] font-semibold text-[#c8ff2e]">
+                <span className="text-[10px] font-semibold text-lime">
                   {t('pricing.perMonth', { amount: perMonth })}
                 </span>
               </>
             ) : null}
           </div>
           {isProgress ? (
-            <span className="shrink-0 bg-[#c8ff2e] px-[9px] py-[3px] font-label text-[7px] font-bold tracking-[0.12em] text-[#0b0b0b] uppercase">
+            <span className="shrink-0 bg-lime px-[9px] py-[3px] font-label text-[7px] font-bold tracking-[0.12em] text-background uppercase">
               {t('pricing.featuredBadge')}
             </span>
           ) : null}
@@ -201,7 +198,7 @@ function PlanCard({
             ₴
           </span>
           {saved ? (
-            <span className="ml-2 border border-[#c8ff2e]/30 bg-[#c8ff2e]/15 px-2 py-0.5 font-label text-[7.5px] font-bold tracking-[0.1em] text-[#c8ff2e]">
+            <span className="ml-2 border border-lime/30 bg-lime/15 px-2 py-0.5 font-label text-[7.5px] font-bold tracking-[0.1em] text-lime">
               {t('pricing.savings', { amount: saved })}
             </span>
           ) : null}
@@ -217,7 +214,7 @@ function PlanCard({
             className={cn(
               'flex-1 whitespace-nowrap px-2.5 py-3 font-label text-xs font-bold tracking-[0.14em] uppercase disabled:cursor-not-allowed disabled:opacity-45',
               isProgress &&
-                'border-[1.5px] border-[#c8ff2e] bg-[#c8ff2e] text-[#0b0b0b]',
+                'border-[1.5px] border-lime bg-lime text-background',
               isFull &&
                 'border-[1.5px] border-accent bg-transparent text-accent',
               !isProgress &&
@@ -254,7 +251,7 @@ function PlanCard({
                 strokeWidth={2.2}
                 className={cn(
                   'mt-px shrink-0',
-                  isProgress && 'text-[#c8ff2e]',
+                  isProgress && 'text-lime',
                   isFull && 'text-accent',
                   !isProgress && !isFull && 'text-white/50',
                 )}

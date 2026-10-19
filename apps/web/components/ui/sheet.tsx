@@ -56,7 +56,7 @@ export function SheetContent({
           }
         }}
         className={cn(
-          'fixed inset-x-0 bottom-0 z-[60] mx-auto w-full max-w-[430px] border-t border-white/10 bg-[#111] px-5 pt-4 pb-9 outline-none',
+          'fixed inset-x-0 bottom-0 z-[60] mx-auto w-full max-w-[430px] border-t border-white/10 bg-panel px-5 pt-4 pb-9 outline-none',
           className,
         )}
         {...props}

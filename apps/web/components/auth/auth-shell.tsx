@@ -7,7 +7,7 @@ import { Link } from '@/i18n/navigation';
 
 export function BrandMark() {
   return (
-    <span className="relative inline-block size-9 shrink-0 select-none font-serif leading-none text-[#00c7c8]">
+    <span className="relative inline-block size-9 shrink-0 select-none font-serif leading-none text-cyan">
       <span className="sr-only">YS</span>
       <span
         aria-hidden
@@ -26,14 +26,12 @@ export function BrandMark() {
 }
 
 export function AuthShell({
-  eyebrow,
   title,
   highlighted,
   description,
   children,
   footer,
 }: {
-  eyebrow: string;
   title: string;
   highlighted: string;
   description: string;
@@ -43,7 +41,7 @@ export function AuthShell({
   const t = useTranslations('auth');
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-[#0b0d0f]/90">
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-background/90">
       <nav className="flex h-16 items-center justify-between border-b border-white/8 px-6">
         <Link
           href="/"
@@ -57,9 +55,6 @@ export function AuthShell({
 
       <section className="flex flex-1 flex-col px-6 pb-10 pt-12">
         <header className="mb-10">
-          <p className="mb-3 font-label text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
-            {eyebrow}
-          </p>
           <h1 className="font-heading text-4xl font-normal uppercase leading-[1.05] tracking-tight text-ink">
             {title} <span className="text-accent">{highlighted}</span>
           </h1>

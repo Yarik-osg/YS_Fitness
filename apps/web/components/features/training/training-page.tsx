@@ -26,7 +26,7 @@ export function TrainingPage() {
 
   if (!program.data) {
     return (
-      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] px-4 pt-8 pb-24 text-white">
+      <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background px-4 pt-8 pb-24 text-white">
         <PageHeader />
         <div className="pt-6">
           <AssignProgramCard program={program} />
@@ -44,7 +44,7 @@ function TrainingLoading({ label }: { label: string }) {
     <main
       aria-busy="true"
       aria-label={label}
-      className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] px-4 pt-8 pb-24"
+      className="mx-auto min-h-screen w-full max-w-[430px] bg-background px-4 pt-8 pb-24"
     >
       <div className="mb-6 flex flex-col gap-2">
         <Skeleton className="h-2 w-20" />
@@ -69,14 +69,14 @@ function ProgramDays({ program }: { program: AssignedProgramResponse }) {
   );
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-[#0b0b0b] pb-24 text-white">
+    <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-24 text-white">
       <PageHeader />
       <div className="flex flex-col gap-3 px-4 pt-4">
-        <section className="border-[1.5px] border-[rgba(200,255,46,0.15)] bg-[rgba(200,255,46,0.04)] px-[18px] py-5">
+        <section className="border-[1.5px] border-lime/15 bg-lime/4 px-[18px] py-5">
           <p className="mb-2 font-label text-[7px] font-semibold tracking-[0.18em] text-white/30 uppercase">
             {t('program')}
           </p>
-          <h2 className="font-heading text-[22px] leading-tight tracking-[0.04em] break-words text-[#c8ff2e] uppercase">
+          <h2 className="font-heading text-[22px] leading-tight tracking-[0.04em] break-words text-lime uppercase">
             {program.templateName}
           </h2>
         </section>
@@ -107,9 +107,6 @@ function PageHeader() {
 
   return (
     <header className="border-b border-white/5 px-5 pt-8 pb-5">
-      <p className="mb-1.5 font-label text-[8px] font-semibold tracking-[0.2em] text-[rgba(200,255,46,0.6)] uppercase">
-        {t('brand')}
-      </p>
       <h1 className="font-heading text-[28px] leading-none text-white uppercase">
         {t('title')}
       </h1>
@@ -138,7 +135,7 @@ function DayCard({
     <article
       className={
         isNext
-          ? 'border-[1.5px] border-[rgba(53,245,232,0.35)] bg-[rgba(53,245,232,0.04)]'
+          ? 'border-[1.5px] border-teal/35 bg-teal/4'
           : 'border-[1.5px] border-white/[0.07] bg-white/[0.015]'
       }
     >
@@ -153,7 +150,7 @@ function DayCard({
       >
         <span>
           {isNext ? (
-            <span className="mb-1 block font-label text-[7px] font-semibold tracking-[0.16em] text-[#35f5e8] uppercase">
+            <span className="mb-1 block font-label text-[7px] font-semibold tracking-[0.16em] text-teal uppercase">
               {t('next')}
             </span>
           ) : null}
@@ -170,7 +167,7 @@ function DayCard({
           </span>
         </span>
         <span className="text-right">
-          <span className="block font-heading text-[22px] leading-none text-[#c8ff2e]">
+          <span className="block font-heading text-[22px] leading-none text-lime">
             {day.exercises.length}
           </span>
           <span className="mt-1 block font-label text-[7px] font-semibold tracking-[0.1em] text-white/25 uppercase">

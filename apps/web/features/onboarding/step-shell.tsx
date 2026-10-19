@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils';
 export function StepShell({
   step,
   total,
-  eyebrow,
   title,
   description,
   children,
@@ -28,7 +27,6 @@ export function StepShell({
 }: {
   step: number;
   total: number;
-  eyebrow: string;
   title: ReactNode;
   description?: string;
   children: ReactNode;
@@ -55,7 +53,7 @@ export function StepShell({
   return (
     <main
       className={cn(
-        'mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-[#0b0b0b]',
+        'mx-auto flex min-h-screen w-full max-w-md flex-col border-x border-white/5 bg-background',
         className,
       )}
     >
@@ -97,15 +95,12 @@ export function StepShell({
         className="flex flex-1 flex-col px-5 pb-8 pt-7"
       >
         <header className="mb-6">
-          <p className="mb-2.5 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
-            {eyebrow}
-          </p>
           <h1 className="font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em] text-white">
             {title}
           </h1>
           <div className="my-2.5 h-px w-15 bg-accent" />
           {description && (
-            <p className="max-w-[19rem] text-[12px] leading-[1.6] text-[#d9d9d9]">
+            <p className="max-w-[19rem] text-[12px] leading-[1.6] text-muted">
               {description}
             </p>
           )}

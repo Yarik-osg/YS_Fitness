@@ -28,7 +28,7 @@ export function ClientNav({
   const t = useTranslations('dashboard');
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-[430px] border-t border-white/10 bg-[#0b0b0b] pb-[env(safe-area-inset-bottom,0px)]">
+    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-[430px] border-t border-white/10 bg-background pb-[env(safe-area-inset-bottom,0px)]">
       {NAV_ITEMS.map((item) => {
         const isActive = item.id === active;
         const className =
@@ -83,7 +83,7 @@ function NavTabContent({
   label: string;
 }) {
   const tone = active
-    ? 'text-[#35f5e8]'
+    ? 'text-teal'
     : available
       ? 'text-white/70'
       : 'text-white/30';
@@ -91,7 +91,7 @@ function NavTabContent({
   return (
     <>
       {active ? (
-        <span className="absolute top-0 left-1/2 h-px w-[22px] -translate-x-1/2 bg-[#35f5e8]" />
+        <span className="absolute top-0 left-1/2 h-px w-[22px] -translate-x-1/2 bg-teal" />
       ) : null}
       <Icon size={20} strokeWidth={1.6} className={tone} />
       <span

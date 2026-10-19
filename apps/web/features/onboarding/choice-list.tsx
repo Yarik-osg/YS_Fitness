@@ -40,9 +40,9 @@ export function ChoiceList({
         const maleAccent = choice.value === 'male';
         const femaleAccent = choice.value === 'female';
         const cardAccent = maleAccent
-          ? '#c8ff2e'
+          ? 'var(--color-lime)'
           : femaleAccent
-            ? '#00c7c8'
+            ? 'var(--color-cyan)'
             : 'var(--accent)';
         const lastOddImage =
           imageGrid && index === choices.length - 1 && choices.length % 2 === 1;
@@ -57,9 +57,9 @@ export function ChoiceList({
             className={cn(
               'relative flex min-h-15 items-center gap-3 overflow-hidden border bg-white/3 p-4 text-left transition',
               selected && maleAccent
-                ? 'border-[#c8ff2e] bg-[#c8ff2e]/7'
+                ? 'border-lime bg-lime/7'
                 : selected && femaleAccent
-                  ? 'border-[#00c7c8] bg-[#00c7c8]/7'
+                  ? 'border-cyan bg-cyan/7'
                   : selected
                     ? 'border-accent bg-accent/7'
                     : 'border-white/12 hover:border-white/30',
@@ -96,14 +96,14 @@ export function ChoiceList({
             {selected && !textRow && (
               <span
                 className={cn(
-                  'absolute grid size-[18px] place-items-center rounded-full text-[#0b0b0b]',
+                  'absolute grid size-[18px] place-items-center rounded-full text-background',
                   grid && !imageGrid
                     ? 'top-1/2 right-3 -translate-y-1/2'
                     : 'top-2 right-2',
                   maleAccent
-                    ? 'bg-[#c8ff2e]'
+                    ? 'bg-lime'
                     : femaleAccent
-                      ? 'bg-[#00c7c8]'
+                      ? 'bg-cyan'
                       : 'bg-accent',
                   programCard &&
                     'top-3.5 left-3.5 right-auto size-5 translate-y-0',
@@ -118,10 +118,10 @@ export function ChoiceList({
                   'absolute top-3.5 right-3.5 px-2 py-1 font-label text-[7px] font-semibold tracking-[0.16em] uppercase',
                   selected
                     ? maleAccent
-                      ? 'bg-[#c8ff2e] text-[#0b0b0b]'
+                      ? 'bg-lime text-background'
                       : femaleAccent
-                        ? 'bg-[#00c7c8] text-[#0b0b0b]'
-                        : 'bg-accent text-[#0b0b0b]'
+                        ? 'bg-cyan text-background'
+                        : 'bg-accent text-background'
                     : 'bg-white/10 text-white',
                 )}
               >
@@ -133,9 +133,9 @@ export function ChoiceList({
                 src={choice.image}
                 color={
                   maleAccent
-                    ? '#c8ff2e'
+                    ? 'var(--color-lime)'
                     : femaleAccent
-                      ? '#00c7c8'
+                      ? 'var(--color-cyan)'
                       : 'var(--accent)'
                 }
                 className={cn(
@@ -155,7 +155,7 @@ export function ChoiceList({
                     className={cn(
                       'grid size-9 shrink-0 place-items-center rounded-full text-base',
                       selected
-                        ? 'bg-accent text-[#0b0b0b]'
+                        ? 'bg-accent text-background'
                         : 'bg-white/7 text-white/50',
                     )}
                   >
@@ -180,9 +180,9 @@ export function ChoiceList({
                       className={cn(
                         'mb-2 h-px w-8',
                         maleAccent
-                          ? 'bg-[#c8ff2e]'
+                          ? 'bg-lime'
                           : femaleAccent
-                            ? 'bg-[#00c7c8]'
+                            ? 'bg-cyan'
                             : 'bg-accent',
                       )}
                     />
@@ -197,7 +197,7 @@ export function ChoiceList({
                         !grid &&
                         !goal &&
                         !choice.description &&
-                        'font-sans text-[13px] font-medium normal-case leading-[1.4] tracking-normal',
+                        'font-body text-[13px] font-medium normal-case leading-[1.4] tracking-normal',
                     )}
                   >
                     {choice.label}
@@ -210,7 +210,7 @@ export function ChoiceList({
                 </span>
                 {textRow ? (
                   selected ? (
-                    <span className="ml-auto grid size-5 shrink-0 place-items-center self-center rounded-full bg-accent text-[#0b0b0b]">
+                    <span className="ml-auto grid size-5 shrink-0 place-items-center self-center rounded-full bg-accent text-background">
                       <Check size={11} strokeWidth={3} />
                     </span>
                   ) : goal ? (
@@ -283,7 +283,7 @@ export function MultiChoiceList({
               className={cn(
                 'grid size-[18px] shrink-0 place-items-center rounded-[3px] border',
                 selected
-                  ? 'border-accent bg-accent text-[#0b0b0b]'
+                  ? 'border-accent bg-accent text-background'
                   : 'border-white/20',
               )}
             >

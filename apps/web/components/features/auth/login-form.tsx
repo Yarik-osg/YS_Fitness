@@ -54,7 +54,6 @@ export function LoginForm() {
 
   return (
     <AuthShell
-      eyebrow={t('login.eyebrow')}
       title={t('login.title')}
       highlighted={t('login.highlighted')}
       description={t('login.description')}
