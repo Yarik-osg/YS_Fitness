@@ -1,4 +1,5 @@
 import type { ApiError, AuthResponse } from '@repo/shared-types';
+import { publicApiBaseUrl } from '@/lib/env';
 import {
   clearCsrfToken,
   readCsrfToken,
@@ -7,8 +8,6 @@ import {
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api/v1';
 const AUTH_PATHS = new Set(['/auth/login', '/auth/register', '/auth/refresh']);
 
 export class ApiClientError extends Error {
@@ -70,7 +69,7 @@ async function performRequest<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${publicApiBaseUrl}${path}`, {
       ...requestInit,
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: 'include',
