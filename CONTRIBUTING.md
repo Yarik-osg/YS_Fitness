@@ -66,7 +66,7 @@ export class CalculateNutritionDto implements CalculateNutritionInput {
 
 ## Next.js App Router
 
-The web app uses locale-prefixed routes and keeps product UI in `components/features/`:
+The web app uses locale-prefixed routes and keeps product UI in `components/features/`. The browser API base URL is centralized in `lib/env.ts`; server-only rewrite configuration remains in `next.config.js`.
 
 ```text
 apps/web/
