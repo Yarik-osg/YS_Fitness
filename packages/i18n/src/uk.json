@@ -610,6 +610,10 @@
       "training": "Тренування",
       "summary": "{exercises, plural, one {# вправа} few {# вправи} many {# вправ} other {# вправ}} · {sets, plural, one {# підхід} few {# підходи} many {# підходів} other {# підходів}}",
       "profile": "Профіль",
+      "kg": "кг",
+      "sinceStart": "{delta} кг від старту",
+      "sessionsLine": "{completed} / {expected} тренувань",
+      "weightError": "Не вдалося завантажити вимірювання.",
       "levels": {
         "beginner": "Початківець",
         "intermediate": "Середній рівень",
@@ -821,5 +825,30 @@
       "loadError": "Не вдалося завантажити календар.",
       "retry": "Ще раз"
     }
+  },
+  "progress": {
+    "brand": "YS Fitness",
+    "title": "Прогрес",
+    "weight": "Вага",
+    "start": "Старт",
+    "sinceStart": "{delta} кг від старту",
+    "add": "Додати вагу",
+    "cancel": "Скасувати",
+    "save": "Зберегти",
+    "saving": "Зберігаємо",
+    "invalid": "Вкажіть вагу від 25 до 500 кг, не більше двох знаків після коми.",
+    "empty": "Ще немає вимірювань.",
+    "chartEmpty": "За цей період вимірювань немає.",
+    "chartLabel": "Графік ваги",
+    "kg": "кг",
+    "period": {
+      "30d": "30 днів",
+      "3m": "3 міс.",
+      "all": "Все"
+    },
+    "training": "Тренування",
+    "completed": "Виконано {completed} з {expected} за програмою",
+    "trainingError": "Не вдалося завантажити програму.",
+    "loadError": "Не вдалося завантажити вимірювання."
   }
 }

@@ -24,6 +24,7 @@ import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ClientNav } from '@/components/features/shell/client-nav';
+import { NumberField } from '@/components/features/profile/number-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
@@ -725,42 +726,6 @@ function Detail({ label, value }: { label: string; value: string }) {
       <p className="text-[12px] text-white/45">{label}</p>
       <p className="text-right text-[13px] text-white">{value}</p>
     </div>
-  );
-}
-
-function NumberField({
-  id,
-  label,
-  unit,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  unit: string;
-  value: string;
-  min: number;
-  max: number;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label htmlFor={id} className="flex flex-col gap-1.5">
-      <span className="text-[12px] text-white/45">
-        {label} ({unit})
-      </span>
-      <input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="border border-white/15 bg-transparent px-3 py-2 text-white outline-none"
-      />
-    </label>
   );
 }
 

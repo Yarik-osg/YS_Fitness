@@ -56,6 +56,17 @@ export interface BodyMeasurementResponse {
   measuredAt: string;
 }
 
+export interface WeightMeasurement {
+  id: string;
+  weightKg: number;
+  measuredAt: string;
+}
+
+export interface WeightMeasurementsResponse {
+  measurements: WeightMeasurement[];
+  firstMeasurement: WeightMeasurement | null;
+}
+
 export interface MeResponse {
   id: string;
   email: string;

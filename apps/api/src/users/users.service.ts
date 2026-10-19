@@ -8,6 +8,7 @@ import type {
   OnboardingResponsesResponse,
   ProfileUpdateResponse,
   TrainingFrequency,
+  WeightMeasurement,
 } from '@repo/shared-types';
 import {
   isPlausibleDateOfBirth,
@@ -34,6 +35,47 @@ const PROFILE_INCOMPLETE = {
   code: 'PROFILE_INCOMPLETE',
   message: 'Complete onboarding before editing this profile',
 };
+
+const CHART_MEASUREMENT_LIMIT = 1000;
+
+const latestMeasurementOrder = [
+  { measuredAt: 'desc' as const },
+  { id: 'desc' as const },
+];
+
+const firstMeasurementOrder = [
+  { measuredAt: 'asc' as const },
+  { id: 'asc' as const },
+];
+
+const weightMeasurementSelect = {
+  id: true,
+  weightKg: true,
+  measuredAt: true,
+} as const;
+
+function toWeightMeasurement(row: {
+  id: string;
+  weightKg: Prisma.Decimal;
+  measuredAt: Date;
+}): WeightMeasurement {
+  return {
+    id: row.id,
+    weightKg: row.weightKg.toNumber(),
+    measuredAt: row.measuredAt.toISOString(),
+  };
+}
+
+function chartOrder<T extends { id: string; measuredAt: Date }>(
+  rows: T[],
+): T[] {
+  return rows.slice().sort((left, right) => {
+    const byTime = left.measuredAt.getTime() - right.measuredAt.getTime();
+    if (byTime !== 0) return byTime;
+    if (left.id === right.id) return 0;
+    return left.id < right.id ? 1 : -1;
+  });
+}
 
 @Injectable()
 export class UsersService {
@@ -66,7 +108,7 @@ export class UsersService {
           },
         },
         bodyMeasurements: {
-          orderBy: { measuredAt: 'desc' },
+          orderBy: latestMeasurementOrder,
           take: 1,
           select: {
             id: true,
@@ -77,6 +119,40 @@ export class UsersService {
         },
       },
     });
+  }
+
+  async listMeasurements(userId: string) {
+    const [rows, first] = await Promise.all([
+      this.prisma.bodyMeasurement.findMany({
+        where: { userId },
+        orderBy: latestMeasurementOrder,
+        take: CHART_MEASUREMENT_LIMIT,
+        select: weightMeasurementSelect,
+      }),
+      this.prisma.bodyMeasurement.findFirst({
+        where: { userId },
+        orderBy: firstMeasurementOrder,
+        select: weightMeasurementSelect,
+      }),
+    ]);
+
+    return {
+      measurements: chartOrder(rows).map(toWeightMeasurement),
+      firstMeasurement: first ? toWeightMeasurement(first) : null,
+    };
+  }
+
+  async createMeasurement(userId: string, weightKg: number) {
+    const created = await this.prisma.bodyMeasurement.create({
+      data: {
+        userId,
+        weightKg,
+        measuredAt: new Date(),
+      },
+      select: weightMeasurementSelect,
+    });
+
+    return toWeightMeasurement(created);
   }
 
   async saveOnboarding(userId: string, input: OnboardingInput) {
@@ -90,7 +166,7 @@ export class UsersService {
             transaction.userProfile.findUnique({ where: { userId } }),
             transaction.bodyMeasurement.findFirst({
               where: { userId },
-              orderBy: { measuredAt: 'desc' },
+              orderBy: latestMeasurementOrder,
             }),
             transaction.onboardingResponses.findUnique({ where: { userId } }),
           ]);
@@ -170,7 +246,7 @@ export class UsersService {
           transaction.userProfile.findUnique({ where: { userId } }),
           transaction.bodyMeasurement.findFirst({
             where: { userId },
-            orderBy: { measuredAt: 'desc' },
+            orderBy: latestMeasurementOrder,
           }),
           transaction.onboardingResponses.findUnique({ where: { userId } }),
         ]);

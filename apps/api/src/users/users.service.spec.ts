@@ -108,6 +108,21 @@ describe('UsersService.saveOnboarding', () => {
     expect(bodyMeasurement.create).not.toHaveBeenCalled();
   });
 
+  it('reads the latest onboarding weight with an id tie-break', async () => {
+    const { service } = createService({
+      userProfile,
+      bodyMeasurement,
+      onboardingResponses,
+    });
+
+    await service.saveOnboarding(userId, FEMALE_ONBOARDING);
+
+    expect(bodyMeasurement.findFirst).toHaveBeenCalledWith({
+      where: { userId },
+      orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+    });
+  });
+
   it('rejects when the OnboardingResponses write fails so the transaction can roll back', async () => {
     onboardingResponses.upsert.mockRejectedValue(new Error('write failed'));
     const { service } = createService({
@@ -480,5 +495,165 @@ describe('UsersService.updateProfile', () => {
     expect(programs.assign).not.toHaveBeenCalled();
     expect(programs.unassign).not.toHaveBeenCalled();
     expect(result.program).toEqual(assignedProgram);
+  });
+
+  it('reads the latest profile weight with an id tie-break', async () => {
+    const { service } = serviceWithAssign();
+
+    await service.updateProfile(userId, { weightKg: 58 });
+
+    expect(bodyMeasurement.findFirst).toHaveBeenCalledWith({
+      where: { userId },
+      orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+    });
+  });
+});
+
+describe('UsersService measurements', () => {
+  const sameTime = new Date('2026-05-01T00:00:00.000Z');
+  const earlierId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const laterId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+  function measurement(id: string, weightKg: string, measuredAt: Date) {
+    return {
+      id,
+      weightKg: new Prisma.Decimal(weightKg),
+      measuredAt,
+    };
+  }
+
+  function serviceWithMeasurements() {
+    const bodyMeasurement = {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+    };
+    const prisma = {
+      $transaction: vi.fn(),
+      onboardingResponses: { findUnique: vi.fn() },
+      user: { findUniqueOrThrow: vi.fn() },
+      bodyMeasurement,
+    };
+    const service = new UsersService(
+      prisma as never,
+      { assign: vi.fn(), getAssigned: vi.fn(), unassign: vi.fn() } as never,
+      { hasActiveAccess: vi.fn() } as never,
+    );
+    return { service, prisma, bodyMeasurement };
+  }
+
+  it('loads the profile weight with an id tie-break', async () => {
+    const { service, prisma } = serviceWithMeasurements();
+    prisma.user.findUniqueOrThrow.mockResolvedValue({ id: userId });
+
+    await service.getMe(userId);
+
+    expect(prisma.user.findUniqueOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          bodyMeasurements: expect.objectContaining({
+            orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+            take: 1,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('returns the latest 1000 in chart order and keeps the first-ever row', async () => {
+    const { service, bodyMeasurement } = serviceWithMeasurements();
+    const older = measurement(
+      earlierId,
+      '60.5',
+      new Date('2020-01-01T00:00:00.000Z'),
+    );
+    bodyMeasurement.findMany.mockResolvedValue([
+      measurement(laterId, '71.5', sameTime),
+      measurement(earlierId, '70.25', sameTime),
+    ]);
+    bodyMeasurement.findFirst.mockResolvedValue(older);
+
+    const result = await service.listMeasurements(userId);
+
+    expect(bodyMeasurement.findMany).toHaveBeenCalledWith({
+      where: { userId },
+      orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+      take: 1000,
+      select: { id: true, weightKg: true, measuredAt: true },
+    });
+    expect(bodyMeasurement.findFirst).toHaveBeenCalledWith({
+      where: { userId },
+      orderBy: [{ measuredAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, weightKg: true, measuredAt: true },
+    });
+    expect(result.measurements.map((row) => row.id)).toEqual([
+      laterId,
+      earlierId,
+    ]);
+    expect(result.measurements[0]?.weightKg).toBe(71.5);
+    expect(typeof result.measurements[0]?.weightKg).toBe('number');
+    expect(result.firstMeasurement).toEqual({
+      id: earlierId,
+      weightKg: 60.5,
+      measuredAt: '2020-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('does not duplicate the first row when it is already in the chart', async () => {
+    const { service, bodyMeasurement } = serviceWithMeasurements();
+    const only = measurement(earlierId, '70', sameTime);
+    bodyMeasurement.findMany.mockResolvedValue([only]);
+    bodyMeasurement.findFirst.mockResolvedValue(only);
+
+    const result = await service.listMeasurements(userId);
+
+    expect(result.measurements).toHaveLength(1);
+    expect(result.firstMeasurement?.id).toBe(result.measurements[0]?.id);
+  });
+
+  it('sorts an older timestamp before a newer one when ids disagree', async () => {
+    const { service, bodyMeasurement } = serviceWithMeasurements();
+    const older = new Date('2026-01-01T00:00:00.000Z');
+    const newer = new Date('2026-06-01T00:00:00.000Z');
+    bodyMeasurement.findMany.mockResolvedValue([
+      measurement(earlierId, '80', newer),
+      measurement(laterId, '70', older),
+    ]);
+    bodyMeasurement.findFirst.mockResolvedValue(
+      measurement(laterId, '70', older),
+    );
+
+    const result = await service.listMeasurements(userId);
+
+    expect(result.measurements.map((row) => row.id)).toEqual([
+      laterId,
+      earlierId,
+    ]);
+  });
+
+  it('appends a measurement at the server time even when the weight matches', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-01T12:00:00.000Z'));
+    const { service, bodyMeasurement } = serviceWithMeasurements();
+    bodyMeasurement.create.mockResolvedValue(
+      measurement(laterId, '70.5', new Date('2026-04-01T12:00:00.000Z')),
+    );
+
+    const created = await service.createMeasurement(userId, 70.5);
+
+    expect(bodyMeasurement.create).toHaveBeenCalledWith({
+      data: {
+        userId,
+        weightKg: 70.5,
+        measuredAt: new Date('2026-04-01T12:00:00.000Z'),
+      },
+      select: { id: true, weightKg: true, measuredAt: true },
+    });
+    expect(created).toEqual({
+      id: laterId,
+      weightKg: 70.5,
+      measuredAt: '2026-04-01T12:00:00.000Z',
+    });
+    vi.useRealTimers();
   });
 });
