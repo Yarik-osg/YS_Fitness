@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   Optional,
@@ -325,17 +326,27 @@ export class UsersService {
       });
     }
     try {
+      await this.photoStorage().remove(row.storageKey);
+    } catch (error) {
+      this.logger.error(
+        `Progress photo ${row.id} was kept because its file could not be removed`,
+      );
+      this.logger.error(error instanceof Error ? error.message : 'unknown');
+      throw new InternalServerErrorException({
+        code: 'PHOTO_DELETE_FAILED',
+        message: 'The photo could not be deleted. Try again.',
+      });
+    }
+    try {
       await this.prisma.progressPhoto.delete({ where: { id: row.id } });
     } catch (error) {
-      if (isMissingRecord(error)) {
-        throw new NotFoundException({
-          code: 'PHOTO_NOT_FOUND',
-          message: 'Progress photo not found.',
-        });
-      }
+      if (isMissingRecord(error)) return;
+      this.logger.error(
+        `Progress photo ${row.id} file was removed and the row delete failed`,
+      );
+      this.logger.error(error instanceof Error ? error.message : 'unknown');
       throw error;
     }
-    await this.removeStoredPhoto(row.storageKey);
   }
 
   private photoStorage(): ProgressPhotoStorage {

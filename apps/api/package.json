@@ -23,7 +23,8 @@
     "check-types": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "backfill:progress-photos": "tsx src/users/backfill-progress-photos.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

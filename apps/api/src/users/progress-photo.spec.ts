@@ -127,12 +127,13 @@ describe('UsersService progress photos', () => {
     expect(files.remove).toHaveBeenCalledWith(files.save.mock.calls[0]?.[0]);
   });
 
-  it('deletes the row before the file and still succeeds if the file is already gone', async () => {
+  it('removes the file before the row and keeps the row when the file stays', async () => {
     const photoId = '22222222-2222-4222-8222-222222222222';
     const prisma = {
       progressPhoto: {
         findFirst: vi.fn().mockResolvedValue({
           id: photoId,
+          userId,
           storageKey: `${userId}/${photoId}.jpg`,
         }),
         delete: vi.fn().mockResolvedValue({}),
@@ -145,7 +146,6 @@ describe('UsersService progress photos', () => {
     });
     files.remove.mockImplementation(async () => {
       order.push('remove');
-      throw new Error('disk');
     });
     const service = new UsersService(
       prisma as never,
@@ -157,7 +157,78 @@ describe('UsersService progress photos', () => {
     await expect(
       service.deleteProgressPhoto(userId, photoId),
     ).resolves.toBeUndefined();
-    expect(order).toEqual(['delete', 'remove']);
+    expect(order).toEqual(['remove', 'delete']);
+
+    files.remove.mockRejectedValueOnce(new Error('disk'));
+    await expect(
+      service.deleteProgressPhoto(userId, photoId),
+    ).rejects.toMatchObject({
+      response: { code: 'PHOTO_DELETE_FAILED' },
+    });
+    expect(prisma.progressPhoto.delete).toHaveBeenCalledTimes(1);
+
+    prisma.progressPhoto.delete.mockRejectedValueOnce(new Error('db down'));
+    await expect(service.deleteProgressPhoto(userId, photoId)).rejects.toThrow(
+      'db down',
+    );
+    await expect(
+      service.deleteProgressPhoto(userId, photoId),
+    ).resolves.toBeUndefined();
+    expect(prisma.progressPhoto.delete).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not remove a file for a missing photo or someone else', async () => {
+    const photoId = '22222222-2222-4222-8222-222222222222';
+    const prisma = {
+      progressPhoto: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        delete: vi.fn(),
+      },
+    };
+    const files = storage();
+    const service = new UsersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      files,
+    );
+
+    await expect(
+      service.deleteProgressPhoto(userId, photoId),
+    ).rejects.toMatchObject({
+      response: { code: 'PHOTO_NOT_FOUND' },
+    });
+    expect(files.remove).not.toHaveBeenCalled();
+    expect(prisma.progressPhoto.delete).not.toHaveBeenCalled();
+  });
+
+  it('treats a row that disappeared after the file was removed as deleted', async () => {
+    const photoId = '22222222-2222-4222-8222-222222222222';
+    const prisma = {
+      progressPhoto: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: photoId,
+          storageKey: `${userId}/${photoId}.jpg`,
+        }),
+        delete: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error('missing'), { code: 'P2025' }),
+          ),
+      },
+    };
+    const files = storage();
+    const service = new UsersService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      files,
+    );
+
+    await expect(
+      service.deleteProgressPhoto(userId, photoId),
+    ).resolves.toBeUndefined();
+    expect(files.remove).toHaveBeenCalledTimes(1);
   });
 });
 
