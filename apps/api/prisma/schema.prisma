@@ -129,7 +129,9 @@ model ProgressPhoto {
   id          String   @id @default(uuid()) @db.Uuid
   userId      String   @map("user_id") @db.Uuid
   contentType String   @map("content_type") @db.VarChar(32)
-  image       Bytes
+  storageKey  String   @unique @map("storage_key") @db.VarChar(96)
+  width       Int
+  height      Int
   createdAt   DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

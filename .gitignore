@@ -37,6 +37,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Uploaded progress photos (local development storage)
+storage/
+
 # Misc
 .DS_Store
 *.pem

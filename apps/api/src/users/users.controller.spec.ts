@@ -37,6 +37,18 @@ describe('UsersController measurements', () => {
     expect(
       Reflect.getMetadata(
         GUARDS_METADATA,
+        UsersController.prototype.readProgressPhoto,
+      ),
+    ).toBeUndefined();
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        UsersController.prototype.deleteProgressPhoto,
+      ),
+    ).toBeUndefined();
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
         UsersController.prototype.listMeasurements,
       ),
     ).not.toEqual([SubscriptionGuard]);

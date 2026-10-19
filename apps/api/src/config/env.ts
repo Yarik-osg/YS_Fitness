@@ -26,6 +26,8 @@ export const envSchema = z.object({
   MAIL_FROM: z.string().min(3).default('YS Fitness <no-reply@localhost>'),
   // Public web URL used in email links; defaults to the first WEB_ORIGINS entry.
   APP_URL: z.string().url().optional(),
+  // Directory for progress photos in development. Unset uses ./storage/progress-photos.
+  PROGRESS_PHOTO_DIR: z.string().min(1).optional(),
   SEED_TRAINER_EMAIL: z.string().email().optional(),
   SEED_TRAINER_PASSWORD: z.string().min(8).optional(),
 });

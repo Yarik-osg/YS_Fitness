@@ -862,10 +862,21 @@
     "photos": "Progress photos",
     "photoStart": "Start",
     "photoNow": "Now",
-    "photoEmpty": "Photo",
+    "photoEmpty": "No photos yet.",
     "addPhoto": "Add photo",
     "photoInvalid": "This photo could not be read. Use a JPEG, PNG, WebP, or HEIC.",
     "photoLimit": "You can keep up to 8 photos.",
-    "photoLoadError": "Photos could not be loaded."
+    "photoLoadError": "Photos could not be loaded.",
+    "photoImageError": "This photo could not be loaded.",
+    "compare": "Compare",
+    "comparePick": "Choose two different photos",
+    "photoBefore": "Before",
+    "photoAfter": "After",
+    "chooseDifferent": "Choose different photos",
+    "deletePhoto": "Delete photo",
+    "deleteConfirm": "Delete the photo from {date}?",
+    "deleting": "Deleting",
+    "photoDeleteError": "The photo could not be deleted.",
+    "close": "Close"
   }
 }

@@ -1,7 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
@@ -28,6 +33,10 @@ import {
   ProgressPhotoError,
   type ProgressPhotoContentType,
 } from './progress-photo.js';
+import {
+  LocalProgressPhotoStorage,
+  type ProgressPhotoStorage,
+} from './progress-photo-storage.js';
 import {
   EXPERIENCE_FROM_PRISMA,
   EXPERIENCE_TO_PRISMA,
@@ -73,6 +82,42 @@ function asProgressPhotoType(value: string): ProgressPhotoContentType | null {
   return null;
 }
 
+function isMissingRecord(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2025'
+  );
+}
+
+function assertPhotoId(id: string) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  ) {
+    throw new BadRequestException({
+      code: 'PHOTO_INVALID',
+      message: 'Photo id is not valid.',
+    });
+  }
+}
+
+function toProgressPhoto(row: {
+  id: string;
+  createdAt: Date;
+  contentType: string;
+  width: number;
+  height: number;
+}): ProgressPhoto {
+  return {
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    contentType: 'image/jpeg',
+    width: row.width,
+    height: row.height,
+  };
+}
+
 function toWeightMeasurement(row: {
   id: string;
   weightKg: Prisma.Decimal;
@@ -98,10 +143,15 @@ function chartOrder<T extends { id: string; measuredAt: Date }>(
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly programs: ProgramsService,
     private readonly subscriptions: SubscriptionsService,
+    @Optional()
+    @Inject(LocalProgressPhotoStorage)
+    private readonly photos?: ProgressPhotoStorage,
   ) {}
 
   async getMe(userId: string) {
@@ -177,23 +227,39 @@ export class UsersService {
   async listProgressPhotos(userId: string): Promise<ProgressPhotosResponse> {
     const rows = await this.prisma.progressPhoto.findMany({
       where: { userId },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
     return {
       photos: rows.flatMap((row) => {
         const contentType = asProgressPhotoType(row.contentType);
-        if (!contentType) return [];
+        if (contentType !== 'image/jpeg') return [];
         return [
           {
             id: row.id,
             createdAt: row.createdAt.toISOString(),
             contentType,
-            imageBase64: Buffer.from(row.image).toString('base64'),
+            width: row.width,
+            height: row.height,
           },
         ];
       }),
     };
+  }
+
+  async readProgressPhoto(userId: string, photoId: string): Promise<Buffer> {
+    assertPhotoId(photoId);
+    const row = await this.prisma.progressPhoto.findFirst({
+      where: { id: photoId, userId },
+    });
+    const image = row ? await this.photoStorage().read(row.storageKey) : null;
+    if (!image) {
+      throw new NotFoundException({
+        code: 'PHOTO_NOT_FOUND',
+        message: 'Progress photo not found.',
+      });
+    }
+    return image;
   }
 
   async createProgressPhoto(
@@ -207,40 +273,98 @@ export class UsersService {
       if (error instanceof ProgressPhotoError) {
         throw new BadRequestException({
           code: error.code,
-          message: 'Use a JPEG, PNG, or WebP under 400 KB.',
+          message: 'Use a JPEG, PNG, or WebP under 400 KB and 1024 pixels.',
         });
       }
       throw error;
     }
 
-    const created = await this.prisma.$transaction(async (transaction) => {
-      await transaction.$queryRaw`
-        SELECT id FROM users WHERE id = CAST(${userId} AS uuid) FOR UPDATE
-      `;
-      const count = await transaction.progressPhoto.count({
-        where: { userId },
-      });
-      if (count >= PROGRESS_PHOTO_LIMIT) {
-        throw new BadRequestException({
-          code: 'PHOTO_LIMIT',
-          message: 'Progress photo limit reached.',
+    const id = randomUUID();
+    const storageKey = `${userId}/${id}.jpg`;
+    await this.photoStorage().save(storageKey, decoded.image);
+    try {
+      const created = await this.prisma.$transaction(async (transaction) => {
+        await transaction.$queryRaw`
+          SELECT id FROM users WHERE id = CAST(${userId} AS uuid) FOR UPDATE
+        `;
+        const count = await transaction.progressPhoto.count({
+          where: { userId },
         });
-      }
-      return transaction.progressPhoto.create({
-        data: {
-          userId,
-          contentType: decoded.contentType,
-          image: decoded.image,
-        },
+        if (count >= PROGRESS_PHOTO_LIMIT) {
+          throw new BadRequestException({
+            code: 'PHOTO_LIMIT',
+            message: 'Progress photo limit reached.',
+          });
+        }
+        return transaction.progressPhoto.create({
+          data: {
+            id,
+            userId,
+            contentType: decoded.contentType,
+            storageKey,
+            width: decoded.width,
+            height: decoded.height,
+          },
+        });
       });
-    });
+      return toProgressPhoto(created);
+    } catch (error) {
+      await this.removeStoredPhoto(storageKey);
+      throw error;
+    }
+  }
 
-    return {
-      id: created.id,
-      createdAt: created.createdAt.toISOString(),
-      contentType: decoded.contentType,
-      imageBase64: Buffer.from(created.image).toString('base64'),
-    };
+  async deleteProgressPhoto(userId: string, photoId: string): Promise<void> {
+    assertPhotoId(photoId);
+    const row = await this.prisma.progressPhoto.findFirst({
+      where: { id: photoId, userId },
+    });
+    if (!row) {
+      throw new NotFoundException({
+        code: 'PHOTO_NOT_FOUND',
+        message: 'Progress photo not found.',
+      });
+    }
+    try {
+      await this.photoStorage().remove(row.storageKey);
+    } catch (error) {
+      this.logger.error(
+        `Progress photo ${row.id} was kept because its file could not be removed`,
+      );
+      this.logger.error(error instanceof Error ? error.message : 'unknown');
+      throw new InternalServerErrorException({
+        code: 'PHOTO_DELETE_FAILED',
+        message: 'The photo could not be deleted. Try again.',
+      });
+    }
+    try {
+      await this.prisma.progressPhoto.delete({ where: { id: row.id } });
+    } catch (error) {
+      if (isMissingRecord(error)) return;
+      this.logger.error(
+        `Progress photo ${row.id} file was removed and the row delete failed`,
+      );
+      this.logger.error(error instanceof Error ? error.message : 'unknown');
+      throw error;
+    }
+  }
+
+  private photoStorage(): ProgressPhotoStorage {
+    if (!this.photos) {
+      throw new Error('Progress photo storage is not configured');
+    }
+    return this.photos;
+  }
+
+  private async removeStoredPhoto(storageKey: string) {
+    try {
+      await this.photoStorage().remove(storageKey);
+    } catch (error) {
+      this.logger.error(
+        `Progress photo file was left on disk after ${storageKey} could not be removed`,
+      );
+      this.logger.error(error instanceof Error ? error.message : 'unknown');
+    }
   }
 
   async saveOnboarding(userId: string, input: OnboardingInput) {

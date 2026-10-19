@@ -18,6 +18,8 @@ const usersApi = vi.hoisted(() => ({
   getMe: vi.fn(),
   getMeasurements: vi.fn(),
   getProgressPhotos: vi.fn(),
+  getProgressPhotoBlob: vi.fn(),
+  deleteProgressPhoto: vi.fn(),
   createMeasurement: vi.fn(),
   createProgressPhoto: vi.fn(),
   getOnboardingResponses: vi.fn(),
@@ -89,6 +91,9 @@ describe('ProgressPage', () => {
     vi.setSystemTime(now);
     usersApi.getMeasurements.mockReset();
     usersApi.getProgressPhotos.mockReset().mockResolvedValue({ photos: [] });
+    usersApi.getProgressPhotoBlob
+      .mockReset()
+      .mockResolvedValue(new Blob(['photo'], { type: 'image/jpeg' }));
     readProgressPhoto.mockReset().mockResolvedValue('aGVsbG8=');
     usersApi.createMeasurement.mockReset();
     usersApi.createProgressPhoto.mockReset();
@@ -185,7 +190,7 @@ describe('ProgressPage', () => {
     renderPage();
 
     expect(await screen.findByText('Ще немає вимірювань.')).toBeInTheDocument();
-    expect(screen.getAllByText('—')).toHaveLength(5);
+    expect(screen.getAllByText('—')).toHaveLength(3);
   });
 
   it('appends a weight, keeps the input after a failure, and cancels without saving', async () => {
@@ -308,7 +313,8 @@ describe('ProgressPage', () => {
           id: 'photo-1',
           createdAt: '2026-08-02T00:00:00.000Z',
           contentType: 'image/jpeg',
-          imageBase64: 'aGVsbG8=',
+          width: 8,
+          height: 8,
         },
       ],
     });
@@ -320,10 +326,9 @@ describe('ProgressPage', () => {
     expect(names[0]).toHaveTextContent('Згинання');
     expect(screen.getByText('+9,0').className).toContain('text-teal');
     expect(screen.getByText('−88,0').className).toContain('text-amber');
-    expect(screen.getByRole('img', { name: 'Зараз' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('img', { name: 'Старт' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: /\d{2}\.\d{2}\.2026/ }),
+    ).toBeInTheDocument();
   });
 
   it('shows the photo limit when the upload is refused', async () => {

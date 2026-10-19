@@ -26,6 +26,7 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   accessToken?: string | null;
   skipRefresh?: boolean;
+  responseType?: 'json' | 'blob';
 }
 
 let refreshPromise: Promise<AuthResponse> | null = null;
@@ -57,7 +58,14 @@ async function performRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { body, accessToken, skipRefresh, headers, ...requestInit } = options;
+  const {
+    body,
+    accessToken,
+    skipRefresh,
+    headers,
+    responseType,
+    ...requestInit
+  } = options;
   const csrfToken = readCsrfToken();
   const requestHeaders = new Headers(headers);
 
@@ -99,6 +107,7 @@ async function performRequest<T>(
 
   if (!response.ok) throw await parseError(response);
   if (response.status === 204) return undefined as T;
+  if (responseType === 'blob') return (await response.blob()) as T;
 
   const text = await response.text();
   if (!text) return null as T;
@@ -111,6 +120,15 @@ async function performRequest<T>(
 export function apiRequest<T>(path: string, options: RequestOptions = {}) {
   const token = options.accessToken ?? useAuthStore.getState().accessToken;
   return performRequest<T>(path, { ...options, accessToken: token });
+}
+
+export function apiBlob(path: string, options: RequestOptions = {}) {
+  const token = options.accessToken ?? useAuthStore.getState().accessToken;
+  return performRequest<Blob>(path, {
+    ...options,
+    accessToken: token,
+    responseType: 'blob',
+  });
 }
 
 export function refreshSession(): Promise<AuthResponse> {

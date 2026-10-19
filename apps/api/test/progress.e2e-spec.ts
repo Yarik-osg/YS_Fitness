@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import cookieParser from 'cookie-parser';
@@ -16,8 +19,11 @@ describeWithDatabase('progress photos and strength (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaClient;
   let imageBase64 = '';
+  let photoDir = '';
 
   beforeAll(async () => {
+    photoDir = await mkdtemp(path.join(tmpdir(), 'progress-photos-'));
+    process.env.PROGRESS_PHOTO_DIR = photoDir;
     configureE2eEnvironment(testDatabaseUrl);
     imageBase64 = (
       await sharp({
@@ -62,6 +68,7 @@ describeWithDatabase('progress photos and strength (e2e)', () => {
   afterAll(async () => {
     await prisma?.$disconnect();
     await app?.close();
+    if (photoDir) await rm(photoDir, { recursive: true, force: true });
   });
 
   async function accessToken(email: string) {
@@ -92,6 +99,9 @@ describeWithDatabase('progress photos and strength (e2e)', () => {
     const other = await accessToken('other@progress.example.com');
     const created = await upload(owner).expect(201);
     expect(created.body.contentType).toBe('image/jpeg');
+    expect(created.body).not.toHaveProperty('imageBase64');
+    expect(created.body.width).toBe(2);
+    expect(created.body.height).toBe(2);
 
     const hidden = await request(app.getHttpServer())
       .get('/api/v1/users/me/progress-photos')
@@ -105,6 +115,49 @@ describeWithDatabase('progress photos and strength (e2e)', () => {
       .expect(200);
     expect(listed.body.photos).toHaveLength(1);
     expect(listed.body.photos[0].id).toBe(created.body.id);
+
+    const photoId = created.body.id as string;
+    await request(app.getHttpServer())
+      .get(`/api/v1/users/me/progress-photos/${photoId}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/users/me/progress-photos/not-a-uuid')
+      .set('Authorization', `Bearer ${owner}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get(`/api/v1/users/me/progress-photos/${photoId}`)
+      .set('Authorization', `Bearer ${other}`)
+      .expect(404);
+    const image = await request(app.getHttpServer())
+      .get(`/api/v1/users/me/progress-photos/${photoId}`)
+      .set('Authorization', `Bearer ${owner}`)
+      .expect(200);
+    expect(image.headers['content-type']).toContain('image/jpeg');
+    expect(image.headers['cache-control']).toBe('private, no-store');
+    expect(image.body[0]).toBe(0xff);
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/me/progress-photos/${photoId}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/me/progress-photos/${randomUUID()}`)
+      .set('Authorization', `Bearer ${owner}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/me/progress-photos/${photoId}`)
+      .set('Authorization', `Bearer ${other}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/me/progress-photos/${photoId}`)
+      .set('Authorization', `Bearer ${owner}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/me/progress-photos/${photoId}`)
+      .set('Authorization', `Bearer ${owner}`)
+      .expect(404);
+    expect(await prisma.progressPhoto.count({ where: { id: photoId } })).toBe(
+      0,
+    );
   });
 
   it('does not store an invalid photo and keeps the cap under two overlapping uploads', async () => {
@@ -122,11 +175,17 @@ describeWithDatabase('progress photos and strength (e2e)', () => {
     ).toBe(0);
 
     await prisma.progressPhoto.createMany({
-      data: Array.from({ length: 7 }, () => ({
-        userId: user.id,
-        contentType: 'image/jpeg',
-        image: Buffer.from(imageBase64, 'base64'),
-      })),
+      data: Array.from({ length: 7 }, () => {
+        const id = randomUUID();
+        return {
+          id,
+          userId: user.id,
+          contentType: 'image/jpeg',
+          storageKey: `${user.id}/${id}.jpg`,
+          width: 2,
+          height: 2,
+        };
+      }),
     });
 
     const raced = await Promise.all([upload(token), upload(token)]);
@@ -137,6 +196,7 @@ describeWithDatabase('progress photos and strength (e2e)', () => {
     expect(
       await prisma.progressPhoto.count({ where: { userId: user.id } }),
     ).toBe(8);
+    expect(await readdir(path.join(photoDir, user.id))).toHaveLength(1);
   });
 
   it('uses the earliest loaded weight even when history is longer than 50 logs', async () => {
