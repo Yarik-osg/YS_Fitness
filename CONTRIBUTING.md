@@ -46,7 +46,7 @@ Rules:
 1. Controllers translate HTTP input/output and call services; they do not inject Prisma.
 2. DTO adapter classes reference schemas from `@repo/validation` through a static `schema` property for the global Zod pipe.
 3. Services own domain rules and transactions.
-4. Repositories isolate substantial Prisma queries and persistence mapping. A small module may keep simple Prisma access in its service until a repository improves clarity or testing.
+4. Repositories isolate nontrivial Prisma queries and persistence mapping. New modules must use a repository for multi-step, complex, or query-heavy persistence; a simple single-record read/write may stay in the service when that is clearer.
 5. Public response types come from `@repo/shared-types`. Prisma types never leave `apps/api`.
 6. Unit tests are colocated as `*.spec.ts`; PostgreSQL-backed flows live in `apps/api/test/*.e2e-spec.ts`.
 7. A module writes only its own tables. Cross-domain work goes through an exported service or explicit contract.
@@ -66,39 +66,39 @@ export class CalculateNutritionDto implements CalculateNutritionInput {
 
 ## Next.js App Router
 
-The web app uses route groups for layouts and `features/` for product logic:
+The web app uses locale-prefixed routes. App screens live in `components/features/`. Marketing, onboarding, and checkout already live in `features/`. The browser API base URL is centralized in `lib/env.ts`; server-only rewrite configuration remains in `next.config.js`.
 
 ```text
 apps/web/
 ├── app/
-│   ├── (marketing)/
-│   ├── (auth)/
-│   ├── (client)/
-│   ├── (trainer)/
-│   └── layout.tsx
+│   └── [locale]/
+│       ├── (marketing)/
+│       ├── (auth)/
+│       ├── (client)/
+│       └── (password)/
 ├── components/
+│   ├── features/
 │   ├── layout/
 │   └── ui/
 ├── features/
+│   ├── checkout/
+│   ├── marketing/
 │   └── onboarding/
-│       ├── actions/
-│       ├── components/
-│       └── hooks/
-├── lib/
-│   ├── api/
-│   ├── auth/
-│   └── env.ts
-└── types/
+└── lib/
+    ├── api/
+    │   └── client.ts
+    ├── auth/
+    └── hooks/
 ```
 
 Rules:
 
 1. `app/` files define routes, layouts, loading/error states, and composition—not domain logic.
-2. Server Actions live under `features/<domain>/actions/` and use `server-only` infrastructure.
+2. Put new app screens in `components/features/<domain>/`. Leave marketing, onboarding, and checkout in `features/<domain>/`. Do not add a `features/<domain>/actions/` tree unless a concrete Server Action needs it.
 3. Client components include `"use client"` only at the smallest interactive boundary.
-4. API clients and API-calling utilities live in `lib/api/`; feature-specific TanStack Query hooks live under the feature's `hooks/`.
+4. The API client and API-calling utilities live in `lib/api/`; API hooks live in `lib/hooks/`.
 5. Use `@repo/validation` for form/request schemas and `@repo/shared-types` for API responses. Do not recreate contracts in the web app.
-6. Web-only view models and navigation types belong in `apps/web/types`.
+6. Keep types close to the code that owns them; use shared API contracts from `@repo/shared-types` rather than creating a parallel root `types/` directory.
 7. Promote a component to shared `components/` or `@repo/ui` only after it is reused.
 
 ## Environment variables
@@ -135,6 +135,4 @@ Git hooks format/lint staged files, type-check affected packages, enforce commit
 These decisions remain intentionally open and should be resolved when the relevant work begins:
 
 - Whether to rename workspace packages from `@repo/*` to `@ys-fitness/*`.
-- Whether web tests standardize on Vitest/Testing Library, Playwright, or both.
-- Whether every API module must have a repository or only query-heavy modules.
 - When `packages/ui` becomes a formal design system with visual documentation.

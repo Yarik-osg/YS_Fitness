@@ -1,6 +1,6 @@
 # YS Fitness
 
-Personal-training SaaS monorepo. This milestone provides a Next.js web shell and a NestJS API with PostgreSQL, Prisma, email/password authentication, rotating refresh sessions, onboarding, and mock subscription checkout.
+Personal-training SaaS monorepo with a Next.js web app and NestJS API backed by PostgreSQL and Prisma. Current product flows include email/password authentication, rotating refresh sessions, onboarding, profiles, assigned training programs, workout logging, and subscriptions with mock checkout.
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) for domain boundaries and [CONTRIBUTING.md](CONTRIBUTING.md) before adding a module. Decisions with long-term impact are recorded in [docs/adr](docs/adr).
 
@@ -11,11 +11,14 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for domain boundaries and [CONTRIBUTING.
 - `apps/mobile` — planned Expo client (not created yet)
 - `packages/shared-types` — public API-contract types (never Prisma models)
 - `packages/validation` — shared Zod request schemas
+- `packages/i18n` — shared internationalization messages and locale utilities
 - `packages/ui` — optional shared React components
+- `packages/eslint-config` — shared ESLint configurations
+- `packages/typescript-config` — shared TypeScript configs for base, Next.js, and React packages
 
 ## Local setup
 
-Requirements: Node.js 20+, pnpm 10, and a Docker-compatible runtime. On macOS, [OrbStack](https://orbstack.dev/) is the recommended lightweight runtime; Docker Desktop is also supported. This repository uses the modern `docker compose` plugin syntax.
+Requirements: Node.js 24 (see `.nvmrc`), pnpm 10, and a Docker-compatible runtime. On macOS, [OrbStack](https://orbstack.dev/) is the recommended lightweight runtime; Docker Desktop is also supported. This repository uses the modern `docker compose` plugin syntax.
 
 ```bash
 cp .env.example .env
@@ -118,7 +121,7 @@ Native requests use `clientType: "MOBILE"` and receive the refresh token in the 
 
 ## Onboarding
 
-`PUT /api/v1/users/me/onboarding` is bearer-authenticated. It upserts the calculation subset on `UserProfile` (name, date of birth, calculation sex, height, activity, goal, timezone, and restrictions), appends a `BodyMeasurement` when weight or body fat changed, and upserts the rest of the quiz on `OnboardingResponses`. An identical retry does not duplicate the measurement. `GET /api/v1/users/me/onboarding-responses` returns that quiz, or `{ responses: null }` when the user finished onboarding before the table existed. Calorie targets and generated programs are deliberately separate future modules.
+`PUT /api/v1/users/me/onboarding` is bearer-authenticated. It upserts the calculation subset on `UserProfile` (name, date of birth, calculation sex, height, activity, goal, timezone, and restrictions), appends a `BodyMeasurement` when weight or body fat changed, and upserts the rest of the quiz on `OnboardingResponses`. An identical retry does not duplicate the measurement. `GET /api/v1/users/me/onboarding-responses` returns that quiz, or `{ responses: null }` when the user finished onboarding before the table existed. Calorie-target calculation and personalized program generation beyond the existing trainer-managed template catalog and assignment are separate future work.
 
 ## Profile
 
@@ -178,6 +181,6 @@ Use `feature/`, `fix/`, `chore/`, `docs/`, or `refactor/` prefixes followed by k
 - Relational health-restriction records (currently validated JSON tags)
 - Goal-history tracking (the profile stores the current goal)
 - Nutrition target calculation
-- Workout-program generation
+- Personalized workout-program generation beyond the existing template catalog and matching
 - WayForPay HTTP, webhooks, signatures, and hosted checkout
 - Dunning, invoices, refunds, and proration
