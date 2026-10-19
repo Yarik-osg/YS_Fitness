@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { ChartColumn, Check, Dumbbell, Medal, Utensils } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useRef, useState } from 'react';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,32 @@ export function LandingPage({
       : sessionHint === 'onboarding'
         ? { href: '/onboarding' as const, label: t('nav.continue') }
         : { href: '/login' as const, label: t('nav.login') };
+  const whyScroller = useRef<HTMLDivElement>(null);
+  const [activeWhy, setActiveWhy] = useState(0);
+
+  function syncWhyCard() {
+    const scroller = whyScroller.current;
+    if (!scroller) return;
+    const cards = [...scroller.children] as HTMLElement[];
+    if (cards.length === 0) return;
+    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+    if (scroller.scrollLeft >= maxScroll - 4) {
+      setActiveWhy(cards.length - 1);
+      return;
+    }
+    const origin = scroller.getBoundingClientRect().left;
+    let closest = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    cards.forEach((card, index) => {
+      const distance = Math.abs(card.getBoundingClientRect().left - origin);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = index;
+      }
+    });
+    setActiveWhy(closest);
+  }
+
   const whyCards = t.raw('why.cards') as { label: string; desc: string }[];
   const painPoints = t.raw('painPoints') as string[];
   const credentials = t.raw('coach.credentials') as string[];
@@ -55,11 +82,6 @@ export function LandingPage({
             {account.label}
           </Link>
           <LocaleSwitcher />
-          <span aria-hidden className="flex flex-col gap-[5px]">
-            <span className="h-px w-5 bg-white" />
-            <span className="h-px w-5 bg-white" />
-            <span className="h-px w-5 bg-white" />
-          </span>
         </div>
       </nav>
       <div className="h-px bg-white/12" />
@@ -108,7 +130,11 @@ export function LandingPage({
             {t('why.heading')}
           </h2>
         </div>
-        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={whyScroller}
+          className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onScroll={syncWhyCard}
+        >
           {whyCards.map((card, index) => {
             const accent = WHY_CARD_ACCENTS[index] ?? 'teal';
             return (
@@ -142,8 +168,10 @@ export function LandingPage({
           {whyCards.map((card, index) => (
             <span
               key={card.label}
-              className={`h-1 rounded-sm ${
-                index === 0 ? 'w-[18px] bg-accent' : 'w-[5px] bg-white/15'
+              className={`h-1 rounded-sm transition-[width,background-color] duration-200 ${
+                index === activeWhy
+                  ? 'w-[18px] bg-accent'
+                  : 'w-[5px] bg-white/15'
               }`}
             />
           ))}
