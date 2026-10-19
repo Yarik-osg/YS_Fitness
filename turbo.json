@@ -18,6 +18,9 @@
         ".next/**",
         "!.next/cache/**",
         "!.next/dev/**"
+      ],
+      "env": [
+        "NEXT_PUBLIC_API_BASE_URL"
       ]
     },
     "lint": {
@@ -38,7 +41,10 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "NEXT_PUBLIC_API_BASE_URL"
+      ]
     },
     "test:e2e": {
       "cache": false
