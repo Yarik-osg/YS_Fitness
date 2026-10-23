@@ -1,4 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { ProgramsService } from './programs.service.js';
 
@@ -58,8 +59,8 @@ function assignedProgram() {
 
 function createService() {
   const prisma = {
-    onboardingResponses: { findUnique: vi.fn() },
-    programTemplate: { findFirst: vi.fn() },
+    onboardingResponses: { findUnique: vi.fn(), update: vi.fn() },
+    programTemplate: { findFirst: vi.fn(), findMany: vi.fn() },
     workoutProgram: {
       upsert: vi.fn(),
       findUnique: vi.fn(),
@@ -69,7 +70,14 @@ function createService() {
     workoutLog: {
       findFirst: vi.fn().mockResolvedValue(null),
       groupBy: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn(),
     },
+    $transaction: vi.fn(
+      async (fn: (db: unknown) => Promise<unknown>, options?: unknown) => {
+        void options;
+        return fn(prisma);
+      },
+    ),
   };
 
   return { prisma, service: new ProgramsService(prisma as never) };
@@ -305,5 +313,473 @@ describe('ProgramsService', () => {
     expect(prisma.workoutProgram.deleteMany).toHaveBeenCalledWith({
       where: { userId },
     });
+  });
+});
+
+const nextTemplate = {
+  id: '22222222-2222-4222-8222-222222222222',
+  code: 'WM2U',
+  name: 'WM2U intermediate upper',
+  gender: 'FEMALE',
+  level: 'INTERMEDIATE',
+  frequencyPerWeek: 2,
+  accent: 'UPPER',
+  active: true,
+};
+
+const advancedLower = {
+  id: '55555555-5555-4555-8555-555555555555',
+  code: 'WP2L',
+  name: 'WP2L advanced lower',
+  gender: 'FEMALE',
+  level: 'ADVANCED',
+  frequencyPerWeek: 2,
+  accent: 'LOWER',
+  active: true,
+};
+
+const advancedFull = {
+  id: '66666666-6666-4666-8666-666666666666',
+  code: 'WP2N',
+  name: 'WP2N advanced full',
+  gender: 'FEMALE',
+  level: 'ADVANCED',
+  frequencyPerWeek: 2,
+  accent: 'NONE',
+  active: true,
+};
+
+const startedAt = new Date('2026-09-27T00:00:00.000Z');
+
+function atTarget() {
+  return [{ dayNumber: 1, _count: { _all: 16 } }];
+}
+
+function installPromotion(
+  prisma: ReturnType<typeof createService>['prisma'],
+  options: {
+    record?: ReturnType<typeof assignedProgram>;
+    responses?: ReturnType<typeof onboarding>;
+    templates?: Array<typeof nextTemplate>;
+  } = {},
+) {
+  let program = options.record ?? assignedProgram();
+  let responses = options.responses ?? onboarding();
+  const originalResponses = {
+    ...responses,
+    focusAreas: [...responses.focusAreas],
+  };
+  const templates = options.templates ?? [nextTemplate];
+  prisma.onboardingResponses.findUnique.mockImplementation(
+    async () => responses,
+  );
+  prisma.onboardingResponses.update.mockImplementation(
+    async (args: { data: Record<string, unknown> }) => {
+      responses = { ...responses, ...args.data };
+      return responses;
+    },
+  );
+  prisma.workoutProgram.findUnique.mockImplementation(
+    async (args?: { select?: unknown }) =>
+      args?.select ? { templateId: program.templateId } : program,
+  );
+  prisma.programTemplate.findFirst.mockImplementation(
+    async (args: {
+      where: {
+        gender: string;
+        level: string;
+        frequencyPerWeek: number;
+        accent: string;
+      };
+    }) =>
+      templates.find(
+        (template) =>
+          template.gender === args.where.gender &&
+          template.level === args.where.level &&
+          template.frequencyPerWeek === args.where.frequencyPerWeek &&
+          template.accent === args.where.accent,
+      ) ?? null,
+  );
+  prisma.workoutLog.groupBy.mockImplementation(
+    async (args: { where: { completedAt: { gte: Date } } }) =>
+      args.where.completedAt.gte.getTime() === startedAt.getTime()
+        ? atTarget()
+        : [],
+  );
+  prisma.workoutProgram.upsert.mockImplementation(
+    async (args: { update: { templateId: string; assignedAt: Date } }) => {
+      const template = templates.find(
+        (item) => item.id === args.update.templateId,
+      );
+      program = {
+        ...program,
+        templateId: args.update.templateId,
+        assignedAt: args.update.assignedAt,
+        template: {
+          ...program.template,
+          id: args.update.templateId,
+          code: template?.code ?? program.template.code,
+          name: template?.name ?? program.template.name,
+          level: template?.level ?? program.template.level,
+          accent: template?.accent ?? program.template.accent,
+          frequencyPerWeek:
+            template?.frequencyPerWeek ?? program.template.frequencyPerWeek,
+          gender: template?.gender ?? program.template.gender,
+        },
+      };
+      return program;
+    },
+  );
+
+  return {
+    responses: () => responses,
+    program: () => program,
+    apply(data: Record<string, unknown>) {
+      responses = { ...responses, ...data };
+      return responses;
+    },
+    restore() {
+      responses = {
+        ...originalResponses,
+        focusAreas: [...originalResponses.focusAreas],
+      };
+    },
+  };
+}
+
+function serializationConflict() {
+  return new Prisma.PrismaClientKnownRequestError('write conflict', {
+    code: 'P2034',
+    clientVersion: '6.16.2',
+  });
+}
+
+describe('program promotion', () => {
+  it('offers one same-accent intermediate program to a beginner', async () => {
+    const { prisma, service } = createService();
+    installPromotion(prisma);
+    prisma.workoutLog.groupBy.mockResolvedValue(atTarget());
+
+    const result = await service.getPromotion(userId);
+
+    expect(result).toMatchObject({
+      kind: 'level-up',
+      fromLevel: 'beginner',
+      toLevel: 'intermediate',
+      suggestions: [
+        {
+          id: nextTemplate.id,
+          code: 'WM2U',
+          accent: 'UPPER',
+          level: 'intermediate',
+          frequencyPerWeek: 2,
+        },
+      ],
+    });
+    expect(prisma.programTemplate.findFirst).toHaveBeenCalledWith({
+      where: {
+        gender: 'FEMALE',
+        level: 'INTERMEDIATE',
+        frequencyPerWeek: 2,
+        accent: 'UPPER',
+        active: true,
+      },
+    });
+    expect(prisma.programTemplate.findMany).not.toHaveBeenCalled();
+    expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
+  });
+
+  it('offers one same-accent advanced program to an intermediate member', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.level = 'INTERMEDIATE';
+    const advanced = { ...nextTemplate, level: 'ADVANCED', code: 'WP2U' };
+    installPromotion(prisma, {
+      record,
+      responses: onboarding({ experience: 'INTERMEDIATE' }),
+      templates: [advanced],
+    });
+    prisma.workoutLog.groupBy.mockResolvedValue(atTarget());
+
+    const result = await service.getPromotion(userId);
+
+    expect(result).toMatchObject({
+      kind: 'level-up',
+      fromLevel: 'intermediate',
+      toLevel: 'advanced',
+      suggestions: [{ id: advanced.id, accent: 'UPPER', level: 'advanced' }],
+    });
+    expect(prisma.programTemplate.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        level: 'ADVANCED',
+        accent: 'UPPER',
+      }),
+    });
+  });
+
+  it('lists other advanced accents in template code order', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.level = 'ADVANCED';
+    installPromotion(prisma, {
+      record,
+      responses: onboarding({ experience: 'ADVANCED' }),
+      templates: [advancedLower, advancedFull],
+    });
+    prisma.programTemplate.findMany.mockResolvedValue([
+      advancedLower,
+      advancedFull,
+    ]);
+    prisma.workoutLog.groupBy.mockResolvedValue(atTarget());
+
+    const result = await service.getPromotion(userId);
+
+    expect(prisma.programTemplate.findMany).toHaveBeenCalledWith({
+      where: {
+        gender: 'FEMALE',
+        level: 'ADVANCED',
+        frequencyPerWeek: 2,
+        accent: { not: 'UPPER' },
+        active: true,
+      },
+      orderBy: { code: 'asc' },
+    });
+    expect(result?.suggestions.map((item) => item.code)).toEqual([
+      'WP2L',
+      'WP2N',
+    ]);
+    expect(result?.suggestions.map((item) => item.accent)).toEqual([
+      'LOWER',
+      'NONE',
+    ]);
+  });
+
+  it('offers upper and lower body when the current program is whole body', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.level = 'ADVANCED';
+    record.template.accent = 'NONE';
+    record.template.code = 'WP4';
+    const upper = {
+      ...advancedLower,
+      id: '77777777-7777-4777-8777-777777777777',
+      code: 'WP4U',
+      accent: 'UPPER',
+    };
+    const lower = { ...advancedLower, code: 'WP4L' };
+    installPromotion(prisma, {
+      record,
+      responses: onboarding({
+        experience: 'ADVANCED',
+        focusAreas: ['full_body'],
+      }),
+      templates: [lower, upper],
+    });
+    prisma.programTemplate.findMany.mockResolvedValue([lower, upper]);
+    prisma.workoutLog.groupBy.mockResolvedValue(atTarget());
+
+    const result = await service.getPromotion(userId);
+
+    expect(prisma.programTemplate.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ accent: { not: 'NONE' } }),
+      orderBy: { code: 'asc' },
+    });
+    expect(result?.suggestions.map((item) => item.accent)).toEqual([
+      'LOWER',
+      'UPPER',
+    ]);
+    expect(result?.suggestions.map((item) => item.code)).not.toContain('WP4');
+  });
+
+  it('returns an empty list at the target when nothing matches', async () => {
+    const { prisma, service } = createService();
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
+    prisma.workoutLog.groupBy.mockResolvedValue(atTarget());
+    prisma.programTemplate.findFirst.mockResolvedValue(null);
+
+    await expect(service.getPromotion(userId)).resolves.toEqual({
+      kind: 'level-up',
+      fromLevel: 'beginner',
+      toLevel: 'intermediate',
+      suggestions: [],
+    });
+    expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+
+    await expect(
+      service.acceptPromotion(userId, nextTemplate.id),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+  });
+
+  it('returns null before the session target', async () => {
+    const { prisma, service } = createService();
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
+
+    await expect(service.getPromotion(userId)).resolves.toBeNull();
+    expect(prisma.programTemplate.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rejects an id that is not in the eligible set', async () => {
+    const { prisma, service } = createService();
+    installPromotion(prisma);
+
+    await expect(
+      service.acceptPromotion(userId, advancedLower.id),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps history, starts a new cycle, and ignores a second accept', async () => {
+    const { prisma, service } = createService();
+    installPromotion(prisma);
+
+    const accepted = await service.acceptPromotion(userId, nextTemplate.id);
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
+    expect(prisma.onboardingResponses.update).toHaveBeenCalledWith({
+      where: { userId },
+      data: { experience: 'INTERMEDIATE', focusAreas: ['shoulders'] },
+    });
+    expect(prisma.workoutProgram.upsert).toHaveBeenCalledTimes(1);
+    expect(
+      prisma.workoutProgram.findUnique.mock.calls.some(
+        ([args]) =>
+          (args as { select?: { templateId?: boolean } } | undefined)?.select
+            ?.templateId,
+      ),
+    ).toBe(false);
+    expect(accepted.templateId).toBe(nextTemplate.id);
+    expect(accepted.assignedAt).not.toBe(startedAt.toISOString());
+    expect(accepted.programProgress).toEqual({ completed: 0, expected: 16 });
+    expect(prisma.workoutLog.deleteMany).not.toHaveBeenCalled();
+
+    const reset = await service.getMine(userId);
+    expect(reset.program?.programProgress).toEqual({
+      completed: 0,
+      expected: 16,
+    });
+
+    prisma.workoutLog.groupBy.mockResolvedValue([
+      { dayNumber: 1, _count: { _all: 1 } },
+    ]);
+    const later = await service.getMine(userId);
+    expect(later.program?.programProgress.completed).toBe(1);
+
+    await expect(
+      service.acceptPromotion(userId, nextTemplate.id),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.workoutProgram.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('assigns the chosen advanced zone and rewrites its focus', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.level = 'ADVANCED';
+    installPromotion(prisma, {
+      record,
+      responses: onboarding({ experience: 'ADVANCED' }),
+      templates: [advancedLower, advancedFull],
+    });
+    prisma.programTemplate.findMany.mockResolvedValue([
+      advancedLower,
+      advancedFull,
+    ]);
+
+    const accepted = await service.acceptPromotion(userId, advancedFull.id);
+
+    expect(prisma.onboardingResponses.update).toHaveBeenCalledWith({
+      where: { userId },
+      data: { experience: 'ADVANCED', focusAreas: ['full_body'] },
+    });
+    expect(accepted.templateId).toBe(advancedFull.id);
+    expect(accepted.accent).toBe('NONE');
+    expect(accepted.programProgress.completed).toBe(0);
+  });
+
+  it('rolls the onboarding write back with a failed assignment', async () => {
+    const { prisma, service } = createService();
+    const state = installPromotion(prisma);
+    const calls: string[] = [];
+    let inside = false;
+    prisma.$transaction.mockImplementation(async (fn) => {
+      inside = true;
+      try {
+        return await (fn as (db: unknown) => Promise<unknown>)(prisma);
+      } catch (error) {
+        state.restore();
+        throw error;
+      } finally {
+        inside = false;
+      }
+    });
+    prisma.onboardingResponses.update.mockImplementation(async (args) => {
+      calls.push(inside ? 'update' : 'update-outside');
+      return state.apply(args.data);
+    });
+    prisma.workoutProgram.upsert.mockImplementation(async () => {
+      calls.push(inside ? 'upsert' : 'upsert-outside');
+      throw new Error('assign failed');
+    });
+
+    await expect(
+      service.acceptPromotion(userId, nextTemplate.id),
+    ).rejects.toThrow('assign failed');
+    expect(calls).toEqual(['update', 'upsert']);
+    expect(state.responses().experience).toBe('BEGINNER');
+  });
+
+  it('counts the finished sessions inside the accept transaction', async () => {
+    const { prisma, service } = createService();
+    installPromotion(prisma);
+    const txLog = {
+      findFirst: vi.fn().mockResolvedValue(null),
+      groupBy: vi.fn().mockResolvedValue(atTarget()),
+    };
+    prisma.$transaction.mockImplementation(async (fn) =>
+      (fn as (db: unknown) => Promise<unknown>)({
+        ...prisma,
+        workoutLog: txLog,
+      }),
+    );
+
+    await service.acceptPromotion(userId, nextTemplate.id);
+
+    expect(txLog.groupBy).toHaveBeenCalled();
+    expect(prisma.workoutLog.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('retries a serialization conflict once', async () => {
+    const { prisma, service } = createService();
+    installPromotion(prisma);
+    const run = prisma.$transaction.getMockImplementation();
+    let attempts = 0;
+    prisma.$transaction.mockImplementation(async (fn, options) => {
+      attempts += 1;
+      if (attempts === 1) throw serializationConflict();
+      if (!run) throw new Error('missing transaction');
+      return run(fn, options);
+    });
+
+    const accepted = await service.acceptPromotion(userId, nextTemplate.id);
+
+    expect(attempts).toBe(2);
+    expect(accepted.templateId).toBe(nextTemplate.id);
+  });
+
+  it('does not report success when the retry also conflicts', async () => {
+    const { prisma, service } = createService();
+    installPromotion(prisma);
+    prisma.$transaction.mockRejectedValue(serializationConflict());
+
+    await expect(
+      service.acceptPromotion(userId, nextTemplate.id),
+    ).rejects.toMatchObject({ code: 'P2034' });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
   });
 });

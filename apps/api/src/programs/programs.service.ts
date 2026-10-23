@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   AssignedProgramLookupResponse,
   AssignedProgramResponse,
@@ -6,18 +10,35 @@ import type {
   CurrentProgramResponse,
   ExerciseResponse,
   ProgramAccent,
+  ProgramPromotion,
+  ProgramPromotionSuggestion,
   TrainingExperience,
 } from '@repo/shared-types';
 import type { ListExercisesQuery } from '@repo/validation';
-import type { MuscleGroup, Prisma } from '@prisma/client';
+import {
+  Prisma,
+  type MuscleGroup,
+  type ProgramAccent as Accent,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { matchProgramTemplate } from './match-template.js';
+import { focusAreaForAccent, matchProgramTemplate } from './match-template.js';
 import { expectedProgramSessions, nextProgramDay } from './program-cycle.js';
 
 const PROGRAM_NOT_AVAILABLE = {
   code: 'PROGRAM_NOT_AVAILABLE',
   message: 'No program is available for this track yet',
 };
+
+const PROMOTION_NOT_AVAILABLE = {
+  code: 'PROMOTION_NOT_AVAILABLE',
+  message: 'This program is no longer available to start',
+};
+
+const STORED_EXPERIENCE = {
+  beginner: 'BEGINNER',
+  intermediate: 'INTERMEDIATE',
+  advanced: 'ADVANCED',
+} as const satisfies Record<TrainingExperience, string>;
 
 const programInclude = {
   template: {
@@ -41,7 +62,7 @@ type ProgramRecord = Prisma.WorkoutProgramGetPayload<{
 
 type ProgramStore = Pick<
   Prisma.TransactionClient,
-  'onboardingResponses' | 'programTemplate' | 'workoutProgram'
+  'onboardingResponses' | 'programTemplate' | 'workoutProgram' | 'workoutLog'
 >;
 
 type AssignedProgramBase = Omit<
@@ -93,7 +114,7 @@ export class ProgramsService {
           include: programInclude,
         });
         if (!current) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
-        return this.withProgramCycle(userId, toAssignedProgram(current));
+        return this.withProgramCycle(userId, toAssignedProgram(current), db);
       }
     }
 
@@ -104,7 +125,7 @@ export class ProgramsService {
       include: programInclude,
     });
 
-    return this.withProgramCycle(userId, toAssignedProgram(program));
+    return this.withProgramCycle(userId, toAssignedProgram(program), db);
   }
 
   async getAssignedProgram(
@@ -120,7 +141,7 @@ export class ProgramsService {
   ): Promise<CurrentProgramResponse> {
     const program = await this.loadProgram(userId, db);
     if (!program) return { program: null };
-    return { program: await this.withProgramCycle(userId, program) };
+    return { program: await this.withProgramCycle(userId, program, db) };
   }
 
   async getAssigned(
@@ -133,8 +154,33 @@ export class ProgramsService {
     });
     if (!program) return { program: null };
     return {
-      program: await this.withProgramCycle(userId, toAssignedSummary(program)),
+      program: await this.withProgramCycle(
+        userId,
+        toAssignedSummary(program),
+        db,
+      ),
     };
+  }
+
+  async getPromotion(userId: string): Promise<ProgramPromotion | null> {
+    return this.promotionFor(userId, this.prisma);
+  }
+
+  async acceptPromotion(
+    userId: string,
+    templateId: string,
+  ): Promise<AssignedProgramResponse> {
+    try {
+      return await this.acceptPromotionOnce(userId, templateId);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      ) {
+        return this.acceptPromotionOnce(userId, templateId);
+      }
+      throw error;
+    }
   }
 
   async unassign(
@@ -163,6 +209,117 @@ export class ProgramsService {
     }));
   }
 
+  private acceptPromotionOnce(
+    userId: string,
+    templateId: string,
+  ): Promise<AssignedProgramResponse> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const promotion = await this.promotionFor(userId, tx);
+        const suggestion = promotion?.suggestions.find(
+          (item) => item.id === templateId,
+        );
+        if (!promotion || !suggestion) {
+          throw new BadRequestException(PROMOTION_NOT_AVAILABLE);
+        }
+
+        const responses = await tx.onboardingResponses.findUnique({
+          where: { userId },
+        });
+        if (!responses) {
+          throw new BadRequestException(PROMOTION_NOT_AVAILABLE);
+        }
+
+        const track = responses.programTrack === 'MALE' ? 'male' : 'female';
+        const current = matchProgramTemplate({
+          programTrack: track,
+          experience: responses.experience.toLowerCase(),
+          trainingFrequency: responses.trainingFrequency,
+          focusArea: responses.focusAreas[0],
+        });
+        const keepFocus =
+          promotion.kind === 'level-up' &&
+          current?.accent === suggestion.accent &&
+          responses.focusAreas[0] !== undefined;
+        const focus = keepFocus
+          ? responses.focusAreas[0]
+          : focusAreaForAccent(track, suggestion.accent as Accent);
+        if (!focus) throw new BadRequestException(PROMOTION_NOT_AVAILABLE);
+
+        await tx.onboardingResponses.update({
+          where: { userId },
+          data: {
+            experience: STORED_EXPERIENCE[suggestion.level],
+            focusAreas: [focus],
+          },
+        });
+
+        const assigned = await this.assign(userId, tx);
+        if (assigned.templateId !== templateId) {
+          throw new BadRequestException(PROMOTION_NOT_AVAILABLE);
+        }
+        return assigned;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  private async promotionFor(
+    userId: string,
+    db: ProgramStore,
+  ): Promise<ProgramPromotion | null> {
+    const { program } = await this.getMine(userId, db);
+    if (
+      !program ||
+      program.programProgress.completed < program.programProgress.expected
+    ) {
+      return null;
+    }
+
+    const track = program.gender;
+    const gender = track === 'male' ? 'MALE' : 'FEMALE';
+    const fromLevel = program.level;
+    const toLevel: TrainingExperience =
+      fromLevel === 'beginner' ? 'intermediate' : 'advanced';
+    const kind = fromLevel === 'advanced' ? 'zone-change' : 'level-up';
+
+    if (kind === 'level-up') {
+      const template = await db.programTemplate.findFirst({
+        where: {
+          gender,
+          level: STORED_EXPERIENCE[toLevel],
+          frequencyPerWeek: program.frequencyPerWeek,
+          accent: program.accent as Accent,
+          active: true,
+        },
+      });
+      const suggestions =
+        template && focusAreaForAccent(track, template.accent)
+          ? [toSuggestion(template)]
+          : [];
+      return { kind, fromLevel, toLevel, suggestions };
+    }
+
+    const templates = await db.programTemplate.findMany({
+      where: {
+        gender,
+        level: 'ADVANCED',
+        frequencyPerWeek: program.frequencyPerWeek,
+        accent: { not: program.accent as Accent },
+        active: true,
+      },
+      orderBy: { code: 'asc' },
+    });
+    return {
+      kind,
+      fromLevel,
+      toLevel,
+      suggestions: templates
+        .filter((template) => focusAreaForAccent(track, template.accent))
+        .map((template) => toSuggestion(template)),
+    };
+  }
+
   private async loadProgram(
     userId: string,
     db: ProgramStore,
@@ -177,6 +334,7 @@ export class ProgramsService {
   private async withProgramCycle<T extends AssignedProgramBase>(
     userId: string,
     program: T,
+    db: ProgramStore = this.prisma,
   ): Promise<
     T &
       Pick<
@@ -190,14 +348,14 @@ export class ProgramsService {
       templateId: program.templateId,
       completedAt: { gte: assignedAt },
     };
-    // Read logs here so program lookup does not depend on WorkoutsService.
+    // Count on the caller's store so an open transaction uses its own snapshot.
     const [latest, groups] = await Promise.all([
-      this.prisma.workoutLog.findFirst({
+      db.workoutLog.findFirst({
         where: loggedSinceAssignment,
         orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
         select: { dayNumber: true },
       }),
-      this.prisma.workoutLog.groupBy({
+      db.workoutLog.groupBy({
         by: ['dayNumber'],
         where: loggedSinceAssignment,
         _count: { _all: true },
@@ -223,6 +381,24 @@ export class ProgramsService {
       dayLogCounts,
     };
   }
+}
+
+function toSuggestion(template: {
+  id: string;
+  code: string;
+  name: string;
+  accent: Accent;
+  level: string;
+  frequencyPerWeek: number;
+}): ProgramPromotionSuggestion {
+  return {
+    id: template.id,
+    code: template.code,
+    name: template.name,
+    accent: template.accent,
+    level: template.level.toLowerCase() as TrainingExperience,
+    frequencyPerWeek: template.frequencyPerWeek,
+  };
 }
 
 export function toProgramSummary(

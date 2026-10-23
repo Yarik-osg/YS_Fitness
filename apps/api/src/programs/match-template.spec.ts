@@ -6,7 +6,7 @@ import {
   parseProgramCsv,
   type ParsedProgramFile,
 } from '../../prisma/parse-program-csv.js';
-import { matchProgramTemplate } from './match-template.js';
+import { focusAreaForAccent, matchProgramTemplate } from './match-template.js';
 
 const experiences = ['beginner', 'intermediate', 'advanced'] as const;
 const frequencies = ['2', '3', '4'] as const;
@@ -195,4 +195,15 @@ describe('matchProgramTemplate male track', () => {
       ).toMatchObject(match);
     },
   );
+});
+
+describe('focusAreaForAccent', () => {
+  it('picks the first allowed focus that maps back to the accent', () => {
+    expect(focusAreaForAccent('female', 'LOWER')).toBe('glutes');
+    expect(focusAreaForAccent('female', 'UPPER')).toBe('shoulders');
+    expect(focusAreaForAccent('female', 'NONE')).toBe('full_body');
+    expect(focusAreaForAccent('male', 'LEGS')).toBe('legs');
+    expect(focusAreaForAccent('male', 'CHEST')).toBe('chest');
+    expect(focusAreaForAccent('male', 'NONE')).toBe('full_body');
+  });
 });

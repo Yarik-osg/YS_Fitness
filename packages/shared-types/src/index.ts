@@ -253,6 +253,27 @@ export interface AssignedProgramLookupResponse {
   program: AssignedProgramSummary | null;
 }
 
+export interface ProgramPromotionSuggestion {
+  id: string;
+  code: string;
+  name: string;
+  accent: ProgramAccent;
+  level: TrainingExperience;
+  frequencyPerWeek: number;
+}
+
+export interface ProgramPromotion {
+  kind: 'level-up' | 'zone-change';
+  fromLevel: TrainingExperience;
+  toLevel: TrainingExperience;
+  suggestions: ProgramPromotionSuggestion[];
+}
+
+/** Sessions in one block: eight weeks at the program's weekly frequency. */
+export function expectedProgramSessions(frequencyPerWeek: number): number {
+  return frequencyPerWeek * 8;
+}
+
 export interface ProfileUpdateResponse {
   heightCm: number;
   weightKg: number;

@@ -616,6 +616,40 @@
       "kg": "kg",
       "sinceStart": "{delta} kg from the start",
       "sessionsLine": "{completed} / {expected} workouts",
+      "promotion": {
+        "levelUpTitle": "Next level",
+        "levelUpBody": "You finished this block. The focus stays the same.",
+        "zoneTitle": "Choose a new focus",
+        "zoneBody": "You finished this block. Choose an advanced program for a different zone.",
+        "emptyTitle": "No next program",
+        "emptyBody": "No suitable next program is available. Your current program stays as it is.",
+        "loadError": "The next program could not be loaded.",
+        "confirm": "Assign",
+        "close": "Keep",
+        "level": "Level",
+        "focus": "Focus",
+        "nextBlock": "Next block",
+        "accents": {
+          "NONE": "Whole body",
+          "UPPER": "Upper body",
+          "LOWER": "Lower body",
+          "BACK": "Back",
+          "CHEST": "Chest",
+          "SHOULDERS": "Shoulders",
+          "ARMS": "Arms",
+          "LEGS": "Legs"
+        },
+        "programs": {
+          "NONE": "Whole-body program",
+          "UPPER": "Upper-body program",
+          "LOWER": "Lower-body program",
+          "BACK": "Back-focus program",
+          "CHEST": "Chest-focus program",
+          "SHOULDERS": "Shoulder-focus program",
+          "ARMS": "Arm-focus program",
+          "LEGS": "Leg-focus program"
+        }
+      },
       "weightError": "Measurements could not be loaded.",
       "levels": {
         "beginner": "Beginner",

@@ -4,7 +4,13 @@ import type {
   ProgramExerciseResponse,
   TrainingExperience,
 } from '@repo/shared-types';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
@@ -724,7 +730,312 @@ describe('Dashboard program', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  it('keeps the promotion sheet closed before the session target', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/programs/me')) {
+        return json({
+          program: {
+            ...ASSIGNED_PROGRAM,
+            programProgress: { completed: 31, expected: 32 },
+          },
+        });
+      }
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(await screen.findByText('31 / 32')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes('/programs/promotion'),
+      ),
+    ).toBe(false);
+  });
+
+  it('names the program for each new focus', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion')) {
+          return json({
+            kind: 'zone-change',
+            fromLevel: 'advanced',
+            toLevel: 'advanced',
+            suggestions: [
+              {
+                id: NEXT_TEMPLATE_ID,
+                code: 'MP2B',
+                name: 'MP2B advanced back',
+                accent: 'BACK',
+                level: 'advanced',
+                frequencyPerWeek: 2,
+              },
+            ],
+          });
+        }
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Обери новий акцент',
+    });
+    expect(within(dialog).getByText('Спина')).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', {
+        name: 'Програма з акцентом на спину',
+      }),
+    ).toBeEnabled();
+  });
+
+  it('shows an error when the next program cannot be loaded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion')) return json({}, 500);
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(await screen.findByText('32 / 32')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Наступну програму не вдалося завантажити.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('offers the next program at the session target', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion') && init?.method === 'POST') {
+          return json(ASSIGNED_PROGRAM);
+        }
+        if (url.includes('/programs/promotion')) {
+          return json(LEVEL_UP);
+        }
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(await screen.findByText('32 / 32')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('dialog', { name: 'Наступний рівень' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Призначити' })).toBeEnabled();
+  });
+
+  it('shows no confirm action when no next program exists', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion')) {
+          return json({ ...LEVEL_UP, suggestions: [] });
+        }
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Наступної програми немає',
+    });
+    expect(
+      within(dialog).queryByRole('button', { name: 'Призначити' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Залишити' }),
+    ).toBeInTheDocument();
+  });
+
+  it('closes the promotion sheet without accepting', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion') && init?.method === 'POST') {
+          return json(LEVEL_UP);
+        }
+        if (url.includes('/programs/promotion')) return json(LEVEL_UP);
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      },
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    signInAsAlina();
+    renderDashboard();
+
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Наступний рівень' }),
+      ).getByRole('button', { name: 'Залишити' }),
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) =>
+          String(input).includes('/programs/promotion') &&
+          (init as RequestInit | undefined)?.method === 'POST',
+      ),
+    ).toBe(false);
+  });
+
+  it('disables confirm while the next program is being saved', async () => {
+    const user = userEvent.setup();
+    let release: (response: Response) => void = () => undefined;
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion') && init?.method === 'POST') {
+          return pending;
+        }
+        if (url.includes('/programs/promotion')) return json(LEVEL_UP);
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Наступний рівень',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Призначити' }),
+    );
+
+    expect(
+      within(dialog).getByRole('button', { name: 'Призначити' }),
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByRole('button', { name: 'Залишити' }),
+    ).toBeDisabled();
+
+    release(
+      json({
+        ...finishedProgram(),
+        level: 'intermediate',
+        programProgress: { completed: 0, expected: 32 },
+      }),
+    );
+    expect(await screen.findByText('Програму призначено.')).toBeInTheDocument();
+  });
+
+  it('refreshes and shows the assignment error when the offer is rejected', async () => {
+    const user = userEvent.setup();
+    let promotionReads = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion') && init?.method === 'POST') {
+          return json(
+            {
+              code: 'PROMOTION_NOT_AVAILABLE',
+              message: 'This program is no longer available to start',
+            },
+            400,
+          );
+        }
+        if (url.includes('/programs/promotion')) {
+          promotionReads += 1;
+          return json(promotionReads === 1 ? LEVEL_UP : null);
+        }
+        if (url.includes('/programs/me')) {
+          return json({ program: finishedProgram() });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Наступний рівень' }),
+      ).getByRole('button', { name: 'Призначити' }),
+    );
+
+    expect(
+      await screen.findByText('Програму не вдалося призначити.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Програму призначено.')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(promotionReads).toBeGreaterThan(1);
+  });
 });
+
+const NEXT_TEMPLATE_ID = '22222222-2222-4222-8222-222222222222';
+
+const LEVEL_UP = {
+  kind: 'level-up' as const,
+  fromLevel: 'beginner' as const,
+  toLevel: 'intermediate' as const,
+  suggestions: [
+    {
+      id: NEXT_TEMPLATE_ID,
+      code: 'WM2U',
+      name: 'WM2U intermediate upper',
+      accent: 'UPPER' as const,
+      level: 'intermediate' as const,
+      frequencyPerWeek: 2,
+    },
+  ],
+};
+
+function finishedProgram() {
+  return {
+    ...ASSIGNED_PROGRAM,
+    programProgress: { completed: 32, expected: 32 },
+  };
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

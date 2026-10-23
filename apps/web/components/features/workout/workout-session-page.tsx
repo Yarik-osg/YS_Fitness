@@ -22,6 +22,7 @@ import {
   SheetFooter,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { ProgramPromotionSheet } from '@/components/features/programs/program-promotion-sheet';
 import { Link } from '@/i18n/navigation';
 import { exerciseName } from '@/lib/exercise-name';
 import { useMyProgram } from '@/lib/hooks/use-programs';
@@ -575,6 +576,8 @@ function Completion({
 }: SavedSession) {
   const locale = useLocale();
   const t = useTranslations('workouts');
+  const program = useMyProgram();
+  const progress = program.data?.programProgress;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-background px-5 pt-14 pb-10 text-white">
@@ -650,6 +653,11 @@ function Completion({
         {t('completion.mottoLead')}{' '}
         <span className="text-lime">{t('completion.mottoAccent')}</span>
       </p>
+      <ProgramPromotionSheet
+        enabled={
+          progress !== undefined && progress.completed >= progress.expected
+        }
+      />
     </main>
   );
 }

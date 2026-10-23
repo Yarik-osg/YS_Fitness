@@ -3,6 +3,7 @@ import type {
   ProgramTrack,
   TrainingExperience,
 } from '@prisma/client';
+import { FEMALE_FOCUS_AREAS, MALE_FOCUS_AREAS } from '@repo/validation';
 
 const LEVELS = {
   beginner: 'BEGINNER',
@@ -60,4 +61,19 @@ export function matchProgramTemplate(input: {
     frequencyPerWeek,
     accent,
   };
+}
+
+/** First onboarding focus that `matchProgramTemplate` maps to `accent`. */
+export function focusAreaForAccent(
+  programTrack: 'female' | 'male',
+  accent: ProgramAccent,
+): string | undefined {
+  const table = programTrack === 'male' ? MALE_ACCENTS : FEMALE_ACCENTS;
+  const allowed = new Set<string>(
+    programTrack === 'male' ? MALE_FOCUS_AREAS : FEMALE_FOCUS_AREAS,
+  );
+  for (const [focus, mapped] of Object.entries(table)) {
+    if (mapped === accent && allowed.has(focus)) return focus;
+  }
+  return undefined;
 }

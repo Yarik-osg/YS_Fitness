@@ -5,6 +5,7 @@ import type {
   CurrentProgramResponse,
   ExerciseResponse,
   MuscleGroup,
+  ProgramPromotion,
 } from '@repo/shared-types';
 import { ApiClientError, apiRequest } from './client';
 
@@ -32,6 +33,17 @@ export async function getAssignedProgram() {
 export function assignProgram() {
   return apiRequest<AssignedProgramResponse>('/programs/assign', {
     method: 'POST',
+  });
+}
+
+export function getProgramPromotion() {
+  return apiRequest<ProgramPromotion | null>('/programs/promotion');
+}
+
+export function acceptPromotion(templateId: string) {
+  return apiRequest<AssignedProgramResponse>('/programs/promotion', {
+    method: 'POST',
+    body: { templateId },
   });
 }
 
