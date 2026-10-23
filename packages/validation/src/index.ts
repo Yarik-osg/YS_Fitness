@@ -425,3 +425,11 @@ export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;
 export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
 export type ListWorkoutLogsQuery = z.infer<typeof listWorkoutLogsQuerySchema>;
 export type WorkoutCalendarQuery = z.infer<typeof workoutCalendarQuerySchema>;
+
+export const acceptPromotionSchema = z
+  .object({
+    templateId: z.string().uuid(),
+  })
+  .strict();
+
+export type AcceptPromotionInput = z.infer<typeof acceptPromotionSchema>;

@@ -6,6 +6,7 @@ import { getWorkoutCalendar } from '@/lib/api/workouts';
 import {
   assignedProgramQueryKey,
   myProgramQueryKey,
+  promotionQueryKey,
 } from '@/lib/hooks/use-programs';
 import {
   useLogWorkout,
@@ -114,6 +115,7 @@ describe('useLogWorkout', () => {
         workoutLogsQueryKey,
         myProgramQueryKey,
         assignedProgramQueryKey,
+        promotionQueryKey,
       ]),
     );
   });

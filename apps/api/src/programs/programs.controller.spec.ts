@@ -15,6 +15,24 @@ describe('ProgramsController', () => {
     ).toEqual([SubscriptionGuard]);
   });
 
+  it('keeps the promotion routes behind SubscriptionGuard', () => {
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        ProgramsController.prototype.getPromotion,
+      ),
+    ).toEqual([SubscriptionGuard]);
+    expect(
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        ProgramsController.prototype.acceptPromotion,
+      ),
+    ).toEqual([SubscriptionGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, ProgramsController)).toEqual([
+      JwtAuthGuard,
+    ]);
+  });
+
   it('keeps GET /programs/assigned behind SubscriptionGuard', () => {
     expect(
       Reflect.getMetadata(

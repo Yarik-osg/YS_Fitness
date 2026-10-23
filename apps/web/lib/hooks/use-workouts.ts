@@ -10,6 +10,7 @@ import {
 import {
   assignedProgramQueryKey,
   myProgramQueryKey,
+  promotionQueryKey,
 } from '@/lib/hooks/use-programs';
 
 export const workoutLogsQueryKey = ['workouts', 'logs'] as const;
@@ -57,6 +58,7 @@ export function useLogWorkout() {
       void queryClient.invalidateQueries({
         queryKey: assignedProgramQueryKey,
       });
+      void queryClient.invalidateQueries({ queryKey: promotionQueryKey });
     },
   });
 }

@@ -105,6 +105,14 @@ vi.mock('@/lib/hooks/use-programs', () => ({
     isPending: programQueryState.pending,
     isFetched: !programQueryState.pending,
   }),
+  useProgramPromotion: () => ({
+    data: null,
+    isPending: false,
+  }),
+  useAcceptPromotion: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-workouts', () => ({

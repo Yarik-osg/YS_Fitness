@@ -14,6 +14,7 @@ import { ERROR_DURATION_MS } from '@/components/ui/toaster';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import { useLogout } from '@/lib/hooks/use-auth';
+import { ProgramPromotionSheet } from '@/components/features/programs/program-promotion-sheet';
 import { useAssignProgram, useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
 import { useMeasurements } from '@/lib/hooks/use-users';
@@ -146,6 +147,13 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             </Button>
           )}
         </section>
+
+        <ProgramPromotionSheet
+          enabled={
+            program.programProgress.completed >=
+            program.programProgress.expected
+          }
+        />
 
         <div className="grid grid-cols-2 gap-2.5">
           <Link
