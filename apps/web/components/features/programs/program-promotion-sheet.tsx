@@ -26,7 +26,7 @@ export function ProgramPromotionSheet({ enabled }: { enabled: boolean }) {
   const promotion = useProgramPromotion(enabled);
   const accept = useAcceptPromotion();
   const t = useTranslations('dashboard');
-  const offer = promotion.data ?? null;
+  const offer = enabled ? (promotion.data ?? null) : null;
   const offerKey = offer
     ? `${offer.kind}:${offer.suggestions.map((item) => item.id).join(',')}`
     : null;

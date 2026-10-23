@@ -1010,6 +1010,61 @@ describe('Dashboard program', () => {
     });
     expect(promotionReads).toBeGreaterThan(1);
   });
+
+  it('closes a stale offer once the new block is under the target', async () => {
+    const user = userEvent.setup();
+    let programReads = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/programs/promotion') && init?.method === 'POST') {
+          return json(
+            {
+              code: 'PROMOTION_NOT_AVAILABLE',
+              message: 'This program is no longer available to start',
+            },
+            400,
+          );
+        }
+        if (url.includes('/programs/promotion')) return json(LEVEL_UP);
+        if (url.includes('/programs/me')) {
+          programReads += 1;
+          return json({
+            program:
+              programReads === 1
+                ? finishedProgram()
+                : {
+                    ...finishedProgram(),
+                    level: 'intermediate',
+                    programProgress: { completed: 0, expected: 32 },
+                  },
+          });
+        }
+        return json({}, 404);
+      }),
+    );
+
+    signInAsAlina();
+    renderDashboard();
+
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Наступний рівень' }),
+      ).getByRole('button', { name: 'Призначити' }),
+    );
+
+    expect(
+      await screen.findByText('Програму не вдалося призначити.'),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('0 / 32')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Призначити' }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 const NEXT_TEMPLATE_ID = '22222222-2222-4222-8222-222222222222';
