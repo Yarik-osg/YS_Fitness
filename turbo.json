@@ -7,7 +7,7 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"],
-      "env": ["NEXT_PUBLIC_API_BASE_URL"]
+      "env": ["API_PROXY_TARGET", "NEXT_PUBLIC_API_BASE_URL"]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -22,10 +22,40 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["NEXT_PUBLIC_API_BASE_URL"]
+      "env": [
+        "API_PROXY_TARGET",
+        "APP_URL",
+        "COOKIE_SAME_SITE",
+        "CSRF_SECRET",
+        "DATABASE_URL",
+        "JWT_ACCESS_SECRET",
+        "JWT_ACCESS_TTL_SECONDS",
+        "JWT_REFRESH_SECRET",
+        "JWT_REFRESH_TTL_DAYS",
+        "MAIL_FROM",
+        "NEXT_PUBLIC_API_BASE_URL",
+        "NODE_ENV",
+        "PORT",
+        "PROGRESS_PHOTO_DIR",
+        "REFRESH_COOKIE_NAME",
+        "SEED_TRAINER_EMAIL",
+        "SEED_TRAINER_PASSWORD",
+        "SMTP_HOST",
+        "SMTP_PASSWORD",
+        "SMTP_PORT",
+        "SMTP_SECURE",
+        "SMTP_USER",
+        "WEB_ORIGINS"
+      ]
     },
     "test:e2e": {
-      "cache": false
+      "cache": false,
+      "env": [
+        "PROGRESS_PHOTO_DIR",
+        "SEED_TRAINER_EMAIL",
+        "SEED_TRAINER_PASSWORD",
+        "TEST_DATABASE_URL"
+      ]
     }
   }
 }
