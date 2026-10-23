@@ -20,11 +20,13 @@ export function resolveAffectedBase(run) {
       `${ref}^{commit}`,
     ]);
     if (verified.status !== 0) continue;
-    // A ref that is HEAD is the branch itself. Filtering against it selects nothing.
+    // A ref that is HEAD is the branch itself. Its merge base selects nothing.
     if (verified.stdout.trim() === headSha) continue;
     const base = run(['merge-base', 'HEAD', ref]);
-    if (base.status !== 0 || !base.stdout.trim()) continue;
-    return ref;
+    const baseSha = base.stdout?.trim() ?? '';
+    if (base.status !== 0 || !baseSha) continue;
+    // Turbo compares with the given commit, so the branch point has to be that commit.
+    return baseSha;
   }
 
   return null;
@@ -47,15 +49,15 @@ function runTests(filter) {
 }
 
 function main() {
-  const ref = resolveAffectedBase(git);
-  if (!ref) {
+  const baseSha = resolveAffectedBase(git);
+  if (!baseSha) {
     process.stderr.write(
       'No merge base with origin/main or main. Running the full test suite.\n',
     );
     process.exit(runTests(null).status ?? 1);
   }
 
-  process.exit(runTests(ref).status ?? 1);
+  process.exit(runTests(baseSha).status ?? 1);
 }
 
 const invoked = process.argv[1]

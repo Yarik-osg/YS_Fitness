@@ -45,26 +45,26 @@ function runner(cwd) {
   };
 }
 
-test('uses origin/main when it shares history with HEAD', () => {
+test('uses the merge base with origin/main when it shares history with HEAD', () => {
   const cwd = initRepo();
   try {
-    commit(cwd, 'base');
+    const base = commit(cwd, 'base');
     git(cwd, ['branch', 'origin/main']);
     git(cwd, ['checkout', '-b', 'feature']);
     commit(cwd, 'feature');
-    assert.equal(resolveAffectedBase(runner(cwd)), 'origin/main');
+    assert.equal(resolveAffectedBase(runner(cwd)), base);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('uses local main when origin/main is absent', () => {
+test('uses the merge base with local main when origin/main is absent', () => {
   const cwd = initRepo();
   try {
-    commit(cwd, 'base');
+    const base = commit(cwd, 'base');
     git(cwd, ['checkout', '-b', 'feature']);
     commit(cwd, 'feature');
-    assert.equal(resolveAffectedBase(runner(cwd)), 'main');
+    assert.equal(resolveAffectedBase(runner(cwd)), base);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -83,14 +83,33 @@ test('does not filter against the branch that is already HEAD', () => {
 test('skips an unrelated origin/main and uses main', () => {
   const cwd = initRepo();
   try {
-    commit(cwd, 'base');
+    const base = commit(cwd, 'base');
     git(cwd, ['checkout', '--orphan', 'unrelated']);
     git(cwd, ['commit', '--allow-empty', '-m', 'other']);
     git(cwd, ['branch', '-M', 'origin/main']);
     git(cwd, ['checkout', 'main']);
     git(cwd, ['checkout', '-b', 'feature']);
     commit(cwd, 'feature');
-    assert.equal(resolveAffectedBase(runner(cwd)), 'main');
+    assert.equal(resolveAffectedBase(runner(cwd)), base);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('uses the shared ancestor when origin/main and HEAD have diverged', () => {
+  const cwd = initRepo();
+  try {
+    const ancestor = commit(cwd, 'ancestor');
+    git(cwd, ['branch', 'origin/main']);
+    git(cwd, ['checkout', 'origin/main']);
+    commit(cwd, 'remote');
+    git(cwd, ['checkout', 'main']);
+    git(cwd, ['checkout', '-b', 'feature']);
+    const feature = commit(cwd, 'feature');
+    const base = resolveAffectedBase(runner(cwd));
+    assert.equal(base, ancestor);
+    assert.notEqual(base, feature);
+    assert.notEqual(base, git(cwd, ['rev-parse', 'origin/main']));
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
