@@ -116,11 +116,13 @@ Only variables prefixed with `NEXT_PUBLIC_` may be exposed to browser bundles. A
 pnpm format:check
 pnpm lint
 pnpm check-types
-pnpm test
 pnpm build
+pnpm test
 ```
 
-Git hooks format/lint staged files, type-check affected packages, enforce commit messages, and test affected packages before push. Hooks supplement CI; they do not replace it.
+Git hooks format/lint staged files, type-check affected packages, enforce commit messages, and test affected packages before push. Affected tests use the merge base with `origin/main`, or local `main` when that remote ref is missing. If neither base exists, the hook runs the full test suite. Hooks supplement CI; they do not replace it.
+
+API end-to-end tests are `pnpm test:e2e` and `pnpm --filter api test:e2e`. Both require `TEST_DATABASE_URL` to be a migrated database URL, and both refuse the database named by `DATABASE_URL` in `apps/api/.env`. CI applies migrations, then runs `pnpm test:e2e` with its own test URL.
 
 ## Pull requests
 

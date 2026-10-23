@@ -8,7 +8,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for domain boundaries and [CONTRIBUTING.
 
 - `apps/api` — NestJS REST API
 - `apps/web` — Next.js App Router web application
-- `apps/mobile` — planned Expo client (not created yet)
+- `apps/mobile` — planned Expo client. It is not part of this workspace yet and will be added later.
 - `packages/shared-types` — public API-contract types (never Prisma models)
 - `packages/validation` — shared Zod request schemas
 - `packages/i18n` — shared internationalization messages and locale utilities
@@ -166,18 +166,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md#subscriptions) for the payment-provider to
 
 ```bash
 pnpm format:check
-pnpm check-types
 pnpm lint
-pnpm test
+pnpm check-types
 pnpm build
+pnpm test
 ```
 
-End-to-end tests require a separate migrated PostgreSQL database. The e2e run seeds that database before the API boots, because startup refuses an empty exercise catalog:
+End-to-end tests are `pnpm test:e2e` from the repository root. `pnpm --filter api test:e2e` uses the same database check, then runs Vitest. Both exit when `TEST_DATABASE_URL` is missing or is not a URL with a database name. When `apps/api/.env` defines `DATABASE_URL`, that database name is refused. CI has no API `.env` and supplies its own test URL. Turbo runs the suite with caching off. Apply the schema before the run:
 
 ```bash
 DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter api exec prisma migrate deploy
-TEST_DATABASE_URL="postgresql://..." pnpm --filter api test:e2e
+TEST_DATABASE_URL="postgresql://..." pnpm test:e2e
 ```
+
+The e2e run seeds that database before the API boots, because startup refuses an empty exercise catalog.
 
 Husky runs staged formatting/linting and affected type checks before commits, commitlint enforces Conventional Commits, and affected tests run before pushes. Pull requests repeat all gates in GitHub Actions with a PostgreSQL service.
 
