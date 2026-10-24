@@ -253,7 +253,9 @@ function expectNoPlaceholderCards() {
 }
 
 function expectHomeCards() {
-  expect(screen.getAllByText(TEMPLATE_NAME)).toHaveLength(2);
+  expect(screen.getAllByText('Програма на верх тіла')).toHaveLength(2);
+  expect(screen.queryByText(TEMPLATE_NAME)).not.toBeInTheDocument();
+  expect(screen.queryByText('WB2U')).not.toBeInTheDocument();
   expect(screen.getAllByText('Тренування 02')).toHaveLength(2);
   expect(screen.getByText('2 рази', { exact: true })).toBeInTheDocument();
   expect(screen.getByText('9 / 16')).toBeInTheDocument();
@@ -483,6 +485,7 @@ describe('Dashboard program', () => {
     expect(
       screen.getByText('“Results come to those who do not stop.”'),
     ).toBeInTheDocument();
+    expect(screen.getAllByText('Upper-body program').length).toBeGreaterThan(0);
   });
 
   it('shows the Ukrainian label for every template level', async () => {

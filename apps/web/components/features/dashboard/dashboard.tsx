@@ -18,6 +18,7 @@ import { ProgramPromotionSheet } from '@/components/features/programs/program-pr
 import { useAssignProgram, useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
 import { useMeasurements } from '@/lib/hooks/use-users';
+import { useProgramTitle } from '@/lib/program-title';
 import {
   formatDelta,
   formatWeight,
@@ -78,6 +79,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
     day?.exercises.reduce((total, row) => total + row.sets, 0) ?? 0;
   const dayNumber = String(day?.dayNumber ?? 1).padStart(2, '0');
   const dayLabel = t('home.firstDay', { number: dayNumber });
+  const programTitle = useProgramTitle(program.accent);
   const quotes = messages.dashboard.home.quotes;
   const quote = quotes[new Date().getDay() % quotes.length] ?? quotes[0];
 
@@ -112,12 +114,9 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
 
       <div className="flex flex-col gap-3 px-4 pt-4">
         <section className="border-[1.5px] border-teal/12 bg-teal/4 px-[18px] py-[18px]">
-          <p className="mb-3 font-label text-[7px] font-semibold tracking-[0.18em] text-white/30 uppercase">
-            {t('home.today')}
-          </p>
-          <p className="mb-3.5 font-heading text-xl tracking-[0.04em] break-words text-teal">
-            {program.templateName}
-          </p>
+          <h2 className="mb-3.5 font-heading text-xl tracking-[0.04em] break-words text-teal">
+            {programTitle}
+          </h2>
           <div className="mb-4 flex flex-col gap-1.5">
             <Stat label={t('home.nextWorkout')} value={dayLabel} />
             <Stat
@@ -195,8 +194,8 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             <p className="text-[8.5px] leading-snug font-medium text-white/40">
               {t('home.timesShort', { count: program.frequencyPerWeek })}
             </p>
-            <p className="mt-1 line-clamp-2 font-label text-[7.5px] font-bold tracking-[0.08em] text-white/25">
-              {program.templateName}
+            <p className="mt-1 line-clamp-2 text-xs text-white/70">
+              {programTitle}
             </p>
             <Chevron className="absolute right-3 bottom-3 text-white/40" />
           </Link>

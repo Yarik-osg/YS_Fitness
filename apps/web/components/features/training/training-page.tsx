@@ -14,6 +14,7 @@ import { ClientNav } from '@/components/features/shell/client-nav';
 import { TrainingCalendar } from '@/components/features/training/training-calendar';
 import { Link } from '@/i18n/navigation';
 import { exerciseName } from '@/lib/exercise-name';
+import { useProgramTitle } from '@/lib/program-title';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 
 export function TrainingPage() {
@@ -63,7 +64,8 @@ function TrainingLoading({ label }: { label: string }) {
 }
 
 function ProgramDays({ program }: { program: AssignedProgramResponse }) {
-  const t = useTranslations('training');
+  const home = useTranslations('dashboard.home');
+  const programTitle = useProgramTitle(program.accent);
   const days = [...program.days].sort(
     (left, right) => left.dayNumber - right.dayNumber,
   );
@@ -73,12 +75,14 @@ function ProgramDays({ program }: { program: AssignedProgramResponse }) {
       <PageHeader />
       <div className="flex flex-col gap-3 px-4 pt-4">
         <section className="border-[1.5px] border-lime/15 bg-lime/4 px-[18px] py-5">
-          <p className="mb-2 font-label text-[7px] font-semibold tracking-[0.18em] text-white/30 uppercase">
-            {t('program')}
-          </p>
-          <h2 className="font-heading text-[22px] leading-tight tracking-[0.04em] break-words text-lime uppercase">
-            {program.templateName}
+          <h2 className="font-heading text-[22px] leading-tight break-words text-lime">
+            {programTitle}
           </h2>
+          <p className="mt-2 text-xs text-white/55">
+            {home(`levels.${program.level}`)}
+            {' · '}
+            {home('timesShort', { count: program.frequencyPerWeek })}
+          </p>
         </section>
         <TrainingCalendar
           frequencyPerWeek={program.frequencyPerWeek}

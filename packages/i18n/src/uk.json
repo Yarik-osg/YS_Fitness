@@ -598,7 +598,6 @@
     },
     "home": {
       "screenTitle": "Головна",
-      "today": "Сьогодні",
       "nextWorkout": "Наступне тренування",
       "firstDay": "Тренування {number}",
       "perWeek": "Тренувань на тиждень",
@@ -606,6 +605,7 @@
       "sessionCount": "{completed} / {expected}",
       "times": "{count} рази",
       "timesShort": "{count} рази/тиж.",
+      "programFallback": "Програма",
       "start": "Почати тренування →",
       "training": "Тренування",
       "summary": "{exercises, plural, one {# вправа} few {# вправи} many {# вправ} other {# вправ}} · {sets, plural, one {# підхід} few {# підходи} many {# підходів} other {# підходів}}",
@@ -839,7 +839,6 @@
   "training": {
     "brand": "YS FITNESS",
     "title": "Тренування",
-    "program": "Твоя програма",
     "dayTitle": "Тренування {number}",
     "next": "Наступне",
     "completedTimes": "{count, plural, one {Виконано: # раз цього циклу} few {Виконано: # рази цього циклу} many {Виконано: # разів цього циклу} other {Виконано: # разів цього циклу}}",
