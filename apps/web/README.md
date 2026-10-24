@@ -24,7 +24,7 @@ Login may include a safe internal `next` path (pathname plus query). After a suc
 
 ## Coach
 
-`/coach` lists clients. A name opens `/coach/clients/:userId`, a read-only file of the saved profile, quiz, assigned program, and subscription access. The header links back to `/coach`, switches locale, and logs out through `POST /auth/logout`. Success opens `/login`. A failed logout stays on the page and shows the error. `ys_web_session=coach` keeps a trainer or admin on the coach pages. It is not sent to the API.
+`/coach` lists clients. A name opens `/coach/clients/:userId`, a read-only file of the saved profile, quiz, assigned program, and subscription access. Below that, sessions, weight, strength, and progress photos load on their own. A failed section stays on the page and can be retried without hiding the others. Session pages do not drop workouts from an earlier program. Photo bytes are loaded with the signed-in request and dropped when the client changes. The header links back to `/coach`, switches locale, and logs out through `POST /auth/logout`. Success opens `/login`. A failed logout stays on the page and shows the error. `ys_web_session=coach` keeps a trainer or admin on the coach pages. It is not sent to the API.
 
 ## Onboarding persistence
 

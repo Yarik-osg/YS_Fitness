@@ -9,3 +9,14 @@ export class CoachClientParamsDto {
 
   userId!: string;
 }
+
+export const coachClientPhotoParamsSchema = coachClientParamsSchema.extend({
+  photoId: z.string().uuid(),
+});
+
+export class CoachClientPhotoParamsDto {
+  static readonly schema = coachClientPhotoParamsSchema;
+
+  userId!: string;
+  photoId!: string;
+}

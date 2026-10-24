@@ -31,6 +31,10 @@ vi.mock('@/lib/program-title', () => ({
   useProgramTitle: () => 'Upper-body program',
 }));
 
+vi.mock('./coach-client-history', () => ({
+  CoachClientHistory: () => null,
+}));
+
 const DETAIL: CoachClientDetail = {
   id: 'client-1',
   email: 'olena@example.com',

@@ -5,14 +5,12 @@ import type {
   StrengthChange,
   WeightMeasurement,
 } from '@repo/shared-types';
-import { areaY, defineChart, lineY } from '@tanstack/charts';
-import { Chart } from '@tanstack/charts/react';
-import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { createMeasurementSchema, WEIGHT_KG } from '@repo/validation';
 import { ArrowRight, Check, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { ProgressPhotos } from '@/components/features/progress/progress-photos';
+import { WeightChart } from '@/components/features/progress/weight-chart';
 import { NumberField } from '@/components/features/profile/number-field';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button } from '@/components/ui/button';
@@ -25,7 +23,6 @@ import {
   formatDelta,
   formatWeight,
   latestMeasurement,
-  oneLabelPerDay,
 } from '@/lib/weight-chart';
 import { inPeriod, type WeightPeriod } from '@/lib/weight-period';
 import {
@@ -197,7 +194,11 @@ function WeightCard({
               ) : visible.length === 0 ? (
                 <p className="mt-4 text-sm text-muted">{t('chartEmpty')}</p>
               ) : (
-                <WeightChart points={visible} label={t('chartLabel')} />
+                <WeightChart
+                  points={visible}
+                  label={t('chartLabel')}
+                  unit={t('kg')}
+                />
               )}
               <AddWeightForm defaultWeightKg={current?.weightKg} />
             </>
@@ -205,100 +206,6 @@ function WeightCard({
         </div>
       </div>
     </section>
-  );
-}
-
-function paddedDomain(values: number[]): [number, number] {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  if (min === max) return [min - 1, max + 1];
-  const pad = (max - min) * 0.06;
-  return [min - pad, max + pad];
-}
-
-function WeightChart({
-  points,
-  label,
-}: {
-  points: WeightMeasurement[];
-  label: string;
-}) {
-  const locale = useLocale();
-  const definition = useMemo(() => {
-    const times = points.map((point) => Date.parse(point.measuredAt));
-    return defineChart({
-      marks: [
-        areaY(points, {
-          x: (point) => Date.parse(point.measuredAt),
-          y: 'weightKg',
-          fill: 'var(--color-teal)',
-          fillOpacity: 0.14,
-          stroke: 'transparent',
-        }),
-        lineY(points, {
-          x: (point) => Date.parse(point.measuredAt),
-          y: 'weightKg',
-          points: true,
-          stroke: 'var(--color-teal)',
-          strokeWidth: 1.5,
-        }),
-      ],
-      margin: { top: 12, right: 8, bottom: 4, left: 28 },
-      clip: true,
-      scales: {
-        x: {
-          scale: scaleLinear(paddedDomain(times), [0, 1]),
-          grid: false,
-          axis: {
-            line: false,
-            ticks: {
-              values: oneLabelPerDay(times),
-              line: false,
-              format: (value) => formatDayMonth(new Date(value).toISOString()),
-            },
-            tickLabels: {
-              fontSize: 7,
-              thin: { minGap: 36, priority: 'ends' },
-            },
-          },
-        },
-        y: {
-          scale: scaleLinear(
-            paddedDomain(points.map((point) => point.weightKg)),
-            [0, 1],
-          ),
-          grid: { stroke: 'var(--color-line)' },
-          axis: {
-            line: false,
-            ticks: {
-              count: 3,
-              line: false,
-              format: (value) => formatWeight(locale, value),
-            },
-            tickLabels: { fontSize: 7 },
-          },
-        },
-      },
-      theme: {
-        foreground: 'var(--color-muted)',
-        muted: 'var(--color-muted)',
-        grid: 'var(--color-line)',
-        background: 'transparent',
-        palette: ['var(--color-teal)'],
-      },
-    });
-  }, [locale, points]);
-
-  return (
-    <div className="mb-4 h-28 w-full min-w-0">
-      <Chart
-        definition={definition}
-        ariaLabel={label}
-        className="h-full w-full max-w-full"
-        height={112}
-        initialWidth={280}
-      />
-    </div>
   );
 }
 
@@ -566,11 +473,4 @@ function StrengthRow({ change }: { change: StrengthChange }) {
       </p>
     </div>
   );
-}
-
-function formatDayMonth(value: string) {
-  const date = new Date(value);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${day}.${month}`;
 }

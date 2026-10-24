@@ -4,9 +4,17 @@ import type {
   CoachClientDetail,
   CoachClientOnboarding,
   CoachClientSummary,
+  CoachClientWorkoutLog,
+  CoachClientWorkoutsResponse,
   CoachClientsResponse,
+  ProgressPhotosResponse,
+  StrengthChangesResponse,
+  WeightMeasurementsResponse,
 } from '@repo/shared-types';
+import type { ListWorkoutLogsQuery } from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { UsersService } from '../users/users.service.js';
+import { WorkoutsService } from '../workouts/workouts.service.js';
 import {
   EXPERIENCE_FROM_PRISMA,
   PROGRAM_TRACK_FROM_PRISMA,
@@ -76,9 +84,30 @@ const clientDetailSelect = {
   },
 } satisfies Prisma.UserSelect;
 
+const workoutHistorySelect = {
+  id: true,
+  completedAt: true,
+  dayNumber: true,
+  template: { select: { code: true, name: true } },
+  sets: {
+    orderBy: [{ order: 'asc' as const }, { setNumber: 'asc' as const }],
+    select: {
+      order: true,
+      setNumber: true,
+      repsCompleted: true,
+      weightKg: true,
+      exercise: { select: { name: true, nameEn: true } },
+    },
+  },
+} satisfies Prisma.WorkoutLogSelect;
+
 @Injectable()
 export class CoachService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly users: UsersService,
+    private readonly workouts: WorkoutsService,
+  ) {}
 
   async listClients(): Promise<CoachClientsResponse> {
     const now = new Date();
@@ -116,6 +145,58 @@ export class CoachService {
     }
     return toDetail(user, now);
   }
+
+  async listWorkouts(
+    userId: string,
+    query: ListWorkoutLogsQuery,
+  ): Promise<CoachClientWorkoutsResponse> {
+    await this.requireClient(userId);
+    const where = { userId };
+    const [logs, total] = await Promise.all([
+      this.prisma.workoutLog.findMany({
+        where,
+        orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+        skip: query.offset,
+        take: query.limit,
+        select: workoutHistorySelect,
+      }),
+      this.prisma.workoutLog.count({ where }),
+    ]);
+    return { logs: logs.map(toWorkoutHistory), total };
+  }
+
+  async listMeasurements(userId: string): Promise<WeightMeasurementsResponse> {
+    await this.requireClient(userId);
+    return this.users.listMeasurements(userId);
+  }
+
+  async listStrength(userId: string): Promise<StrengthChangesResponse> {
+    await this.requireClient(userId);
+    return this.workouts.strength(userId);
+  }
+
+  async listProgressPhotos(userId: string): Promise<ProgressPhotosResponse> {
+    await this.requireClient(userId);
+    return this.users.listProgressPhotos(userId);
+  }
+
+  async readProgressPhoto(userId: string, photoId: string): Promise<Buffer> {
+    await this.requireClient(userId);
+    return this.users.readProgressPhoto(userId, photoId);
+  }
+
+  private async requireClient(userId: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, role: UserRole.CLIENT },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException({
+        code: 'CLIENT_NOT_FOUND',
+        message: 'Client not found.',
+      });
+    }
+  }
 }
 
 function toSummary(user: {
@@ -140,6 +221,27 @@ function toSummary(user: {
 type ClientDetailRow = Prisma.UserGetPayload<{
   select: typeof clientDetailSelect;
 }>;
+
+type WorkoutHistoryRow = Prisma.WorkoutLogGetPayload<{
+  select: typeof workoutHistorySelect;
+}>;
+
+function toWorkoutHistory(log: WorkoutHistoryRow): CoachClientWorkoutLog {
+  return {
+    id: log.id,
+    completedAt: log.completedAt.toISOString(),
+    dayNumber: log.dayNumber,
+    templateCode: log.template.code,
+    templateName: log.template.name,
+    sets: log.sets.map((set) => ({
+      order: set.order,
+      setNumber: set.setNumber,
+      repsCompleted: set.repsCompleted,
+      weightKg: set.weightKg?.toNumber() ?? null,
+      exercise: { name: set.exercise.name, nameEn: set.exercise.nameEn },
+    })),
+  };
+}
 
 function toDetail(user: ClientDetailRow, now: Date): CoachClientDetail {
   const subscription = user.subscriptions[0] ?? null;

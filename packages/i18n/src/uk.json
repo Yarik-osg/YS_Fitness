@@ -944,7 +944,11 @@
       "profile": "Профіль",
       "questionnaire": "Анкета",
       "program": "Програма",
-      "subscription": "Доступ"
+      "subscription": "Доступ",
+      "workouts": "Тренування",
+      "measurements": "Вага",
+      "strength": "Сила",
+      "photos": "Фото"
     },
     "fields": {
       "birthDate": "Дата народження",
@@ -976,6 +980,21 @@
       "ACTIVE": "Активний",
       "CANCELED": "Скасований",
       "EXPIRED": "Завершений"
-    }
+    },
+    "noWorkouts": "Тренувань ще немає.",
+    "noMeasurements": "Записів ваги ще немає.",
+    "noStrength": "Робочих підходів ще немає.",
+    "noPhotos": "Фото прогресу ще немає.",
+    "historyError": "Цей розділ не вдалося завантажити.",
+    "loadMore": "Ще",
+    "loadingMore": "Завантажуємо",
+    "showMore": "Показати всі",
+    "showLess": "Згорнути",
+    "exerciseCount": "{count, plural, one {# вправа} few {# вправи} many {# вправ} other {# вправи}}",
+    "day": "День {day}",
+    "reps": "{count, plural, one {# повтор} few {# повтори} many {# повторів} other {# повтору}}",
+    "kg": "кг",
+    "photoFailed": "Це фото не вдалося завантажити.",
+    "chartLabel": "Вага з часом"
   }
 }

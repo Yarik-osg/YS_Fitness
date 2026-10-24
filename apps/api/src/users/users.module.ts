@@ -10,5 +10,6 @@ import { UsersService } from './users.service.js';
   imports: [AuthModule, ProgramsModule, SubscriptionsModule],
   controllers: [UsersController],
   providers: [UsersService, LocalProgressPhotoStorage],
+  exports: [UsersService],
 })
 export class UsersModule {}

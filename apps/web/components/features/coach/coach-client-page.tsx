@@ -6,6 +6,7 @@ import type {
   CoachClientOnboarding,
 } from '@repo/shared-types';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
+import { CoachClientHistory } from '@/components/features/coach/coach-client-history';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
@@ -141,10 +142,7 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
         {detail.program ? (
           <div>
             <h2 className="font-heading text-xl text-teal">{title}</h2>
-            <p className="mt-2 text-sm text-muted">
-              {detail.program.templateName} · {detail.program.templateCode}
-            </p>
-            <p className="mt-1 text-sm text-ink">
+            <p className="mt-2 text-sm text-ink">
               <ChoiceText
                 path={
                   detail.program.level === 'advanced'
@@ -197,6 +195,8 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
           <p className="text-sm text-muted">{t('noSubscription')}</p>
         )}
       </Section>
+
+      <CoachClientHistory userId={detail.id} />
     </>
   );
 }

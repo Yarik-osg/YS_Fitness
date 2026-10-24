@@ -157,6 +157,28 @@ export interface CoachClientDetail {
   subscription: CoachClientSubscription | null;
 }
 
+export interface CoachClientWorkoutSet {
+  order: number;
+  setNumber: number;
+  repsCompleted: number;
+  weightKg: number | null;
+  exercise: { name: string; nameEn: string };
+}
+
+export interface CoachClientWorkoutLog {
+  id: string;
+  completedAt: string;
+  dayNumber: number;
+  templateCode: string;
+  templateName: string;
+  sets: CoachClientWorkoutSet[];
+}
+
+export interface CoachClientWorkoutsResponse {
+  logs: CoachClientWorkoutLog[];
+  total: number;
+}
+
 export interface MeResponse {
   id: string;
   email: string;

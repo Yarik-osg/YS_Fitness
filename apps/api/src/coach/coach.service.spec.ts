@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { activeAccessWhere } from '../subscriptions/subscription-access.js';
 import { CoachService } from './coach.service.js';
 
+function createService(
+  prisma: unknown,
+  users: unknown = {},
+  workouts: unknown = {},
+) {
+  return new CoachService(prisma as never, users as never, workouts as never);
+}
+
 describe('CoachService.listClients', () => {
   it('lists clients only and treats missing profile, program, and access as empty', async () => {
     const findMany = vi.fn().mockResolvedValue([
@@ -27,7 +35,7 @@ describe('CoachService.listClients', () => {
         subscriptions: [],
       },
     ]);
-    const service = new CoachService({ user: { findMany } } as never);
+    const service = createService({ user: { findMany } });
 
     const result = await service.listClients();
 
@@ -114,7 +122,7 @@ describe('CoachService.getClient', () => {
         ],
       })
       .mockResolvedValueOnce(null);
-    const service = new CoachService({ user: { findFirst } } as never);
+    const service = createService({ user: { findFirst } });
 
     const detail = await service.getClient(
       '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10',
@@ -151,5 +159,131 @@ describe('CoachService.getClient', () => {
     await expect(service.getClient('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('CoachService client history', () => {
+  const query = { limit: 20, offset: 0 };
+
+  function historyPrisma(client: { id: string } | null, logs: unknown[] = []) {
+    return {
+      user: { findFirst: vi.fn().mockResolvedValue(client) },
+      workoutLog: {
+        findMany: vi.fn().mockResolvedValue(logs),
+        count: vi.fn().mockResolvedValue(logs.length),
+      },
+    };
+  }
+
+  it('returns recorded sessions from every template and skips non-clients', async () => {
+    const older = {
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+      completedAt: new Date('2026-01-02T15:00:00.000Z'),
+      dayNumber: 1,
+      template: { code: 'OLD', name: 'Previous block' },
+      sets: [
+        {
+          order: 1,
+          setNumber: 1,
+          repsCompleted: 8,
+          weightKg: { toNumber: () => 20 },
+          exercise: { name: 'Тяга', nameEn: 'Row' },
+        },
+      ],
+    };
+    const newer = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+      completedAt: new Date('2026-01-02T15:00:00.000Z'),
+      dayNumber: 2,
+      template: { code: 'NEW', name: 'Current block' },
+      sets: [],
+    };
+    const prisma = historyPrisma({ id: 'client-1' }, [older, newer]);
+    const measurements = vi.fn();
+    const photos = vi.fn();
+    const readPhoto = vi.fn();
+    const strength = vi.fn();
+    const service = createService(
+      prisma,
+      {
+        listMeasurements: measurements,
+        listProgressPhotos: photos,
+        readProgressPhoto: readPhoto,
+      },
+      { strength },
+    );
+
+    const history = await service.listWorkouts('client-1', query);
+
+    expect(prisma.workoutLog.findMany).toHaveBeenCalledWith({
+      where: { userId: 'client-1' },
+      orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+      skip: 0,
+      take: 20,
+      select: expect.objectContaining({
+        template: { select: { code: true, name: true } },
+      }),
+    });
+    expect(history.total).toBe(2);
+    expect(history.logs.map((log) => log.templateCode)).toEqual(['OLD', 'NEW']);
+    expect(history.logs[0]).toEqual({
+      id: older.id,
+      completedAt: '2026-01-02T15:00:00.000Z',
+      dayNumber: 1,
+      templateCode: 'OLD',
+      templateName: 'Previous block',
+      sets: [
+        {
+          order: 1,
+          setNumber: 1,
+          repsCompleted: 8,
+          weightKg: 20,
+          exercise: { name: 'Тяга', nameEn: 'Row' },
+        },
+      ],
+    });
+    expect(JSON.stringify(history)).not.toContain('recommendation');
+    expect(JSON.stringify(history)).not.toContain('userId');
+
+    prisma.user.findFirst.mockResolvedValue(null);
+    await expect(
+      service.listWorkouts('trainer-1', query),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.workoutLog.findMany).toHaveBeenCalledTimes(1);
+    await expect(service.listMeasurements('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(service.listStrength('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(service.listProgressPhotos('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(
+      service.readProgressPhoto('missing', 'photo-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(measurements).not.toHaveBeenCalled();
+    expect(strength).not.toHaveBeenCalled();
+    expect(photos).not.toHaveBeenCalled();
+    expect(readPhoto).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty history and the existing measurement payload', async () => {
+    const prisma = historyPrisma({ id: 'client-1' }, []);
+    const measurements = vi.fn().mockResolvedValue({
+      measurements: [],
+      firstMeasurement: null,
+    });
+    const service = createService(prisma, { listMeasurements: measurements });
+
+    await expect(service.listWorkouts('client-1', query)).resolves.toEqual({
+      logs: [],
+      total: 0,
+    });
+    await expect(service.listMeasurements('client-1')).resolves.toEqual({
+      measurements: [],
+      firstMeasurement: null,
+    });
+    expect(measurements).toHaveBeenCalledWith('client-1');
   });
 });
