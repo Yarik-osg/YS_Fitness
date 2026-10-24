@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { PrismaClient, type ProgramTemplate } from '@prisma/client';
+import { lockAssignment } from '../src/programs/programs.service.js';
 
 const { databaseName, devDatabaseUrl } = createRequire(import.meta.url)(
   '../../../scripts/e2e-database.mjs',
@@ -103,6 +104,63 @@ describeWithDatabase('program template origin (e2e)', () => {
         await prisma.programTemplate.delete({ where: { id: trainerId } });
       }
       await prisma.user.delete({ where: { id: owner.id } });
+    }
+  });
+
+  it('holds the assignment lock until the first transaction commits', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `origin-lock-${randomBytes(4).toString('hex')}@example.com`,
+        passwordHash: 'not-a-login',
+        role: 'CLIENT',
+      },
+    });
+    let releaseFirst: () => void = () => undefined;
+    const firstMayFinish = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let entered = false;
+    let finished = false;
+    let first: Promise<unknown> | undefined;
+    let second: Promise<unknown> | undefined;
+
+    try {
+      first = prisma.$transaction(async (tx) => {
+        await lockAssignment(tx, user.id);
+        entered = true;
+        await firstMayFinish;
+      });
+      second = prisma.$transaction(async (tx) => {
+        await lockAssignment(tx, user.id);
+        finished = true;
+      });
+
+      const deadline = Date.now() + 2000;
+      let waiting = 0;
+      while (waiting === 0 && Date.now() < deadline) {
+        const rows = await prisma.$queryRaw<{ waiting: number }[]>`
+          SELECT COUNT(*)::int AS waiting
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event = 'advisory'
+        `;
+        waiting = Number(rows[0]?.waiting ?? 0);
+        if (waiting === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+      }
+      expect(waiting).toBeGreaterThan(0);
+      expect(entered).toBe(true);
+      expect(finished).toBe(false);
+
+      releaseFirst();
+      await first;
+      await second;
+      expect(finished).toBe(true);
+    } finally {
+      releaseFirst();
+      await Promise.allSettled([first, second]);
+      await prisma.user.delete({ where: { id: user.id } });
     }
   });
 });

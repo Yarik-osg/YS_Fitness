@@ -68,6 +68,7 @@ type ProgramRecord = Prisma.WorkoutProgramGetPayload<{
 
 type ProgramStore = Pick<
   Prisma.TransactionClient,
+  | '$executeRaw'
   | '$queryRaw'
   | 'onboardingResponses'
   | 'programTemplate'
@@ -116,7 +117,11 @@ export class ProgramsService {
         this.assignLocked(userId, tx, resolved),
       );
     } catch (error) {
-      // Postgres aborts the failed transaction. Recovery is a new one.
+      // Only the transaction opened here can be abandoned. Profile and
+      // promotion already hold a transaction, and Postgres will not let it
+      // continue after P2002. Those callers share lockAssignment, so a missing
+      // row waits instead of failing. A leftover unique violation still aborts
+      // their request; the client retries the whole request.
       if (!isUniqueViolation(error)) throw error;
       return this.recoverLostInsert(userId, resolved.onTrainerProgram, error);
     }
@@ -177,6 +182,11 @@ export class ProgramsService {
     }
   }
 
+  /** Takes the assignment lock before any other write in the caller's transaction. */
+  async holdAssignment(userId: string, db: ProgramStore): Promise<void> {
+    await lockAssignment(db, userId);
+  }
+
   async unassign(
     userId: string,
     db: ProgramStore = this.prisma,
@@ -214,6 +224,9 @@ export class ProgramsService {
   ): Promise<AssignedProgramResponse> {
     return this.prisma.$transaction(
       async (tx) => {
+        // Before onboarding or program writes, so this transaction and
+        // POST /programs/assign take the user lock in the same order.
+        await lockAssignment(tx, userId);
         const promotion = await this.promotionFor(userId, tx);
         const suggestion = promotion?.suggestions.find(
           (item) => item.id === templateId,
@@ -336,8 +349,12 @@ export class ProgramsService {
     db: ProgramStore,
   ): Promise<void> {
     const locked = await lockAssignment(db, userId);
+    // A miss deletes nothing. The user lock is still held, so a concurrent
+    // insert cannot commit a row for this delete to remove.
     if (!locked || locked.origin === 'TRAINER') return;
-    await db.workoutProgram.deleteMany({ where: { userId } });
+    await db.workoutProgram.deleteMany({
+      where: { userId, templateId: locked.templateId },
+    });
   }
 
   private async currentProgram(
@@ -546,16 +563,18 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-// Locks an existing workout_programs row until the transaction commits.
-// A missing row is not locked. Two inserts then rely on user_id uniqueness.
-// P2002 aborts that transaction; do not keep using it. A later writer can
-// still replace a trainer row if it updates workout_programs without this lock.
-// Profile and promotion pass their own transaction, so a lost insert fails
-// the whole request instead of recovering inside the aborted transaction.
-async function lockAssignment(
+// Serializes every assignment writer for this user until the surrounding
+// transaction commits, including when no workout_programs row exists.
+// FOR UPDATE alone cannot lock a missing row. assign, unassign, and a future
+// trainer assignment must call this before creating, updating, or deleting
+// that row. A writer that skips it can still change the row underneath them.
+export async function lockAssignment(
   db: ProgramStore,
   userId: string,
 ): Promise<AssignmentLock | null> {
+  await db.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0::bigint))
+  `;
   const rows = await db.$queryRaw<AssignmentLock[]>`
     SELECT pt.origin, wp.template_id AS "templateId"
     FROM workout_programs wp

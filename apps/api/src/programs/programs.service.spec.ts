@@ -72,6 +72,7 @@ function createService() {
       findUnique: vi.fn(),
       deleteMany: vi.fn(),
     },
+    $executeRaw: vi.fn().mockResolvedValue(0),
     $queryRaw: vi.fn().mockResolvedValue([]),
     exercise: { findMany: vi.fn() },
     workoutLog: {
@@ -323,8 +324,17 @@ describe('ProgramsService', () => {
     await service.unassign(userId);
 
     expect(prisma.workoutProgram.deleteMany).toHaveBeenCalledWith({
-      where: { userId },
+      where: { userId, templateId: 'template-1' },
     });
+  });
+
+  it('does not delete when no assignment row is locked', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    await service.unassign(userId);
+
+    expect(prisma.workoutProgram.deleteMany).not.toHaveBeenCalled();
   });
 
   it('does not replace or match over a trainer assignment', async () => {
@@ -418,6 +428,21 @@ describe('ProgramsService', () => {
     });
     expect(prisma.workoutProgram.create).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves a lost insert inside the caller transaction for that request to retry', async () => {
+    const { prisma, service } = createService();
+    const transaction = { ...prisma };
+    prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
+    prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.workoutProgram.create.mockRejectedValue(uniqueViolation());
+
+    await expect(
+      service.assign(userId, transaction as never),
+    ).rejects.toMatchObject({ code: 'P2002' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.create).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -771,6 +796,9 @@ describe('program promotion', () => {
 
     const accepted = await service.acceptPromotion(userId, nextTemplate.id);
 
+    expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.onboardingResponses.update.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'Serializable',
     });
