@@ -401,3 +401,23 @@ export interface WorkoutLogListResponse {
 export interface WorkoutCalendarResponse {
   logs: WorkoutLogResponse[];
 }
+
+export interface TrainerProgramTemplateSummary {
+  id: string;
+  code: string;
+  name: string;
+  gender: ProgramTrack;
+  level: TrainingExperience;
+  frequencyPerWeek: number;
+  accent: ProgramAccent;
+  active: boolean;
+  ownerId: string;
+}
+
+export interface TrainerProgramTemplateDetail extends TrainerProgramTemplateSummary {
+  days: ProgramDayResponse[];
+}
+
+export interface TrainerProgramTemplateListResponse {
+  templates: TrainerProgramTemplateSummary[];
+}

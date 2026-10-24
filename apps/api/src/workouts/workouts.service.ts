@@ -19,6 +19,7 @@ import { ProgramsService } from '../programs/programs.service.js';
 import { weightRecommendation } from './weight-recommendation.js';
 import {
   WorkoutsRepository,
+  type LockedTemplateDay,
   type WorkoutLogRecord,
 } from './workouts.repository.js';
 
@@ -47,48 +48,34 @@ export class WorkoutsService {
       });
     }
 
-    const day = program.days.find(
-      (entry) => entry.dayNumber === input.dayNumber,
+    assertPrescribedSets(
+      program.days.map((day) => ({
+        dayNumber: day.dayNumber,
+        exercises: day.exercises.map((row) => ({
+          exerciseId: row.exercise.id,
+          order: row.order,
+          sets: row.sets,
+        })),
+      })),
+      input,
     );
-    if (!day) {
-      throw new NotFoundException({
-        code: 'PROGRAM_DAY_NOT_FOUND',
-        message: 'That day is not on the assigned program',
-      });
-    }
 
-    const prescribedSets = new Map(
-      day.exercises.map((row) => [`${row.exercise.id}:${row.order}`, row.sets]),
-    );
-    const seenSets = new Set<string>();
-    for (const set of input.sets) {
-      const row = `${set.exerciseId}:${set.order}`;
-      const sets = prescribedSets.get(row);
-      if (sets === undefined) {
-        throw new BadRequestException({
-          code: 'EXERCISE_NOT_ON_DAY',
-          message: 'A logged exercise is not on this program day',
+    const created = await this.workouts.transaction(async (transaction) => {
+      // Same row an edit or delete locks first. The assignment advisory
+      // lock is a different key and is not taken on this path.
+      const days = await this.workouts.lockTemplateDays(
+        input.templateId,
+        transaction,
+      );
+      if (!days) {
+        throw new NotFoundException({
+          code: 'PROGRAM_DAY_NOT_FOUND',
+          message: 'That day is not on the assigned program',
         });
       }
-      if (set.setNumber > sets) {
-        throw new BadRequestException({
-          code: 'SET_NUMBER_OUT_OF_RANGE',
-          message: 'A logged set number exceeds the prescribed sets',
-        });
-      }
-      const key = `${row}:${set.setNumber}`;
-      if (seenSets.has(key)) {
-        throw new BadRequestException({
-          code: 'DUPLICATE_SET',
-          message: 'A set was logged more than once',
-        });
-      }
-      seenSets.add(key);
-    }
-
-    const created = await this.workouts.transaction((transaction) =>
-      this.workouts.create(userId, input, transaction),
-    );
+      assertPrescribedSets(days, input);
+      return this.workouts.create(userId, input, transaction);
+    });
     return toWorkoutLog(created);
   }
 
@@ -124,6 +111,48 @@ export class WorkoutsService {
       new Date(query.to),
     );
     return { logs: logs.map(toWorkoutLog) };
+  }
+}
+
+function assertPrescribedSets(
+  days: LockedTemplateDay[],
+  input: LogWorkoutInput,
+): void {
+  const day = days.find((entry) => entry.dayNumber === input.dayNumber);
+  if (!day) {
+    throw new NotFoundException({
+      code: 'PROGRAM_DAY_NOT_FOUND',
+      message: 'That day is not on the assigned program',
+    });
+  }
+
+  const prescribedSets = new Map(
+    day.exercises.map((row) => [`${row.exerciseId}:${row.order}`, row.sets]),
+  );
+  const seenSets = new Set<string>();
+  for (const set of input.sets) {
+    const row = `${set.exerciseId}:${set.order}`;
+    const sets = prescribedSets.get(row);
+    if (sets === undefined) {
+      throw new BadRequestException({
+        code: 'EXERCISE_NOT_ON_DAY',
+        message: 'A logged exercise is not on this program day',
+      });
+    }
+    if (set.setNumber > sets) {
+      throw new BadRequestException({
+        code: 'SET_NUMBER_OUT_OF_RANGE',
+        message: 'A logged set number exceeds the prescribed sets',
+      });
+    }
+    const key = `${row}:${set.setNumber}`;
+    if (seenSets.has(key)) {
+      throw new BadRequestException({
+        code: 'DUPLICATE_SET',
+        message: 'A set was logged more than once',
+      });
+    }
+    seenSets.add(key);
   }
 }
 

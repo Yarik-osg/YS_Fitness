@@ -32,6 +32,11 @@ const logWithSets = {
 
 export type WorkoutLogRecord = Prisma.WorkoutLogGetPayload<typeof logWithSets>;
 
+export type LockedTemplateDay = {
+  dayNumber: number;
+  exercises: { exerciseId: string; order: number; sets: number }[];
+};
+
 type Client = Prisma.TransactionClient;
 
 @Injectable()
@@ -40,6 +45,33 @@ export class WorkoutsRepository {
 
   transaction<T>(work: (client: Client) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(work);
+  }
+
+  async lockTemplateDays(
+    templateId: string,
+    client: Client,
+  ): Promise<LockedTemplateDay[] | null> {
+    const locked = await client.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM program_templates
+      WHERE id = CAST(${templateId} AS uuid)
+      FOR UPDATE
+    `;
+    if (!locked[0]) return null;
+    const template = await client.programTemplate.findUnique({
+      where: { id: templateId },
+      select: {
+        days: {
+          select: {
+            dayNumber: true,
+            exercises: {
+              select: { exerciseId: true, order: true, sets: true },
+            },
+          },
+        },
+      },
+    });
+    return template?.days ?? null;
   }
 
   create(

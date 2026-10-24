@@ -433,3 +433,85 @@ export const acceptPromotionSchema = z
   .strict();
 
 export type AcceptPromotionInput = z.infer<typeof acceptPromotionSchema>;
+
+const PROGRAM_ACCENTS = [
+  'NONE',
+  'UPPER',
+  'LOWER',
+  'BACK',
+  'CHEST',
+  'SHOULDERS',
+  'ARMS',
+  'LEGS',
+] as const;
+
+const trainerTemplateExerciseSchema = z
+  .object({
+    exerciseId: z.string().uuid(),
+    order: z.number().int().positive(),
+    sets: z.number().int().positive(),
+    repsMin: z.number().int().positive(),
+    repsMax: z.number().int().positive().max(999),
+    allowsAbsAddon: z.boolean(),
+  })
+  .strict()
+  .refine((exercise) => exercise.repsMin <= exercise.repsMax, {
+    path: ['repsMin'],
+    message: 'repsMin must not exceed repsMax',
+  });
+
+const trainerTemplateDaySchema = z
+  .object({
+    dayNumber: z.number().int().positive(),
+    exercises: z.array(trainerTemplateExerciseSchema).min(1),
+  })
+  .strict();
+
+export const trainerTemplateBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    gender: z.enum(['female', 'male']),
+    level: z.enum(['beginner', 'intermediate', 'advanced']),
+    frequencyPerWeek: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+    accent: z.enum(PROGRAM_ACCENTS),
+    days: z.array(trainerTemplateDaySchema).min(1),
+  })
+  .strict()
+  .superRefine((template, ctx) => {
+    const dayNumbers = [...template.days.map((day) => day.dayNumber)].sort(
+      (left, right) => left - right,
+    );
+    const expected = Array.from(
+      { length: template.frequencyPerWeek },
+      (_, index) => index + 1,
+    );
+    if (
+      dayNumbers.length !== expected.length ||
+      dayNumbers.some((dayNumber, index) => dayNumber !== expected[index])
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['days'],
+        message: 'Days must be exactly 1 through frequencyPerWeek',
+      });
+    }
+    template.days.forEach((day, index) => {
+      const orders = day.exercises.map((exercise) => exercise.order);
+      if (new Set(orders).size !== orders.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['days', index, 'exercises'],
+          message: 'Exercise order must be unique within the day',
+        });
+      }
+    });
+  });
+
+export const trainerTemplateParamsSchema = z
+  .object({
+    templateId: z.string().uuid(),
+  })
+  .strict();
+
+export type TrainerTemplateBody = z.infer<typeof trainerTemplateBodySchema>;
+export type TrainerTemplateParams = z.infer<typeof trainerTemplateParamsSchema>;
