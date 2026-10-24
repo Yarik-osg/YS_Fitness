@@ -322,6 +322,11 @@ describeWithDatabase('coach clients (e2e)', () => {
       .set('Authorization', trainer.authorization)
       .expect(404);
     expect(trainerAsClient.body.code).toBe('CLIENT_NOT_FOUND');
+    const adminAsClient = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${admin.id}`)
+      .set('Authorization', trainer.authorization)
+      .expect(404);
+    expect(adminAsClient.body.code).toBe('CLIENT_NOT_FOUND');
 
     const trainerFile = await request(app.getHttpServer())
       .get(path)
