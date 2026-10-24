@@ -102,7 +102,7 @@ function WorkoutSection({
           <Button
             variant="outline"
             size="sm"
-            className="mt-4"
+            className="mt-4 rounded-lg"
             disabled={query.isFetchingNextPage}
             onClick={() => void query.fetchNextPage()}
           >
@@ -146,8 +146,9 @@ function MeasurementSection({
         emptyText={t('noMeasurements')}
       >
         {latest ? (
-          <p className="mb-3 text-sm text-ink tabular-nums">
-            {formatWeight(locale, latest.weightKg)} {t('kg')}
+          <p className="mb-4 font-heading text-3xl leading-none text-ink tabular-nums">
+            {formatWeight(locale, latest.weightKg)}{' '}
+            <span className="text-sm font-normal text-muted">{t('kg')}</span>
           </p>
         ) : null}
         <WeightChart points={points} label={t('chartLabel')} unit={t('kg')} />
@@ -249,12 +250,14 @@ function PhotoSection({
                 <img
                   src={urls[photo.id]}
                   alt={formatWhen(locale, photo.createdAt)}
-                  className="aspect-[3/4] w-full object-cover"
+                  className="aspect-[3/4] w-full rounded-lg border border-line object-cover"
                 />
               ) : failed[photo.id] ? (
-                <p className="text-sm text-amber">{t('photoFailed')}</p>
+                <p className="flex aspect-[3/4] items-center text-sm text-amber">
+                  {t('photoFailed')}
+                </p>
               ) : (
-                <Skeleton className="aspect-[3/4] w-full" />
+                <Skeleton className="aspect-[3/4] w-full rounded-lg" />
               )}
             </li>
           ))}
@@ -275,10 +278,14 @@ function HistorySection({
 }) {
   return (
     <section
-      className={`border border-line px-4 ${compact ? 'mt-6 py-3' : 'mt-8 py-4'}`}
+      className={
+        compact
+          ? 'mt-10'
+          : 'mt-8 rounded-lg border border-line bg-panel px-4 py-4'
+      }
     >
       <h2
-        className={`font-heading text-lg text-ink uppercase ${compact ? 'mb-3' : 'mb-4'}`}
+        className={`font-heading text-base text-ink ${compact ? 'mb-3' : 'mb-4'}`}
       >
         {title}
       </h2>
@@ -353,7 +360,7 @@ function StrengthRow({
         </p>
       </div>
       <p
-        className={`border px-2.5 py-1 font-heading text-base tabular-nums ${
+        className={`rounded-md border px-2 py-0.5 font-heading text-sm tabular-nums ${
           deltaKg < 0
             ? 'border-amber/30 text-amber'
             : 'border-teal/30 text-teal'
@@ -383,13 +390,15 @@ function SessionLog({
   const panelId = `session-${log.id}`;
 
   return (
-    <article className="min-w-0">
+    <article
+      className={`min-w-0 rounded-lg px-3 py-3 ${open ? 'bg-[var(--color-wash)]' : ''}`}
+    >
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={onToggle}
-        className="flex w-full items-start justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex w-full items-start justify-between gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <span>
           <span className="block text-sm whitespace-nowrap text-ink tabular-nums">
@@ -403,7 +412,7 @@ function SessionLog({
         </span>
         <ChevronDown
           aria-hidden="true"
-          className={`mt-0.5 size-4 shrink-0 text-muted ${open ? 'rotate-180' : ''}`}
+          className={`mt-0.5 size-4 shrink-0 text-muted motion-safe:transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
       <Collapse open={open} id={panelId}>
@@ -426,7 +435,7 @@ function ExerciseList({
   const restId = `session-${logId}-rest`;
 
   return (
-    <div className="mt-3 flex flex-col gap-3">
+    <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
       {preview.map((group) => (
         <ExerciseGroup key={group[0]?.order} group={group} />
       ))}
@@ -463,12 +472,16 @@ function ExerciseGroup({ group }: { group: CoachClientWorkoutSet[] }) {
         {group.map((set) => (
           <li
             key={`${set.order}-${set.setNumber}`}
-            className="text-sm text-muted tabular-nums"
+            className="flex items-baseline justify-between gap-4 text-sm tabular-nums"
           >
-            {t('reps', { count: set.repsCompleted })}
-            {set.weightKg === null
-              ? ''
-              : ` · ${formatWeight(locale, set.weightKg)} ${t('kg')}`}
+            <span className="text-muted">
+              {t('reps', { count: set.repsCompleted })}
+            </span>
+            {set.weightKg === null ? null : (
+              <span className="text-ink">
+                {formatWeight(locale, set.weightKg)} {t('kg')}
+              </span>
+            )}
           </li>
         ))}
       </ul>
@@ -492,12 +505,12 @@ function ShowMore({
       aria-expanded={open}
       aria-controls={controls}
       onClick={onToggle}
-      className="mt-3 inline-flex items-center gap-1 self-start text-xs whitespace-nowrap text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="mt-3 inline-flex items-center gap-1 self-start text-xs whitespace-nowrap text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-safe:transition-colors"
     >
       {open ? t('showLess') : t('showMore')}
       <ChevronDown
         aria-hidden="true"
-        className={`size-3.5 ${open ? 'rotate-180' : ''}`}
+        className={`size-3.5 motion-safe:transition-transform ${open ? 'rotate-180' : ''}`}
       />
     </button>
   );

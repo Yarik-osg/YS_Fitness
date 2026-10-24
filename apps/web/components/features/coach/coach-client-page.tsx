@@ -24,7 +24,7 @@ export function CoachClientPage({ userId }: { userId: string }) {
     <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
       <Link
         href="/coach"
-        className="font-label text-xs font-semibold tracking-[0.12em] text-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="text-sm text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-safe:transition-colors"
       >
         {t('back')}
       </Link>
@@ -50,7 +50,7 @@ export function CoachClientPage({ userId }: { userId: string }) {
           <Button
             variant="outline"
             size="sm"
-            className="whitespace-nowrap"
+            className="rounded-lg whitespace-nowrap"
             onClick={() => void client.refetch()}
           >
             {t('retry')}
@@ -71,21 +71,35 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
 
   return (
     <>
-      <h1 className="mt-4 font-heading text-4xl leading-none text-ink uppercase">
+      <h1 className="mt-4 font-heading text-3xl leading-none text-ink">
         {detail.name?.trim() ? detail.name : t('unnamed')}
       </h1>
       <p className="mt-3 text-sm text-ink">{detail.email}</p>
       <p className="mt-1 text-sm text-muted">
         {t('joined')} {joined}
       </p>
-      <p
-        className={`mt-1 text-sm ${detail.onboardingCompleted ? 'text-lime' : 'text-muted'}`}
-      >
-        {t('onboarding')}{' '}
-        {detail.onboardingCompleted
-          ? t('onboardingDone')
-          : t('onboardingMissing')}
-      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <StatusPill
+          label={t('onboarding')}
+          on={detail.onboardingCompleted}
+          yes={t('onboardingDone')}
+          no={t('onboardingMissing')}
+        />
+        <StatusPill
+          label={t('program')}
+          on={detail.program !== null}
+          yes={t('programAssigned')}
+          no={t('programMissing')}
+        />
+        {detail.subscription ? (
+          <StatusPill
+            label={t('subscription')}
+            on={detail.subscription.active}
+            yes={t('subscriptionActive')}
+            no={t('subscriptionInactive')}
+          />
+        ) : null}
+      </div>
 
       <Section title={t('sections.profile')}>
         {detail.profile ? (
@@ -138,10 +152,10 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
         )}
       </Section>
 
-      <Section title={t('sections.program')} className="mt-10">
+      <Section title={t('sections.program')}>
         {detail.program ? (
           <div>
-            <h2 className="font-heading text-xl text-teal">{title}</h2>
+            <h2 className="font-heading text-xl text-ink">{title}</h2>
             <p className="mt-2 text-sm text-ink">
               <ChoiceText
                 path={
@@ -164,10 +178,7 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
         )}
       </Section>
 
-      <Section
-        title={t('sections.subscription')}
-        className="mt-8 border border-line px-4 py-3"
-      >
+      <Section title={t('sections.subscription')}>
         {detail.subscription ? (
           <div>
             <p
@@ -344,18 +355,35 @@ function readMessage(source: unknown, path: string): string | null {
   return typeof current === 'string' ? current : null;
 }
 
-function Section({
-  title,
-  children,
-  className = 'mt-8 border border-line px-4 py-4',
+function StatusPill({
+  label,
+  on,
+  yes,
+  no,
 }: {
-  title: string;
-  children: ReactNode;
-  className?: string;
+  label: string;
+  on: boolean;
+  yes: string;
+  no: string;
 }) {
   return (
-    <section className={className}>
-      <h2 className="mb-4 font-heading text-lg text-ink uppercase">{title}</h2>
+    <span className="inline-flex items-center gap-2">
+      <span className="text-xs text-muted">{label}</span>
+      <span
+        className={`inline-flex rounded-full px-2 py-0.5 text-xs ${
+          on ? 'bg-lime/10 text-lime' : 'text-muted'
+        }`}
+      >
+        {on ? yes : no}
+      </span>
+    </span>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-8 rounded-lg border border-line bg-panel px-4 py-4">
+      <h2 className="mb-4 font-heading text-base text-ink">{title}</h2>
       {children}
     </section>
   );
@@ -364,7 +392,7 @@ function Section({
 function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-sm text-muted">{label}</dt>
+      <dt className="text-xs text-muted">{label}</dt>
       <dd className="mt-1 text-sm break-words text-ink">{value}</dd>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { CoachClientsResponse } from '@repo/shared-types';
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
 import { CoachClientsPage } from './coach-clients-page';
@@ -25,6 +26,7 @@ const roster = vi.hoisted(() => ({
     isPending: false,
     isError: false,
     data: undefined as CoachClientsResponse | undefined,
+    refetch: vi.fn(),
   },
 }));
 
@@ -57,11 +59,21 @@ function renderPage(locale: 'uk' | 'en' = 'uk') {
 describe('CoachClientsPage', () => {
   beforeEach(() => {
     cleanup();
-    roster.current = { isPending: false, isError: false, data: undefined };
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: undefined,
+      refetch: vi.fn(),
+    };
   });
 
   it('shows a loading state', () => {
-    roster.current = { isPending: true, isError: false, data: undefined };
+    roster.current = {
+      isPending: true,
+      isError: false,
+      data: undefined,
+      refetch: vi.fn(),
+    };
     renderPage();
     expect(
       screen.getByRole('main').querySelector('[aria-busy="true"]'),
@@ -73,6 +85,7 @@ describe('CoachClientsPage', () => {
       isPending: false,
       isError: false,
       data: { clients: [] },
+      refetch: vi.fn(),
     };
     renderPage();
     expect(screen.getByText('Клієнтів ще немає.')).toBeInTheDocument();
@@ -80,7 +93,12 @@ describe('CoachClientsPage', () => {
   });
 
   it('shows clients in Ukrainian and English', () => {
-    roster.current = { isPending: false, isError: false, data: CLIENTS };
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: CLIENTS,
+      refetch: vi.fn(),
+    };
     const view = renderPage('uk');
     expect(
       screen.getByRole('heading', { name: 'Клієнти' }),
@@ -107,11 +125,18 @@ describe('CoachClientsPage', () => {
     expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
-  it('shows an error', () => {
-    roster.current = { isPending: false, isError: true, data: undefined };
+  it('shows an error and retries', async () => {
+    roster.current = {
+      isPending: false,
+      isError: true,
+      data: undefined,
+      refetch: vi.fn(),
+    };
     renderPage('en');
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Clients could not be loaded.',
     );
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(roster.current.refetch).toHaveBeenCalledTimes(1);
   });
 });

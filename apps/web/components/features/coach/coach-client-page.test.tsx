@@ -120,7 +120,7 @@ describe('CoachClientPage', () => {
     expect(screen.getByText('Option 3')).toBeInTheDocument();
     expect(screen.getByText('Option 4')).toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getAllByText('Inactive')).toHaveLength(2);
     expect(screen.getByText(/Pending/)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Back to clients' }),

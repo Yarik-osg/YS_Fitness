@@ -3,17 +3,22 @@
 import { useState, type ReactNode } from 'react';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
-import { Link, useRouter } from '@/i18n/navigation';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { useLogout } from '@/lib/hooks/use-auth';
 import { useTranslations } from 'next-intl';
 
+const focusRing =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
 export function CoachShell({ children }: { children: ReactNode }) {
   const t = useTranslations('coach');
   const auth = useTranslations('auth');
+  const pathname = usePathname();
   const router = useRouter();
   const logout = useLogout();
   const [error, setError] = useState<string | null>(null);
+  const onRoster = pathname === '/coach';
 
   async function signOut() {
     setError(null);
@@ -26,29 +31,36 @@ export function CoachShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="coach-app min-h-screen">
       <header className="border-b border-line">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex items-baseline gap-4">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-6">
             <Link
               href="/coach"
-              className="font-heading text-2xl leading-none text-ink uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className={`font-heading text-lg leading-none tracking-wide text-ink uppercase ${focusRing}`}
             >
               YS Fitness
             </Link>
             <Link
               href="/coach"
-              className="font-label text-xs font-semibold tracking-[0.12em] text-muted uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              aria-current={onRoster ? 'page' : undefined}
+              className={`font-label text-xs font-semibold motion-safe:transition-colors ${focusRing} ${
+                onRoster
+                  ? 'text-ink shadow-[inset_0_-1px_0_0_var(--color-teal)]'
+                  : 'text-muted hover:text-ink'
+              }`}
             >
               {t('roster')}
             </Link>
           </div>
-          <div className="flex items-center gap-3">
-            <LocaleSwitcher />
+          <div className="flex items-center gap-2">
+            <LocaleSwitcher
+              className={`inline-flex h-10 items-center rounded-lg px-3 text-xs font-semibold tracking-normal text-muted normal-case hover:text-ink motion-safe:transition-colors ${focusRing}`}
+            />
             <Button
               variant="outline"
               size="sm"
-              className="w-fit whitespace-nowrap"
+              className="w-fit rounded-lg whitespace-nowrap"
               onClick={() => void signOut()}
               disabled={logout.isPending}
             >
