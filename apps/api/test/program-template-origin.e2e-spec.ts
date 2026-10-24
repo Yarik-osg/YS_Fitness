@@ -130,6 +130,7 @@ describeWithDatabase('program template origin (e2e)', () => {
         entered = true;
         await firstMayFinish;
       });
+      await waitUntil(() => entered);
       second = prisma.$transaction(async (tx) => {
         await lockAssignment(tx, user.id);
         finished = true;
@@ -163,6 +164,7 @@ describeWithDatabase('program template origin (e2e)', () => {
     const firstMayFinish = new Promise<void>((resolve) => {
       releaseFirst = resolve;
     });
+    let held = false;
     let finished = false;
     let first: Promise<unknown> | undefined;
     let second: Promise<unknown> | undefined;
@@ -170,9 +172,11 @@ describeWithDatabase('program template origin (e2e)', () => {
     try {
       first = prisma.$transaction(async (tx) => {
         await lockAssignment(tx, user.id);
+        held = true;
         await firstMayFinish;
         throw new Error('rollback');
       });
+      await waitUntil(() => held);
       second = prisma.$transaction(async (tx) => {
         await lockAssignment(tx, user.id);
         finished = true;
@@ -214,6 +218,16 @@ async function advisoryWaitCount(prisma: PrismaClient): Promise<number> {
       AND wait_event = 'advisory'
   `;
   return Number(rows[0]?.waiting ?? 0);
+}
+
+async function waitUntil(ready: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (!ready()) {
+    if (Date.now() > deadline) {
+      throw new Error('timed out waiting for the assignment lock to be held');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 }
 
 async function waitForAdvisoryWait(prisma: PrismaClient): Promise<number> {
