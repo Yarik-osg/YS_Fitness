@@ -30,7 +30,13 @@ function createService(
     assign: ReturnType<typeof vi.fn>;
     getAssigned: ReturnType<typeof vi.fn>;
     unassign: ReturnType<typeof vi.fn>;
-  } = { assign: vi.fn(), getAssigned: vi.fn(), unassign: vi.fn() },
+    holdAssignment: ReturnType<typeof vi.fn>;
+  } = {
+    assign: vi.fn(),
+    getAssigned: vi.fn(),
+    unassign: vi.fn(),
+    holdAssignment: vi.fn(),
+  },
   subscriptions: { hasActiveAccess: ReturnType<typeof vi.fn> } = {
     hasActiveAccess: vi.fn().mockResolvedValue(true),
   },
@@ -240,6 +246,7 @@ describe('UsersService.updateProfile', () => {
       assign: vi.fn().mockResolvedValue(assignedProgram),
       getAssigned: vi.fn().mockResolvedValue({ program: assignedProgram }),
       unassign: vi.fn(),
+      holdAssignment: vi.fn(),
     };
     const created = createService(
       { userProfile, bodyMeasurement, onboardingResponses },
@@ -259,6 +266,9 @@ describe('UsersService.updateProfile', () => {
       trainingFrequency: '4',
     });
 
+    expect(programs.holdAssignment.mock.invocationCallOrder[0]).toBeLessThan(
+      userProfile.findUnique.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(userProfile.update).toHaveBeenCalledWith({
       where: { userId },
       data: { heightCm: 170 },
@@ -281,8 +291,9 @@ describe('UsersService.updateProfile', () => {
     expect(programs.assign).toHaveBeenCalledWith(
       userId,
       { userProfile, bodyMeasurement, onboardingResponses },
-      { preserveAssignedAt: true },
+      { preserveAssignedAt: true, onTrainerProgram: 'keep' },
     );
+    expect(programs.unassign).not.toHaveBeenCalled();
     expect(result.program).toEqual(assignedProgram);
     expect(result).toMatchObject({
       heightCm: 170,
@@ -343,6 +354,7 @@ describe('UsersService.updateProfile', () => {
       ),
       getAssigned: vi.fn().mockResolvedValue({ program: null }),
       unassign: vi.fn(),
+      holdAssignment: vi.fn(),
     };
     const { service } = createService(
       { userProfile, bodyMeasurement, onboardingResponses },
@@ -371,6 +383,7 @@ describe('UsersService.updateProfile', () => {
       ),
       getAssigned: vi.fn().mockResolvedValue({ program: assignedProgram }),
       unassign: vi.fn(),
+      holdAssignment: vi.fn(),
     };
     const { service } = createService(
       { userProfile, bodyMeasurement, onboardingResponses },
@@ -394,6 +407,7 @@ describe('UsersService.updateProfile', () => {
       ),
       getAssigned: vi.fn().mockResolvedValue({ program: assignedProgram }),
       unassign: vi.fn(),
+      holdAssignment: vi.fn(),
     };
     const { service } = createService(
       { userProfile, bodyMeasurement, onboardingResponses },
@@ -414,6 +428,7 @@ describe('UsersService.updateProfile', () => {
       assign: vi.fn(),
       getAssigned: vi.fn().mockResolvedValue({ program: assignedProgram }),
       unassign: vi.fn(),
+      holdAssignment: vi.fn(),
     };
     const subscriptions = {
       hasActiveAccess: vi.fn().mockResolvedValue(false),
@@ -536,7 +551,12 @@ describe('UsersService measurements', () => {
     };
     const service = new UsersService(
       prisma as never,
-      { assign: vi.fn(), getAssigned: vi.fn(), unassign: vi.fn() } as never,
+      {
+        assign: vi.fn(),
+        getAssigned: vi.fn(),
+        unassign: vi.fn(),
+        holdAssignment: vi.fn(),
+      } as never,
       { hasActiveAccess: vi.fn() } as never,
     );
     return { service, prisma, bodyMeasurement };

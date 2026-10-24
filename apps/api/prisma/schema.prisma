@@ -78,6 +78,7 @@ model User {
   workoutProgram       WorkoutProgram?
   workoutLogs          WorkoutLog[]
   progressPhotos       ProgressPhoto[]
+  ownedProgramTemplates ProgramTemplate[]
 
   @@map("users")
 }
@@ -282,6 +283,11 @@ enum ProgramAccent {
   LEGS
 }
 
+enum ProgramOrigin {
+  SYSTEM
+  TRAINER
+}
+
 model Exercise {
   id           String        @id @default(uuid()) @db.Uuid
   code         String        @unique @db.VarChar(16)
@@ -307,6 +313,18 @@ model ProgramTemplate {
   level            TrainingExperience
   frequencyPerWeek Int                @map("frequency_per_week")
   accent           ProgramAccent
+  origin           ProgramOrigin      @default(SYSTEM)
+  /// Null for SYSTEM templates. Required for TRAINER templates by
+  /// program_templates_owner_origin_check, which lives only in the migration
+  /// SQL. The partial unique index program_templates_identity_key (one system
+  /// row per gender, level, frequency, and accent) is also SQL-only.
+  /// `prisma db push` and schema-only rebuilds drop both; apply schema
+  /// changes with `prisma migrate`. A later `migrate dev` may emit
+  /// DROP INDEX program_templates_identity_key or DROP CONSTRAINT
+  /// program_templates_owner_origin_check because Prisma cannot model them.
+  /// Delete those statements. ProgramTemplateConstraintCheck refuses to boot
+  /// without them, and the migration spec fails if a later file drops them.
+  ownerId          String?            @map("owner_id") @db.Uuid
   active           Boolean            @default(true)
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
@@ -314,8 +332,8 @@ model ProgramTemplate {
   days            ProgramTemplateDay[]
   workoutPrograms WorkoutProgram[]
   workoutLogs     WorkoutLog[]
+  owner           User?                @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
-  @@unique([gender, level, frequencyPerWeek, accent], map: "program_templates_identity_key")
   @@map("program_templates")
 }
 

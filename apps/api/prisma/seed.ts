@@ -8,6 +8,7 @@ import { readSeedEnvironment } from '../src/config/seed-environment.js';
 import { CATALOG_PLANS } from './catalog-plans.js';
 import { mergeProgramFiles } from './merge-program-files.js';
 import { parseProgramCsv } from './parse-program-csv.js';
+import { systemTemplatesToDeactivate } from './system-template-deactivation.js';
 
 const prisma = new PrismaClient();
 
@@ -140,10 +141,9 @@ async function seedPrograms(): Promise<void> {
     }
 
     await transaction.programTemplate.updateMany({
-      where:
-        templates.length === 0
-          ? undefined
-          : { code: { notIn: templates.map((template) => template.code) } },
+      where: systemTemplatesToDeactivate(
+        templates.map((template) => template.code),
+      ),
       data: { active: false },
     });
   });

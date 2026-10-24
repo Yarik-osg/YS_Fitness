@@ -17,14 +17,18 @@ export class ExerciseSeedCheck implements OnApplicationBootstrap {
     const [exerciseCount, activeTemplates, placeholderExercisesInUse] =
       await Promise.all([
         this.prisma.exercise.count(),
-        this.prisma.programTemplate.count({ where: { active: true } }),
+        this.prisma.programTemplate.count({
+          where: { active: true, origin: 'SYSTEM' },
+        }),
         this.prisma.exercise.count({
           where: {
             repsMin: PLACEHOLDER_REPS,
             repsMax: PLACEHOLDER_REPS,
             templateExercises: {
               some: {
-                templateDay: { template: { active: true } },
+                templateDay: {
+                  template: { active: true, origin: 'SYSTEM' },
+                },
               },
             },
           },

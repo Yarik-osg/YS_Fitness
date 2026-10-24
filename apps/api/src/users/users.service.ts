@@ -454,6 +454,7 @@ export class UsersService {
   ): Promise<ProfileUpdateResponse> {
     return this.prisma.$transaction(
       async (transaction) => {
+        await this.programs.holdAssignment(userId, transaction);
         const [profile, latestMeasurement, responses] = await Promise.all([
           transaction.userProfile.findUnique({ where: { userId } }),
           transaction.bodyMeasurement.findFirst({
@@ -612,6 +613,7 @@ export class UsersService {
       return toProgramSummary(
         await this.programs.assign(userId, transaction, {
           preserveAssignedAt: true,
+          onTrainerProgram: 'keep',
         }),
       );
     } catch (error) {
