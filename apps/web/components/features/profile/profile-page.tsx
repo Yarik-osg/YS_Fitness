@@ -28,6 +28,7 @@ import { NumberField } from '@/components/features/profile/number-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
+import { useProgramTitle } from '@/lib/program-title';
 import {
   Select,
   SelectContent,
@@ -536,22 +537,25 @@ function ProgramCard({
   const onboarding = useTranslations('onboarding');
   const locale = useLocale();
   const male = track === 'male';
+  const programTitle = useProgramTitle(program?.accent ?? '');
 
   return (
     <section className="border border-teal/18 bg-teal/4 px-4 py-4">
-      <h2 className="mb-3 font-label text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">
-        {t('program')}
-      </h2>
       {loadError ? (
-        <p role="alert" className="text-sm text-red-300">
-          {t('programError')}
-        </p>
+        <>
+          <h2 className="mb-3 font-label text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">
+            {t('program')}
+          </h2>
+          <p role="alert" className="text-sm text-red-300">
+            {t('programError')}
+          </p>
+        </>
       ) : program ? (
         <>
           <div className="mb-3 flex items-start justify-between gap-3">
-            <p className="font-heading text-lg leading-tight break-words text-teal">
-              {program.templateName}
-            </p>
+            <h2 className="font-heading text-lg leading-tight break-words text-teal">
+              {programTitle}
+            </h2>
             {active ? (
               <span className="shrink-0 bg-lime px-2 py-1 font-label text-[8px] font-bold tracking-[0.12em] text-background uppercase">
                 {t('programStatus')}
@@ -581,7 +585,12 @@ function ProgramCard({
           ) : null}
         </>
       ) : (
-        <p className="text-sm text-white/45">{t('noProgram')}</p>
+        <>
+          <h2 className="mb-3 font-label text-[8px] font-bold tracking-[0.16em] text-white/35 uppercase">
+            {t('program')}
+          </h2>
+          <p className="text-sm text-white/45">{t('noProgram')}</p>
+        </>
       )}
     </section>
   );

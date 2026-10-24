@@ -167,7 +167,10 @@ describe('TrainingPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Тренування' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('WB2U — верх')).toBeInTheDocument();
+    expect(screen.getByText('Програма на верх тіла')).toBeInTheDocument();
+    expect(screen.getByText('Початківець · 2 рази/тиж.')).toBeInTheDocument();
+    expect(screen.queryByText('WB2U — верх')).not.toBeInTheDocument();
+    expect(screen.queryByText('WB2U')).not.toBeInTheDocument();
     expect(screen.getByText('Спина · Біцепс · Плечі')).toBeInTheDocument();
     expect(
       screen.queryByText('Тяга вертикального блоку'),
@@ -243,7 +246,9 @@ describe('TrainingPage', () => {
     signIn();
     renderPage('en');
 
-    expect(await screen.findByText('Crunch')).toBeInTheDocument();
+    expect(await screen.findByText('Upper-body program')).toBeInTheDocument();
+    expect(screen.getByText('Beginner · 2 times/week')).toBeInTheDocument();
+    expect(screen.getByText('Crunch')).toBeInTheDocument();
     expect(screen.queryByText('Скручування')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Workout 01/ }));
@@ -270,7 +275,7 @@ describe('TrainingPage', () => {
     signIn();
     renderPage();
 
-    const banner = await screen.findByText('WB2U — верх');
+    const banner = await screen.findByText('Програма на верх тіла');
     const calendar = await screen.findByText('Цього тижня');
     const firstDay = screen.getByRole('heading', { name: 'Тренування 01' });
 

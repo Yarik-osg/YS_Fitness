@@ -189,7 +189,9 @@ describe('Profile page', () => {
     expect(screen.getByText('До 6 місяців')).toBeInTheDocument();
     expect(screen.getByText('Схуднути')).toBeInTheDocument();
     expect(screen.getByText('2 рази')).toBeInTheDocument();
-    expect(screen.getByText(TEMPLATE_NAME)).toBeInTheDocument();
+    expect(screen.getByText('Програма на верх тіла')).toBeInTheDocument();
+    expect(screen.queryByText(TEMPLATE_NAME)).not.toBeInTheDocument();
+    expect(screen.queryByText('WB2U')).not.toBeInTheDocument();
     expect(screen.getByText('9 / 16')).toBeInTheDocument();
     expect(screen.getByText('1 місяць')).toBeInTheDocument();
     expect(
@@ -457,6 +459,7 @@ describe('Profile page', () => {
         ...PROGRAM,
         templateCode: 'WM4',
         templateName: NEXT_TEMPLATE_NAME,
+        accent: 'NONE',
         level: 'intermediate',
         frequencyPerWeek: 4,
       },
@@ -486,7 +489,8 @@ describe('Profile page', () => {
       within(dialog).getByRole('button', { name: 'Підтвердити і зберегти' }),
     );
 
-    expect(await screen.findByText(NEXT_TEMPLATE_NAME)).toBeInTheDocument();
+    expect(await screen.findByText('Програма на все тіло')).toBeInTheDocument();
+    expect(screen.queryByText(NEXT_TEMPLATE_NAME)).not.toBeInTheDocument();
     expect(patches).toEqual([
       {
         heightCm: 170,

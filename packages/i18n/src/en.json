@@ -601,7 +601,6 @@
     },
     "home": {
       "screenTitle": "Home",
-      "today": "Today",
       "nextWorkout": "Next workout",
       "firstDay": "Workout {number}",
       "perWeek": "Workouts per week",
@@ -609,6 +608,7 @@
       "sessionCount": "{completed} / {expected}",
       "times": "{count} times",
       "timesShort": "{count} times/week",
+      "programFallback": "Program",
       "start": "Start workout →",
       "training": "Training",
       "summary": "{exercises, plural, one {# exercise} other {# exercises}} · {sets, plural, one {# set} other {# sets}}",
@@ -842,7 +842,6 @@
   "training": {
     "brand": "YS FITNESS",
     "title": "Training",
-    "program": "Your program",
     "dayTitle": "Workout {number}",
     "next": "Next",
     "completedTimes": "{count, plural, one {Completed: # time this cycle} other {Completed: # times this cycle}}",
