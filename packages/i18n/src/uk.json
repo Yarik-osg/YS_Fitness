@@ -926,6 +926,56 @@
     "programMissing": "Немає",
     "subscriptionActive": "Активний",
     "subscriptionInactive": "Неактивний",
-    "unnamed": "Без імені"
+    "unnamed": "Без імені",
+    "roster": "Клієнти",
+    "logout": "Вийти",
+    "loggingOut": "Виходимо",
+    "back": "До списку",
+    "notFound": "Цього клієнта не знайдено.",
+    "retry": "Спробувати ще",
+    "emptyValue": "—",
+    "cm": "см",
+    "times": "{count, plural, one {# раз/тиж.} few {# рази/тиж.} many {# разів/тиж.} other {# разу/тиж.}}",
+    "noProfile": "Профіль ще не заповнено.",
+    "noOnboarding": "Відповідей анкети немає.",
+    "noProgram": "Програму не призначено.",
+    "noSubscription": "Підписки немає.",
+    "sections": {
+      "profile": "Профіль",
+      "questionnaire": "Анкета",
+      "program": "Програма",
+      "subscription": "Доступ"
+    },
+    "fields": {
+      "birthDate": "Дата народження",
+      "sex": "Стать",
+      "height": "Зріст",
+      "activity": "Активність",
+      "goal": "Мета",
+      "timezone": "Часовий пояс",
+      "track": "Напрям",
+      "currentBody": "Поточна форма",
+      "desiredBody": "Бажана форма",
+      "mainGoal": "Головна мета",
+      "experience": "Досвід",
+      "frequency": "Частота",
+      "focus": "Фокус",
+      "nutrition": "Харчування",
+      "meals": "Прийоми їжі",
+      "habits": "Звички",
+      "physique": "Рівень форми",
+      "assigned": "Призначено",
+      "periodEnd": "Діє до"
+    },
+    "sex": {
+      "MALE": "Чоловіча",
+      "FEMALE": "Жіноча"
+    },
+    "status": {
+      "PENDING": "Очікує",
+      "ACTIVE": "Активний",
+      "CANCELED": "Скасований",
+      "EXPIRED": "Завершений"
+    }
   }
 }

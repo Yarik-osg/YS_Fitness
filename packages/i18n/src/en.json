@@ -929,6 +929,56 @@
     "programMissing": "None",
     "subscriptionActive": "Active",
     "subscriptionInactive": "Inactive",
-    "unnamed": "No name"
+    "unnamed": "No name",
+    "roster": "Clients",
+    "logout": "Log out",
+    "loggingOut": "Signing out",
+    "back": "Back to clients",
+    "notFound": "This client could not be found.",
+    "retry": "Try again",
+    "emptyValue": "—",
+    "cm": "cm",
+    "times": "{count, plural, one {# time/week} other {# times/week}}",
+    "noProfile": "No profile yet.",
+    "noOnboarding": "No questionnaire answers yet.",
+    "noProgram": "No program assigned.",
+    "noSubscription": "No subscription on file.",
+    "sections": {
+      "profile": "Profile",
+      "questionnaire": "Questionnaire",
+      "program": "Program",
+      "subscription": "Access"
+    },
+    "fields": {
+      "birthDate": "Date of birth",
+      "sex": "Sex",
+      "height": "Height",
+      "activity": "Daily activity",
+      "goal": "Goal",
+      "timezone": "Timezone",
+      "track": "Direction",
+      "currentBody": "Current shape",
+      "desiredBody": "Desired shape",
+      "mainGoal": "Main goal",
+      "experience": "Experience",
+      "frequency": "Frequency",
+      "focus": "Focus",
+      "nutrition": "Nutrition",
+      "meals": "Meals",
+      "habits": "Habits",
+      "physique": "Physique",
+      "assigned": "Assigned",
+      "periodEnd": "Until"
+    },
+    "sex": {
+      "MALE": "Male",
+      "FEMALE": "Female"
+    },
+    "status": {
+      "PENDING": "Pending",
+      "ACTIVE": "Active",
+      "CANCELED": "Canceled",
+      "EXPIRED": "Expired"
+    }
   }
 }

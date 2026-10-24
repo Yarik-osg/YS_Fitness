@@ -105,6 +105,58 @@ export interface CoachClientsResponse {
   clients: CoachClientSummary[];
 }
 
+export interface CoachClientProfile {
+  dateOfBirth: string;
+  biologicalSexForCalculation: BiologicalSexForCalculation;
+  heightCm: number;
+  activityLevel: ActivityLevel;
+  goal: WeightGoal;
+  timezone: string;
+}
+
+export interface CoachClientOnboarding {
+  programTrack: ProgramTrack;
+  currentBody: string;
+  desiredBody: string;
+  mainGoal: OnboardingMainGoal;
+  experience: TrainingExperience;
+  trainingFrequency: TrainingFrequency;
+  focusAreas: string[];
+  nutritionCurrent: NutritionCurrent;
+  mealsPerDay: string;
+  eatingHabits: string[];
+  physiqueLevel: string | null;
+}
+
+export interface CoachClientProgram {
+  accent: ProgramAccent;
+  templateCode: string;
+  templateName: string;
+  level: TrainingExperience;
+  frequencyPerWeek: number;
+  gender: ProgramTrack;
+  assignedAt: string;
+}
+
+export interface CoachClientSubscription {
+  active: boolean;
+  status: SubscriptionStatus;
+  planName: string;
+  currentPeriodEnd: string | null;
+}
+
+export interface CoachClientDetail {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+  onboardingCompleted: boolean;
+  profile: CoachClientProfile | null;
+  onboarding: CoachClientOnboarding | null;
+  program: CoachClientProgram | null;
+  subscription: CoachClientSubscription | null;
+}
+
 export interface MeResponse {
   id: string;
   email: string;

@@ -1,8 +1,24 @@
+import type { ReactNode } from 'react';
 import type { CoachClientsResponse } from '@repo/shared-types';
 import { cleanup, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
 import { CoachClientsPage } from './coach-clients-page';
+
+vi.mock('@/i18n/navigation', () => ({
+  Link: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: ReactNode;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 const roster = vi.hoisted(() => ({
   current: {
@@ -69,7 +85,10 @@ describe('CoachClientsPage', () => {
     expect(
       screen.getByRole('heading', { name: 'Клієнти' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Olena Koval')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Olena Koval' })).toHaveAttribute(
+      'href',
+      '/coach/clients/client-1',
+    );
     expect(screen.getByText('olena@example.com')).toBeInTheDocument();
     expect(screen.getByText('Заповнена')).toBeInTheDocument();
     expect(screen.getByText('Призначена')).toBeInTheDocument();
