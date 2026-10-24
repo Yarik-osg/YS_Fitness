@@ -51,6 +51,18 @@ describe('getPostAuthPath', () => {
       '/checkout?planId=plan-3',
     );
   });
+
+  it('sends a trainer to the coach roster before onboarding', () => {
+    const trainer = user(null);
+    trainer.role = 'TRAINER';
+    expect(getPostAuthPath(trainer, 'plan-3')).toBe('/coach');
+  });
+
+  it('sends an admin to the coach roster', () => {
+    const admin = user('2026-09-19T10:00:00.000Z');
+    admin.role = 'ADMIN';
+    expect(getPostAuthPath(admin)).toBe('/coach');
+  });
 });
 
 describe('resolveIncompleteGuestDestination', () => {
@@ -90,6 +102,12 @@ describe('resolvePostLoginPath', () => {
     expect(resolvePostLoginPath(user(null), '/checkout?planId=plan-3')).toBe(
       '/onboarding',
     );
+  });
+
+  it('sends a trainer to the coach roster even when next points at the dashboard', () => {
+    const trainer = user(null);
+    trainer.role = 'TRAINER';
+    expect(resolvePostLoginPath(trainer, '/uk/dashboard')).toBe('/coach');
   });
 });
 

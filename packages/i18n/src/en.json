@@ -911,5 +911,24 @@
     "deleting": "Deleting",
     "photoDeleteError": "The photo could not be deleted.",
     "close": "Close"
+  },
+  "coach": {
+    "title": "Clients",
+    "count": "{count, plural, one {# client} other {# clients}}",
+    "empty": "No clients yet.",
+    "loadError": "Clients could not be loaded.",
+    "name": "Name",
+    "email": "Email",
+    "joined": "Joined",
+    "onboarding": "Onboarding",
+    "program": "Program",
+    "subscription": "Access",
+    "onboardingDone": "Complete",
+    "onboardingMissing": "Not finished",
+    "programAssigned": "Assigned",
+    "programMissing": "None",
+    "subscriptionActive": "Active",
+    "subscriptionInactive": "Inactive",
+    "unnamed": "No name"
   }
 }

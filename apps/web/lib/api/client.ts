@@ -5,6 +5,7 @@ import {
   readCsrfToken,
   writeCsrfToken,
 } from '@/lib/auth/csrf-token';
+import { sessionHintFor } from '@/lib/auth/routing';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
@@ -143,9 +144,7 @@ export function refreshSession(): Promise<AuthResponse> {
           ...response.user,
           onboardingCompletedAt: response.user.onboardingCompletedAt,
         });
-        writeSessionHint(
-          response.user.onboardingCompletedAt ? 'complete' : 'onboarding',
-        );
+        writeSessionHint(sessionHintFor(response.user));
         return response;
       })
       .catch((error: unknown) => {

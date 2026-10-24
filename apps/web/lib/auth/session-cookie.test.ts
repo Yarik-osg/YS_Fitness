@@ -5,6 +5,7 @@ describe('parseSessionHint', () => {
   it('accepts only onboarding and complete values', () => {
     expect(parseSessionHint('onboarding')).toBe('onboarding');
     expect(parseSessionHint('complete')).toBe('complete');
+    expect(parseSessionHint('coach')).toBe('coach');
     expect(parseSessionHint('expired')).toBeNull();
     expect(parseSessionHint(undefined)).toBeNull();
   });

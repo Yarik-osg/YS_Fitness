@@ -908,5 +908,24 @@
     "deleting": "Видаляємо",
     "photoDeleteError": "Не вдалося видалити фото.",
     "close": "Закрити"
+  },
+  "coach": {
+    "title": "Клієнти",
+    "count": "{count, plural, one {# клієнт} few {# клієнти} many {# клієнтів} other {# клієнта}}",
+    "empty": "Клієнтів ще немає.",
+    "loadError": "Не вдалося завантажити клієнтів.",
+    "name": "Ім'я",
+    "email": "Пошта",
+    "joined": "З нами",
+    "onboarding": "Анкета",
+    "program": "Програма",
+    "subscription": "Доступ",
+    "onboardingDone": "Заповнена",
+    "onboardingMissing": "Не завершена",
+    "programAssigned": "Призначена",
+    "programMissing": "Немає",
+    "subscriptionActive": "Активний",
+    "subscriptionInactive": "Неактивний",
+    "unnamed": "Без імені"
   }
 }

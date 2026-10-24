@@ -4,7 +4,7 @@ import { ApiClientError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { readSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { useOnboardingStore } from '@/features/onboarding/onboarding-store';
-import { AuthGate, GuestGate } from './auth-gates';
+import { AuthGate, CoachGate, GuestGate } from './auth-gates';
 
 const navigation = vi.hoisted(() => ({
   pathname: '/dashboard',
@@ -275,6 +275,43 @@ describe('AuthGate', () => {
     });
     expect(screen.queryByText('protected content')).not.toBeInTheDocument();
   });
+
+  it('sends a trainer without onboarding to the coach roster', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      role: 'TRAINER',
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue({
+      id: 'user-1',
+      email: 'trainer@example.com',
+      role: 'TRAINER',
+      profile: null,
+    });
+
+    renderGate();
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/coach');
+    });
+  });
+
+  it('sends an admin to the coach roster', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      role: 'ADMIN',
+    });
+    api.getMe.mockResolvedValue({
+      ...meResponse(completedUser.onboardingCompletedAt),
+      role: 'ADMIN',
+    });
+
+    renderGate();
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/coach');
+    });
+  });
 });
 
 function renderGuestGate() {
@@ -336,5 +373,115 @@ describe('GuestGate', () => {
 
     expect(await screen.findByText('guest content')).toBeInTheDocument();
     expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('sends a trainer from login to the coach roster', async () => {
+    navigation.pathname = '/login';
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      role: 'TRAINER',
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue({
+      id: 'user-1',
+      email: 'trainer@example.com',
+      role: 'TRAINER',
+      profile: null,
+    });
+
+    renderGuestGate();
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/coach');
+    });
+  });
+});
+
+describe('CoachGate', () => {
+  beforeEach(() => {
+    cleanup();
+    navigation.pathname = '/coach';
+    navigation.replace.mockReset();
+    api.refresh.mockReset();
+    api.getMe.mockReset();
+    useAuthStore.getState().clearSession();
+    document.cookie = 'ys_web_session=; Path=/; Max-Age=0';
+  });
+
+  it('shows the roster to a trainer who has not finished client onboarding', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      role: 'TRAINER',
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue({
+      id: 'user-1',
+      email: 'trainer@example.com',
+      role: 'TRAINER',
+      profile: null,
+    });
+
+    render(
+      <CoachGate>
+        <p>coach roster</p>
+      </CoachGate>,
+    );
+
+    expect(await screen.findByText('coach roster')).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('sends a client back to the dashboard', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), completedUser);
+    api.getMe.mockResolvedValue(
+      meResponse(completedUser.onboardingCompletedAt),
+    );
+
+    render(
+      <CoachGate>
+        <p>coach roster</p>
+      </CoachGate>,
+    );
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/dashboard');
+    });
+  });
+
+  it('sends an incomplete client to onboarding', async () => {
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue(meResponse(null));
+
+    render(
+      <CoachGate>
+        <p>coach roster</p>
+      </CoachGate>,
+    );
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/onboarding');
+    });
+  });
+
+  it('rewrites a coach cookie before sending a client away', async () => {
+    writeSessionHint('coach');
+    useAuthStore.getState().setSession(tokenExpiringIn(600), completedUser);
+    api.getMe.mockRejectedValue(
+      new ApiClientError(500, 'INTERNAL_SERVER_ERROR', 'users/me failed'),
+    );
+
+    render(
+      <CoachGate>
+        <p>coach roster</p>
+      </CoachGate>,
+    );
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/dashboard');
+    });
+    expect(readSessionHint()).toBe('complete');
   });
 });

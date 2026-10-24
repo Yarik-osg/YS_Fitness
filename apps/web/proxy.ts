@@ -2,6 +2,7 @@ import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 import { routing } from './i18n/routing';
 import { applyAuthRedirect, splitLocalePath } from './lib/auth/proxy-auth';
+import { parseSessionHint } from './lib/auth/session-cookie';
 
 const handleI18nRouting = createMiddleware(routing);
 
@@ -14,9 +15,7 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const { locale, pathnameWithoutLocale } = splitLocalePath(pathname);
-  const rawHint = request.cookies.get('ys_web_session')?.value;
-  const hint =
-    rawHint === 'onboarding' || rawHint === 'complete' ? rawHint : null;
+  const hint = parseSessionHint(request.cookies.get('ys_web_session')?.value);
 
   const authTarget = applyAuthRedirect({
     pathnameWithoutLocale,
