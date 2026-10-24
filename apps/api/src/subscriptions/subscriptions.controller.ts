@@ -60,7 +60,7 @@ export class SubscriptionsController {
   @Post('grant')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('TRAINER', 'ADMIN')
+  @Roles('ADMIN')
   grant(
     @CurrentUser() user: AuthenticatedUser,
     @Body() input: GrantSubscriptionDto,

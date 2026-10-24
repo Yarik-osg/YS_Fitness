@@ -13,7 +13,7 @@ export type OnboardingStatusUser = {
 };
 
 export function isCoachRole(role: string | null | undefined): boolean {
-  return role === 'TRAINER' || role === 'ADMIN';
+  return role === 'ADMIN';
 }
 
 export function sessionHintFor(user: OnboardingStatusUser): SessionHint {

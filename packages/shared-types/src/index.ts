@@ -1,4 +1,4 @@
-export type UserRole = 'CLIENT' | 'TRAINER' | 'ADMIN';
+export type UserRole = 'CLIENT' | 'ADMIN';
 export type BiologicalSexForCalculation = 'MALE' | 'FEMALE';
 export type ActivityLevel =
   | 'SEDENTARY'

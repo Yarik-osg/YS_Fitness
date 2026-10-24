@@ -64,7 +64,7 @@ function tokenExpiringIn(seconds: number) {
 const trainer = {
   id: 'trainer-1',
   email: 'trainer@example.com',
-  role: 'TRAINER' as const,
+  role: 'ADMIN' as const,
   name: 'Coach',
   onboardingCompletedAt: null,
 };
@@ -126,7 +126,7 @@ describe('CoachShell', () => {
     api.getMe.mockResolvedValue({
       id: trainer.id,
       email: trainer.email,
-      role: 'TRAINER',
+      role: 'ADMIN',
       profile: null,
     });
     api.logout.mockRejectedValue(

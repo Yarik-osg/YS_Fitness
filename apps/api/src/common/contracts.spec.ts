@@ -60,12 +60,13 @@ function issuePaths(result: ReturnType<typeof onboardingSchema.safeParse>) {
 
 describe('shared API contracts', () => {
   it('normalizes email and enforces the password minimum', () => {
-    expect(
-      registerSchema.parse({
-        email: ' Client@Example.COM ',
-        password: '12345678',
-      }).email,
-    ).toBe('client@example.com');
+    const parsed = registerSchema.parse({
+      email: ' Client@Example.COM ',
+      password: '12345678',
+      role: 'ADMIN',
+    });
+    expect(parsed.email).toBe('client@example.com');
+    expect(parsed).not.toHaveProperty('role');
 
     expect(
       registerSchema.safeParse({

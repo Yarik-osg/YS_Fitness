@@ -71,6 +71,24 @@ describe('AuthService.register welcome email', () => {
     expect(mail.sendWelcome).toHaveBeenCalledWith('new@example.com', 'en');
   });
 
+  it('creates the account without a client-supplied role', async () => {
+    const { service, prisma } = createService();
+
+    await service.register(
+      { ...input, role: 'ADMIN' } as typeof input,
+      request,
+    );
+
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          email: 'new@example.com',
+          passwordHash: 'hashed',
+        },
+      }),
+    );
+  });
+
   it('passes no locale when the client did not send one', async () => {
     const { service, mail } = createService();
 

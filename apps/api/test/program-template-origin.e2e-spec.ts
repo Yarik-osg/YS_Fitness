@@ -83,7 +83,7 @@ describeWithDatabase('program template origin (e2e)', () => {
       data: {
         email: `origin-lock-${randomBytes(4).toString('hex')}@example.com`,
         passwordHash: 'not-a-login',
-        role: 'TRAINER',
+        role: 'ADMIN',
       },
     });
     let trainerId: string | undefined;

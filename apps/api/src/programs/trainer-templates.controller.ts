@@ -34,7 +34,7 @@ function actor(user: AuthenticatedUser): TrainerTemplateActor {
 
 @Controller('coach/program-templates')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('TRAINER', 'ADMIN')
+@Roles('ADMIN')
 export class TrainerTemplatesController {
   constructor(private readonly templates: TrainerTemplatesService) {}
 

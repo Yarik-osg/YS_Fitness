@@ -276,16 +276,16 @@ describe('AuthGate', () => {
     expect(screen.queryByText('protected content')).not.toBeInTheDocument();
   });
 
-  it('sends a trainer without onboarding to the coach roster', async () => {
+  it('sends an admin without onboarding to the coach roster', async () => {
     useAuthStore.getState().setSession(tokenExpiringIn(600), {
       ...completedUser,
-      role: 'TRAINER',
+      role: 'ADMIN',
       onboardingCompletedAt: null,
     });
     api.getMe.mockResolvedValue({
       id: 'user-1',
       email: 'trainer@example.com',
-      role: 'TRAINER',
+      role: 'ADMIN',
       profile: null,
     });
 
@@ -375,17 +375,17 @@ describe('GuestGate', () => {
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 
-  it('sends a trainer from login to the coach roster', async () => {
+  it('sends an admin from login to the coach roster', async () => {
     navigation.pathname = '/login';
     useAuthStore.getState().setSession(tokenExpiringIn(600), {
       ...completedUser,
-      role: 'TRAINER',
+      role: 'ADMIN',
       onboardingCompletedAt: null,
     });
     api.getMe.mockResolvedValue({
       id: 'user-1',
       email: 'trainer@example.com',
-      role: 'TRAINER',
+      role: 'ADMIN',
       profile: null,
     });
 
@@ -408,16 +408,16 @@ describe('CoachGate', () => {
     document.cookie = 'ys_web_session=; Path=/; Max-Age=0';
   });
 
-  it('shows the roster to a trainer who has not finished client onboarding', async () => {
+  it('shows the roster to an admin who has not finished client onboarding', async () => {
     useAuthStore.getState().setSession(tokenExpiringIn(600), {
       ...completedUser,
-      role: 'TRAINER',
+      role: 'ADMIN',
       onboardingCompletedAt: null,
     });
     api.getMe.mockResolvedValue({
       id: 'user-1',
       email: 'trainer@example.com',
-      role: 'TRAINER',
+      role: 'ADMIN',
       profile: null,
     });
 
