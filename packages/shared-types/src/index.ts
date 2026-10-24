@@ -282,6 +282,8 @@ export type MuscleGroup =
 export type ProgramAccent =
   'NONE' | 'UPPER' | 'LOWER' | 'BACK' | 'CHEST' | 'SHOULDERS' | 'ARMS' | 'LEGS';
 
+export type ProgramOrigin = 'SYSTEM' | 'TRAINER';
+
 export interface ExerciseResponse {
   id: string;
   code: string;
@@ -410,8 +412,11 @@ export interface TrainerProgramTemplateSummary {
   level: TrainingExperience;
   frequencyPerWeek: number;
   accent: ProgramAccent;
+  origin: ProgramOrigin;
   active: boolean;
-  ownerId: string;
+  ownerId: string | null;
+  dayCount: number;
+  exerciseCount: number;
 }
 
 export interface TrainerProgramTemplateDetail extends TrainerProgramTemplateSummary {

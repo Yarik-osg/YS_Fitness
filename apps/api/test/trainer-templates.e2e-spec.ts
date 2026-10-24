@@ -141,9 +141,19 @@ describeWithDatabase('trainer program templates (e2e)', () => {
 
     expect(response.status).toBe(403);
     expect(response.body.code).toBe('FORBIDDEN');
+
+    const listed = await request(app.getHttpServer())
+      .get('/api/v1/coach/program-templates')
+      .set('authorization', client.authorization);
+    expect(listed.status).toBe(403);
+
+    const exercises = await request(app.getHttpServer())
+      .get('/api/v1/coach/program-templates/exercises')
+      .set('authorization', client.authorization);
+    expect(exercises.status).toBe(403);
   });
 
-  it('lets any admin manage a trainer-origin template and hides system templates', async () => {
+  it('lists both system and custom templates and copies a system template', async () => {
     const created = await createTemplate(trainer.authorization);
     const updated = await request(app.getHttpServer())
       .put(`/api/v1/coach/program-templates/${created.body.id}`)
@@ -151,30 +161,71 @@ describeWithDatabase('trainer program templates (e2e)', () => {
       .send(templateBody(exerciseId));
     expect(updated.status).toBe(200);
 
+    const listed = await request(app.getHttpServer())
+      .get('/api/v1/coach/program-templates')
+      .set('authorization', trainer.authorization);
+    expect(listed.status).toBe(200);
+    expect(
+      listed.body.templates.some(
+        (template: { origin: string }) => template.origin === 'SYSTEM',
+      ),
+    ).toBe(true);
+    expect(
+      listed.body.templates.some(
+        (template: { id: string; origin: string }) =>
+          template.id === created.body.id && template.origin === 'TRAINER',
+      ),
+    ).toBe(true);
+
+    const deniedExercises = await request(app.getHttpServer())
+      .get('/api/v1/coach/program-templates/exercises')
+      .set('authorization', client.authorization);
+    expect(deniedExercises.status).toBe(403);
+    const exercises = await request(app.getHttpServer())
+      .get('/api/v1/coach/program-templates/exercises')
+      .set('authorization', trainer.authorization);
+    expect(exercises.status).toBe(200);
+    expect(exercises.body.length).toBeGreaterThan(0);
+
     const system = await prisma.programTemplate.findFirst({
       where: { origin: 'SYSTEM' },
+      include: { days: { include: { exercises: true } } },
     });
     if (!system) throw new Error('seeded system template missing');
 
-    for (const method of ['put', 'delete', 'duplicate'] as const) {
+    for (const method of ['put', 'delete'] as const) {
       const call =
         method === 'put'
           ? request(app.getHttpServer()).put(
               `/api/v1/coach/program-templates/${system.id}`,
             )
-          : method === 'delete'
-            ? request(app.getHttpServer()).delete(
-                `/api/v1/coach/program-templates/${system.id}`,
-              )
-            : request(app.getHttpServer()).post(
-                `/api/v1/coach/program-templates/${system.id}/duplicate`,
-              );
+          : request(app.getHttpServer()).delete(
+              `/api/v1/coach/program-templates/${system.id}`,
+            );
       const response = await call
         .set('authorization', otherTrainer.authorization)
         .send(templateBody(exerciseId));
       expect(response.status).toBe(404);
       expect(response.body.code).toBe('TEMPLATE_NOT_FOUND');
     }
+
+    const duplicated = await request(app.getHttpServer())
+      .post(`/api/v1/coach/program-templates/${system.id}/duplicate`)
+      .set('authorization', otherTrainer.authorization);
+    expect(duplicated.status).toBe(201);
+    expect(duplicated.body.id).not.toBe(system.id);
+    expect(duplicated.body.origin).toBe('TRAINER');
+    expect(duplicated.body.ownerId).toBe(otherTrainer.id);
+    expect(duplicated.body.name).toBe(`${system.name} - copy`);
+
+    const after = await prisma.programTemplate.findUnique({
+      where: { id: system.id },
+      include: { days: { include: { exercises: true } } },
+    });
+    expect(after?.origin).toBe('SYSTEM');
+    expect(after?.updatedAt.toISOString()).toBe(system.updatedAt.toISOString());
+    expect(after?.name).toBe(system.name);
+    expect(after?.days).toHaveLength(system.days.length);
   });
 
   it('lets a trainer template reuse a system identity', async () => {
