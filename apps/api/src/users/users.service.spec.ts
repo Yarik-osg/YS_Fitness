@@ -281,8 +281,9 @@ describe('UsersService.updateProfile', () => {
     expect(programs.assign).toHaveBeenCalledWith(
       userId,
       { userProfile, bodyMeasurement, onboardingResponses },
-      { preserveAssignedAt: true },
+      { preserveAssignedAt: true, onTrainerProgram: 'keep' },
     );
+    expect(programs.unassign).not.toHaveBeenCalled();
     expect(result.program).toEqual(assignedProgram);
     expect(result).toMatchObject({
       heightCm: 170,

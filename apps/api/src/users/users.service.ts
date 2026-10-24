@@ -612,6 +612,7 @@ export class UsersService {
       return toProgramSummary(
         await this.programs.assign(userId, transaction, {
           preserveAssignedAt: true,
+          onTrainerProgram: 'keep',
         }),
       );
     } catch (error) {

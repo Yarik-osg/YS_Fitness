@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { ProgramsService } from './programs.service.js';
@@ -63,9 +67,12 @@ function createService() {
     programTemplate: { findFirst: vi.fn(), findMany: vi.fn() },
     workoutProgram: {
       upsert: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
       findUnique: vi.fn(),
       deleteMany: vi.fn(),
     },
+    $queryRaw: vi.fn().mockResolvedValue([]),
     exercise: { findMany: vi.fn() },
     workoutLog: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -75,7 +82,7 @@ function createService() {
     $transaction: vi.fn(
       async (fn: (db: unknown) => Promise<unknown>, options?: unknown) => {
         void options;
-        return fn(prisma);
+        return fn({ ...prisma });
       },
     ),
   };
@@ -95,7 +102,7 @@ describe('ProgramsService', () => {
     const { prisma, service } = createService();
     prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
     prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
-    prisma.workoutProgram.upsert.mockResolvedValue(assignedProgram());
+    prisma.workoutProgram.create.mockResolvedValue(assignedProgram());
 
     const result = await service.assign(userId);
 
@@ -106,13 +113,12 @@ describe('ProgramsService', () => {
         frequencyPerWeek: 2,
         accent: 'UPPER',
         active: true,
+        origin: 'SYSTEM',
       },
     });
-    expect(prisma.workoutProgram.upsert).toHaveBeenCalledWith(
+    expect(prisma.workoutProgram.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId },
-        create: { userId, templateId: 'template-1' },
-        update: expect.objectContaining({ templateId: 'template-1' }),
+        data: { userId, templateId: 'template-1' },
       }),
     );
     expect(result).toMatchObject({
@@ -144,7 +150,7 @@ describe('ProgramsService', () => {
       onboarding({ programTrack: 'MALE', focusAreas: ['glutes'] }),
     );
     prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
-    prisma.workoutProgram.upsert.mockResolvedValue(assignedProgram());
+    prisma.workoutProgram.create.mockResolvedValue(assignedProgram());
 
     await service.assign(userId);
 
@@ -155,6 +161,7 @@ describe('ProgramsService', () => {
         frequencyPerWeek: 2,
         accent: 'LEGS',
         active: true,
+        origin: 'SYSTEM',
       },
     });
   });
@@ -186,23 +193,25 @@ describe('ProgramsService', () => {
     await expect(service.assign(userId)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
   });
 
   it('keeps the start date when the matched template is unchanged', async () => {
     const { prisma, service } = createService();
     prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
     prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
-    prisma.workoutProgram.findUnique.mockImplementation(
-      async (args: { select?: unknown }) =>
-        args.select ? { templateId: 'template-1' } : assignedProgram(),
-    );
+    prisma.$queryRaw.mockResolvedValue([
+      { origin: 'SYSTEM', templateId: 'template-1' },
+    ]);
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
 
     const result = await service.assign(userId, undefined, {
       preserveAssignedAt: true,
     });
 
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
     expect(result.assignedAt).toBe('2026-09-27T00:00:00.000Z');
   });
 
@@ -307,6 +316,9 @@ describe('ProgramsService', () => {
 
   it('removes the assigned program', async () => {
     const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      { origin: 'SYSTEM', templateId: 'template-1' },
+    ]);
 
     await service.unassign(userId);
 
@@ -314,7 +326,107 @@ describe('ProgramsService', () => {
       where: { userId },
     });
   });
+
+  it('does not replace or match over a trainer assignment', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      { origin: 'TRAINER', templateId: 'trainer-template' },
+    ]);
+
+    await expect(service.assign(userId)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.programTemplate.findFirst).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('returns the trainer assignment when the profile keeps it', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      { origin: 'TRAINER', templateId: 'trainer-template' },
+    ]);
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
+
+    const result = await service.assign(userId, undefined, {
+      onTrainerProgram: 'keep',
+    });
+
+    expect(result.templateCode).toBe('WB2U');
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a trainer assignment', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      { origin: 'TRAINER', templateId: 'trainer-template' },
+    ]);
+
+    await service.unassign(userId);
+
+    expect(prisma.workoutProgram.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('reads the committed trainer row after a lost insert and does not write again', async () => {
+    const { prisma, service } = createService();
+    prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
+    prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
+    prisma.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { origin: 'TRAINER', templateId: 'trainer-template' },
+      ]);
+    prisma.workoutProgram.create.mockRejectedValue(uniqueViolation());
+
+    await expect(service.assign(userId)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.workoutProgram.create).toHaveBeenCalledTimes(1);
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns the committed system row after a lost insert without writing again', async () => {
+    const { prisma, service } = createService();
+    prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
+    prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
+    prisma.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ origin: 'SYSTEM', templateId: 'template-1' }]);
+    prisma.workoutProgram.create.mockRejectedValue(uniqueViolation());
+    prisma.workoutProgram.findUnique.mockResolvedValue(assignedProgram());
+
+    const result = await service.assign(userId, undefined, {
+      onTrainerProgram: 'keep',
+    });
+
+    expect(result.templateCode).toBe('WB2U');
+    expect(prisma.workoutProgram.create).toHaveBeenCalledTimes(1);
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('does not insert again when the lost insert left no row', async () => {
+    const { prisma, service } = createService();
+    prisma.onboardingResponses.findUnique.mockResolvedValue(onboarding());
+    prisma.programTemplate.findFirst.mockResolvedValue({ id: 'template-1' });
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.workoutProgram.create.mockRejectedValue(uniqueViolation());
+
+    await expect(service.assign(userId)).rejects.toMatchObject({
+      code: 'P2002',
+    });
+    expect(prisma.workoutProgram.create).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
 });
+
+function uniqueViolation() {
+  return new Prisma.PrismaClientKnownRequestError('unique', {
+    code: 'P2002',
+    clientVersion: '6.16.2',
+  });
+}
 
 const nextTemplate = {
   id: '22222222-2222-4222-8222-222222222222',
@@ -406,18 +518,21 @@ function installPromotion(
         ? atTarget()
         : [],
   );
-  prisma.workoutProgram.upsert.mockImplementation(
-    async (args: { update: { templateId: string; assignedAt: Date } }) => {
+  prisma.$queryRaw.mockImplementation(async () => [
+    { origin: 'SYSTEM', templateId: program.templateId },
+  ]);
+  prisma.workoutProgram.update.mockImplementation(
+    async (args: { data: { templateId: string; assignedAt: Date } }) => {
       const template = templates.find(
-        (item) => item.id === args.update.templateId,
+        (item) => item.id === args.data.templateId,
       );
       program = {
         ...program,
-        templateId: args.update.templateId,
-        assignedAt: args.update.assignedAt,
+        templateId: args.data.templateId,
+        assignedAt: args.data.assignedAt,
         template: {
           ...program.template,
-          id: args.update.templateId,
+          id: args.data.templateId,
           code: template?.code ?? program.template.code,
           name: template?.name ?? program.template.name,
           level: template?.level ?? program.template.level,
@@ -483,6 +598,7 @@ describe('program promotion', () => {
         frequencyPerWeek: 2,
         accent: 'UPPER',
         active: true,
+        origin: 'SYSTEM',
       },
     });
     expect(prisma.programTemplate.findMany).not.toHaveBeenCalled();
@@ -541,6 +657,7 @@ describe('program promotion', () => {
         frequencyPerWeek: 2,
         accent: { not: 'UPPER' },
         active: true,
+        origin: 'SYSTEM',
       },
       orderBy: { code: 'asc' },
     });
@@ -604,13 +721,13 @@ describe('program promotion', () => {
       suggestions: [],
     });
     expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
 
     await expect(
       service.acceptPromotion(userId, nextTemplate.id),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
   });
 
   it('returns null before the session target', async () => {
@@ -629,7 +746,23 @@ describe('program promotion', () => {
       service.acceptPromotion(userId, advancedLower.id),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('returns no offer and does not rewrite onboarding for a trainer program', async () => {
+    const { prisma, service } = createService();
+    prisma.workoutProgram.findUnique.mockResolvedValue({
+      template: { origin: 'TRAINER' },
+    });
+
+    await expect(service.getPromotion(userId)).resolves.toBeNull();
+    await expect(
+      service.acceptPromotion(userId, nextTemplate.id),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+    expect(prisma.programTemplate.findFirst).not.toHaveBeenCalled();
   });
 
   it('keeps history, starts a new cycle, and ignores a second accept', async () => {
@@ -645,7 +778,7 @@ describe('program promotion', () => {
       where: { userId },
       data: { experience: 'INTERMEDIATE', focusAreas: ['shoulders'] },
     });
-    expect(prisma.workoutProgram.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.workoutProgram.update).toHaveBeenCalledTimes(1);
     expect(
       prisma.workoutProgram.findUnique.mock.calls.some(
         ([args]) =>
@@ -673,7 +806,7 @@ describe('program promotion', () => {
     await expect(
       service.acceptPromotion(userId, nextTemplate.id),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.workoutProgram.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.workoutProgram.update).toHaveBeenCalledTimes(1);
   });
 
   it('assigns the chosen advanced zone and rewrites its focus', async () => {
@@ -721,15 +854,15 @@ describe('program promotion', () => {
       calls.push(inside ? 'update' : 'update-outside');
       return state.apply(args.data);
     });
-    prisma.workoutProgram.upsert.mockImplementation(async () => {
-      calls.push(inside ? 'upsert' : 'upsert-outside');
+    prisma.workoutProgram.update.mockImplementation(async () => {
+      calls.push(inside ? 'assign' : 'assign-outside');
       throw new Error('assign failed');
     });
 
     await expect(
       service.acceptPromotion(userId, nextTemplate.id),
     ).rejects.toThrow('assign failed');
-    expect(calls).toEqual(['update', 'upsert']);
+    expect(calls).toEqual(['update', 'assign']);
     expect(state.responses().experience).toBe('BEGINNER');
   });
 
@@ -780,6 +913,6 @@ describe('program promotion', () => {
       service.acceptPromotion(userId, nextTemplate.id),
     ).rejects.toMatchObject({ code: 'P2034' });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
-    expect(prisma.workoutProgram.upsert).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
   });
 });

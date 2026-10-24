@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -34,6 +35,11 @@ const PROMOTION_NOT_AVAILABLE = {
   message: 'This program is no longer available to start',
 };
 
+const TRAINER_PROGRAM_ASSIGNED = {
+  code: 'TRAINER_PROGRAM_ASSIGNED',
+  message: 'A trainer program is already assigned',
+};
+
 const STORED_EXPERIENCE = {
   beginner: 'BEGINNER',
   intermediate: 'INTERMEDIATE',
@@ -62,8 +68,22 @@ type ProgramRecord = Prisma.WorkoutProgramGetPayload<{
 
 type ProgramStore = Pick<
   Prisma.TransactionClient,
-  'onboardingResponses' | 'programTemplate' | 'workoutProgram' | 'workoutLog'
+  | '$queryRaw'
+  | 'onboardingResponses'
+  | 'programTemplate'
+  | 'workoutProgram'
+  | 'workoutLog'
 >;
+
+type AssignOptions = {
+  preserveAssignedAt?: boolean;
+  onTrainerProgram?: 'keep' | 'reject';
+};
+
+type AssignmentLock = {
+  origin: 'SYSTEM' | 'TRAINER';
+  templateId: string;
+};
 
 type AssignedProgramBase = Omit<
   AssignedProgramSummary,
@@ -81,51 +101,25 @@ export class ProgramsService {
   async assign(
     userId: string,
     db: ProgramStore = this.prisma,
-    options?: { preserveAssignedAt?: boolean },
+    options?: AssignOptions,
   ): Promise<AssignedProgramResponse> {
-    const responses = await db.onboardingResponses.findUnique({
-      where: { userId },
-    });
-    if (!responses) {
-      throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+    const resolved: AssignOptions = {
+      ...options,
+      onTrainerProgram: options?.onTrainerProgram ?? 'reject',
+    };
+    if (db !== this.prisma) {
+      return this.assignLocked(userId, db, resolved);
     }
 
-    const match = matchProgramTemplate({
-      programTrack: responses.programTrack === 'MALE' ? 'male' : 'female',
-      experience: responses.experience.toLowerCase(),
-      trainingFrequency: responses.trainingFrequency,
-      focusArea: responses.focusAreas[0],
-    });
-    if (!match) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
-
-    const template = await db.programTemplate.findFirst({
-      where: { ...match, active: true },
-    });
-    if (!template) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
-
-    if (options?.preserveAssignedAt) {
-      const existing = await db.workoutProgram.findUnique({
-        where: { userId },
-        select: { templateId: true },
-      });
-      if (existing?.templateId === template.id) {
-        const current = await db.workoutProgram.findUnique({
-          where: { userId },
-          include: programInclude,
-        });
-        if (!current) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
-        return this.withProgramCycle(userId, toAssignedProgram(current), db);
-      }
+    try {
+      return await this.prisma.$transaction((tx) =>
+        this.assignLocked(userId, tx, resolved),
+      );
+    } catch (error) {
+      // Postgres aborts the failed transaction. Recovery is a new one.
+      if (!isUniqueViolation(error)) throw error;
+      return this.recoverLostInsert(userId, resolved.onTrainerProgram, error);
     }
-
-    const program = await db.workoutProgram.upsert({
-      where: { userId },
-      create: { userId, templateId: template.id },
-      update: { templateId: template.id, assignedAt: new Date() },
-      include: programInclude,
-    });
-
-    return this.withProgramCycle(userId, toAssignedProgram(program), db);
   }
 
   async getAssignedProgram(
@@ -187,7 +181,12 @@ export class ProgramsService {
     userId: string,
     db: ProgramStore = this.prisma,
   ): Promise<void> {
-    await db.workoutProgram.deleteMany({ where: { userId } });
+    const run = (store: ProgramStore) => this.unassignLocked(userId, store);
+    if (db === this.prisma) {
+      await this.prisma.$transaction(run);
+      return;
+    }
+    await run(db);
   }
 
   async listExercises(query: ListExercisesQuery): Promise<ExerciseResponse[]> {
@@ -264,10 +263,102 @@ export class ProgramsService {
     );
   }
 
+  private async assignLocked(
+    userId: string,
+    db: ProgramStore,
+    options: AssignOptions,
+  ): Promise<AssignedProgramResponse> {
+    const locked = await lockAssignment(db, userId);
+    if (locked?.origin === 'TRAINER') {
+      if (options.onTrainerProgram === 'reject') {
+        throw new ConflictException(TRAINER_PROGRAM_ASSIGNED);
+      }
+      return this.currentProgram(userId, db);
+    }
+
+    const responses = await db.onboardingResponses.findUnique({
+      where: { userId },
+    });
+    if (!responses) {
+      throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+    }
+
+    const match = matchProgramTemplate({
+      programTrack: responses.programTrack === 'MALE' ? 'male' : 'female',
+      experience: responses.experience.toLowerCase(),
+      trainingFrequency: responses.trainingFrequency,
+      focusArea: responses.focusAreas[0],
+    });
+    if (!match) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+
+    const template = await db.programTemplate.findFirst({
+      where: { ...match, active: true, origin: 'SYSTEM' },
+    });
+    if (!template) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+
+    if (options.preserveAssignedAt && locked?.templateId === template.id) {
+      return this.currentProgram(userId, db);
+    }
+
+    if (!locked) {
+      const program = await db.workoutProgram.create({
+        data: { userId, templateId: template.id },
+        include: programInclude,
+      });
+      return this.withProgramCycle(userId, toAssignedProgram(program), db);
+    }
+
+    const program = await db.workoutProgram.update({
+      where: { userId },
+      data: { templateId: template.id, assignedAt: new Date() },
+      include: programInclude,
+    });
+    return this.withProgramCycle(userId, toAssignedProgram(program), db);
+  }
+
+  private async recoverLostInsert(
+    userId: string,
+    onTrainerProgram: AssignOptions['onTrainerProgram'],
+    cause: unknown,
+  ): Promise<AssignedProgramResponse> {
+    return this.prisma.$transaction(async (tx) => {
+      const locked = await lockAssignment(tx, userId);
+      if (!locked) throw cause;
+      if (locked.origin === 'TRAINER' && onTrainerProgram === 'reject') {
+        throw new ConflictException(TRAINER_PROGRAM_ASSIGNED);
+      }
+      return this.currentProgram(userId, tx);
+    });
+  }
+
+  private async unassignLocked(
+    userId: string,
+    db: ProgramStore,
+  ): Promise<void> {
+    const locked = await lockAssignment(db, userId);
+    if (!locked || locked.origin === 'TRAINER') return;
+    await db.workoutProgram.deleteMany({ where: { userId } });
+  }
+
+  private async currentProgram(
+    userId: string,
+    db: ProgramStore,
+  ): Promise<AssignedProgramResponse> {
+    const current = await this.loadProgram(userId, db);
+    if (!current) throw new NotFoundException(PROGRAM_NOT_AVAILABLE);
+    return this.withProgramCycle(userId, current, db);
+  }
+
   private async promotionFor(
     userId: string,
     db: ProgramStore,
   ): Promise<ProgramPromotion | null> {
+    const assigned = await db.workoutProgram.findUnique({
+      where: { userId },
+      select: { template: { select: { origin: true } } },
+    });
+    if (assigned?.template?.origin === 'TRAINER') return null;
+
     const { program } = await this.getMine(userId, db);
     if (
       !program ||
@@ -291,6 +382,7 @@ export class ProgramsService {
           frequencyPerWeek: program.frequencyPerWeek,
           accent: program.accent as Accent,
           active: true,
+          origin: 'SYSTEM',
         },
       });
       const suggestions =
@@ -307,6 +399,7 @@ export class ProgramsService {
         frequencyPerWeek: program.frequencyPerWeek,
         accent: { not: program.accent as Accent },
         active: true,
+        origin: 'SYSTEM',
       },
       orderBy: { code: 'asc' },
     });
@@ -444,6 +537,33 @@ function toAssignedSummary(program: {
     accent: program.template.accent as ProgramAccent,
     assignedAt: program.assignedAt.toISOString(),
   };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
+}
+
+// Locks an existing workout_programs row until the transaction commits.
+// A missing row is not locked. Two inserts then rely on user_id uniqueness.
+// P2002 aborts that transaction; do not keep using it. A later writer can
+// still replace a trainer row if it updates workout_programs without this lock.
+// Profile and promotion pass their own transaction, so a lost insert fails
+// the whole request instead of recovering inside the aborted transaction.
+async function lockAssignment(
+  db: ProgramStore,
+  userId: string,
+): Promise<AssignmentLock | null> {
+  const rows = await db.$queryRaw<AssignmentLock[]>`
+    SELECT pt.origin, wp.template_id AS "templateId"
+    FROM workout_programs wp
+    JOIN program_templates pt ON pt.id = wp.template_id
+    WHERE wp.user_id = CAST(${userId} AS uuid)
+    FOR UPDATE OF wp
+  `;
+  return rows[0] ?? null;
 }
 
 function toAssignedProgram(program: ProgramRecord): AssignedProgramRecord {

@@ -12,7 +12,7 @@ type ExerciseCountArgs = {
     templateExercises?: {
       some?: {
         templateDay?: {
-          template?: { active?: boolean };
+          template?: { active?: boolean; origin?: string };
         };
       };
     };
@@ -23,7 +23,9 @@ function referencesActiveTemplate(args?: ExerciseCountArgs): boolean {
   return (
     args?.where?.repsMin === 12 &&
     args?.where?.repsMax === 12 &&
-    args.where.templateExercises?.some?.templateDay?.template?.active === true
+    args.where.templateExercises?.some?.templateDay?.template?.active ===
+      true &&
+    args.where.templateExercises.some.templateDay.template.origin === 'SYSTEM'
   );
 }
 
@@ -47,16 +49,21 @@ function checkWith(state: {
       }),
     },
     programTemplate: {
-      count: vi.fn((args?: { where?: { active?: boolean } }) =>
+      count: vi.fn((args?: { where?: { active?: boolean; origin?: string } }) =>
         Promise.resolve(
           args?.where?.active === true
-            ? state.activeTemplates
+            ? args.where.origin === 'SYSTEM'
+              ? state.activeTemplates
+              : 0
             : (state.templates ?? state.activeTemplates),
         ),
       ),
     },
   };
-  return new ExerciseSeedCheck(prisma as never);
+  return {
+    check: new ExerciseSeedCheck(prisma as never),
+    prisma,
+  };
 }
 
 const seeded = {
@@ -75,7 +82,7 @@ describe('ExerciseSeedCheck', () => {
         activeTemplates: 0,
         placeholdersOnActiveTemplates: 0,
         templates: 0,
-      }).onApplicationBootstrap(),
+      }).check.onApplicationBootstrap(),
     ).rejects.toThrow(MISSING_EXERCISE_DATA_ERROR);
   });
 
@@ -87,7 +94,7 @@ describe('ExerciseSeedCheck', () => {
         placeholdersOnActiveTemplates: 44,
         unscopedPlaceholders: 44,
         templates: 27,
-      }).onApplicationBootstrap(),
+      }).check.onApplicationBootstrap(),
     ).rejects.toThrow(MISSING_EXERCISE_DATA_ERROR);
   });
 
@@ -97,7 +104,7 @@ describe('ExerciseSeedCheck', () => {
         exercises: 0,
         activeTemplates: 27,
         placeholdersOnActiveTemplates: 0,
-      }).onApplicationBootstrap(),
+      }).check.onApplicationBootstrap(),
     ).rejects.toThrow(MISSING_EXERCISE_DATA_ERROR);
   });
 
@@ -107,20 +114,46 @@ describe('ExerciseSeedCheck', () => {
         exercises: 44,
         activeTemplates: 27,
         placeholdersOnActiveTemplates: 44,
-      }).onApplicationBootstrap(),
+      }).check.onApplicationBootstrap(),
     ).rejects.toThrow(UNSEEDED_EXERCISE_DATA_ERROR);
   });
 
   it('boots when active templates reference exercises with real rep ranges', async () => {
-    await expect(
-      checkWith(seeded).onApplicationBootstrap(),
-    ).resolves.toBeUndefined();
+    const { check, prisma } = checkWith(seeded);
+    await expect(check.onApplicationBootstrap()).resolves.toBeUndefined();
+    expect(prisma.programTemplate.count).toHaveBeenCalledWith({
+      where: { active: true, origin: 'SYSTEM' },
+    });
+    expect(prisma.exercise.count).toHaveBeenCalledWith({
+      where: {
+        repsMin: 12,
+        repsMax: 12,
+        templateExercises: {
+          some: {
+            templateDay: {
+              template: { active: true, origin: 'SYSTEM' },
+            },
+          },
+        },
+      },
+    });
   });
 
   it('boots when no exercise on an active template allows an abs add-on', async () => {
     await expect(
-      checkWith(seeded).onApplicationBootstrap(),
+      checkWith(seeded).check.onApplicationBootstrap(),
     ).resolves.toBeUndefined();
+  });
+
+  it('refuses to boot when no system template is active', async () => {
+    await expect(
+      checkWith({
+        exercises: 44,
+        activeTemplates: 0,
+        placeholdersOnActiveTemplates: 0,
+        templates: 4,
+      }).check.onApplicationBootstrap(),
+    ).rejects.toThrow(MISSING_EXERCISE_DATA_ERROR);
   });
 
   it('boots when only an inactive template still has placeholder reps', async () => {
@@ -129,7 +162,7 @@ describe('ExerciseSeedCheck', () => {
         ...seeded,
         unscopedPlaceholders: 8,
         placeholdersOnActiveTemplates: 0,
-      }).onApplicationBootstrap(),
+      }).check.onApplicationBootstrap(),
     ).resolves.toBeUndefined();
   });
 });
