@@ -81,6 +81,21 @@ a {
   --color-accent: var(--color-lime);
 }
 
+/* Coach pages only. Public and client surfaces keep the root palette. */
+.coach-app {
+  --color-background: #121416;
+  --color-panel: #1b1e22;
+  --color-line: #2c3036;
+  --color-teal: #5ebfb6;
+  --color-wash: rgb(255 255 255 / 0.03);
+  --color-accent: var(--color-teal);
+  --accent: var(--color-teal);
+  --background: var(--color-background);
+  --foreground: var(--color-ink);
+  background: var(--color-background);
+  color: var(--color-ink);
+}
+
 .noise-overlay::before {
   position: fixed;
   inset: 0;

@@ -21,8 +21,18 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@/i18n/navigation', () => ({
-  Link: ({ href, children }: { href: string; children: ReactNode }) => (
-    <a href={href}>{children}</a>
+  Link: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: ReactNode;
+    'aria-current'?: 'page';
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
   ),
   usePathname: () => navigation.pathname,
   useRouter: () => ({ replace: navigation.replace }),
@@ -87,6 +97,10 @@ describe('CoachShell', () => {
     api.logout.mockResolvedValue(undefined);
 
     renderShell();
+    expect(screen.getByRole('link', { name: 'Clients' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
     expect(
       screen.getByRole('button', { name: 'Change language' }),
     ).toBeInTheDocument();
@@ -96,6 +110,14 @@ describe('CoachShell', () => {
     expect(navigation.replace).toHaveBeenCalledWith('/login');
     expect(readSessionHint()).toBeNull();
     expect(useAuthStore.getState().accessToken).toBeNull();
+  });
+
+  it('does not mark Clients as the current page on a client file', () => {
+    navigation.pathname = '/coach/clients/client-1';
+    renderShell();
+    expect(screen.getByRole('link', { name: 'Clients' })).not.toHaveAttribute(
+      'aria-current',
+    );
   });
 
   it('keeps the coach page when logout fails after the local session is cleared', async () => {
