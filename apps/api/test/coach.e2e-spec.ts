@@ -490,19 +490,31 @@ describeWithDatabase('coach clients (e2e)', () => {
         .expect(403);
     }
 
-    const hidden = [
-      '/api/v1/coach/clients/00000000-0000-4000-8000-000000000000/workouts',
-      `/api/v1/coach/clients/${trainer.id}/measurements`,
-      `/api/v1/coach/clients/${admin.id}/strength`,
-      `/api/v1/coach/clients/${trainer.id}/progress-photos`,
+    const deniedIds = [
+      '00000000-0000-4000-8000-000000000000',
+      trainer.id,
+      admin.id,
     ];
-    for (const path of hidden) {
-      const response = await request(app.getHttpServer())
-        .get(path)
-        .set('Authorization', trainer.authorization)
-        .expect(404);
-      expect(response.body.code).toBe('CLIENT_NOT_FOUND');
-      expect(JSON.stringify(response.body)).not.toContain('storageKey');
+    for (const userId of deniedIds) {
+      for (const authorization of [
+        trainer.authorization,
+        admin.authorization,
+      ]) {
+        for (const path of [
+          `/api/v1/coach/clients/${userId}/workouts`,
+          `/api/v1/coach/clients/${userId}/measurements`,
+          `/api/v1/coach/clients/${userId}/strength`,
+          `/api/v1/coach/clients/${userId}/progress-photos`,
+          `/api/v1/coach/clients/${userId}/progress-photos/${ownPhoto}`,
+        ]) {
+          const response = await request(app.getHttpServer())
+            .get(path)
+            .set('Authorization', authorization)
+            .expect(404);
+          expect(response.body.code).toBe('CLIENT_NOT_FOUND');
+          expect(JSON.stringify(response.body)).not.toContain('storageKey');
+        }
+      }
     }
 
     const page = await request(app.getHttpServer())
@@ -591,13 +603,15 @@ describeWithDatabase('coach clients (e2e)', () => {
       'width',
     ]);
     expect(JSON.stringify(photos.body)).not.toContain('storageKey');
-    const foreignPhoto = await request(app.getHttpServer())
-      .get(
-        `/api/v1/coach/clients/${clientAccount.id}/progress-photos/${otherPhoto}`,
-      )
-      .set('Authorization', trainer.authorization)
-      .expect(404);
-    expect(foreignPhoto.body.code).toBe('PHOTO_NOT_FOUND');
-    expect(JSON.stringify(foreignPhoto.body)).not.toContain('storageKey');
+    for (const authorization of [trainer.authorization, admin.authorization]) {
+      const foreignPhoto = await request(app.getHttpServer())
+        .get(
+          `/api/v1/coach/clients/${clientAccount.id}/progress-photos/${otherPhoto}`,
+        )
+        .set('Authorization', authorization)
+        .expect(404);
+      expect(foreignPhoto.body.code).toBe('PHOTO_NOT_FOUND');
+      expect(JSON.stringify(foreignPhoto.body)).not.toContain('storageKey');
+    }
   });
 });
