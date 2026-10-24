@@ -20,7 +20,11 @@ Landing plan buttons load prices from `GET /subscriptions/plans` and persist the
 
 `/profile` is a protected client route. Completed users reach it from the nav and dashboard. It loads `GET /users/me`, `GET /users/me/onboarding-responses`, `GET /subscriptions/me`, and `GET /programs/assigned`. Saving posts `PATCH /users/me/profile`. Renewing posts `POST /subscriptions/renew` with `{ planId }`. Mock confirmation is immediate, same as checkout, so the page stays on profile.
 
-Login may include a safe internal `next` path (pathname plus query). After a successful login, an onboarded member is sent there instead of the default dashboard/checkout path.
+Login may include a safe internal `next` path (pathname plus query). After a successful login, an onboarded member is sent there instead of the default dashboard/checkout path. A trainer or admin is sent to `/coach` before that path.
+
+## Coach
+
+`/coach` lists clients. A name opens `/coach/clients/:userId`, a read-only file of the saved profile, quiz, assigned program, and subscription access. The header links back to `/coach`, switches locale, and logs out through `POST /auth/logout`. Success opens `/login`. A failed logout stays on the page and shows the error. `ys_web_session=coach` keeps a trainer or admin on the coach pages. It is not sent to the API.
 
 ## Onboarding persistence
 
@@ -44,6 +48,9 @@ The landing nav reads the `ys_web_session` hint. Guests see Log in; users
 still in onboarding see Continue (`/onboarding`); completed users see
 Dashboard (`/dashboard`) and Profile (`/profile`). The dashboard YS mark
 links to the landing page.
-A locale switcher (Ukrainian by default, English) is on every page. The
-choice is stored in the `NEXT_LOCALE` cookie, and every URL is prefixed
-(`/uk` or `/en`).
+A locale switcher (Ukrainian by default, English) is on every page, including
+the coach header beside Log out. The choice is stored in the `NEXT_LOCALE`
+cookie, and every URL is prefixed (`/uk` or `/en`). The session hint also
+accepts `coach`. The proxy keeps that visitor on `/coach` and sends them
+there from the client app. The landing nav still shows Log in for that hint,
+because it only branches on `complete` and `onboarding`.

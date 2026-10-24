@@ -162,6 +162,14 @@ On the web app, landing plan CTAs store `planId` in `sessionStorage`. Guests and
 
 See [ARCHITECTURE.md](ARCHITECTURE.md#subscriptions) for the payment-provider token and index details.
 
+## Coach
+
+`GET /api/v1/coach/clients` and `GET /api/v1/coach/clients/:userId` require a bearer JWT with role `TRAINER` or `ADMIN`. A client token is `403`. A missing bearer is `401`. The `ys_web_session` cookie is not read. `:userId` must be a UUID or the response is `400` `VALIDATION_ERROR`. An unknown id, or a trainer or admin id, is `404` `CLIENT_NOT_FOUND`.
+
+The list returns client accounts only, newest `createdAt` then `id`. Each summary is `id`, `email`, `name`, `createdAt`, `onboardingCompleted`, `programAssigned`, and `subscriptionActive`. The detail adds `profile`, `onboarding`, `program`, and `subscription`, each `null` when that row is missing. Profile is birth date, calculation sex, height, activity, weight goal, and timezone. Onboarding is the saved quiz without row ids. Program is the assigned template's accent, code, CSV subtitle (`name`), level, frequency, gender, and `assignedAt`. Subscription is the latest row by `createdAt`, with `active`, `status`, `planName`, and `currentPeriodEnd`. `active` means `ACTIVE` and `currentPeriodEnd` still in the future, the same rule as subscription access. This read does not expire lapsed rows. Password hashes, sessions, tokens, `providerReference`, `grantedByUserId`, health restrictions, measurements, progress photos, and workout logs are left out.
+
+On the web, `/coach` is the roster and `/coach/clients/:userId` is that read-only file. A name in the roster links to the file. The header links the YS Fitness mark and Clients back to `/coach`, switches locale, and logs out. Log out calls `POST /auth/logout`. Success clears the session hint and opens `/login`. A failed logout shows the error and stays on the page. `ys_web_session=coach` only tells the proxy and gates where to send a trainer or admin. It does not authorize the API. After login, a trainer or admin goes to `/coach` instead of onboarding or the client dashboard.
+
 ## Checks
 
 ```bash

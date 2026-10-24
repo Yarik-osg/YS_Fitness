@@ -3,6 +3,7 @@
 import type { CoachClientSummary } from '@repo/shared-types';
 import { useLocale, useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Link } from '@/i18n/navigation';
 import { useCoachClients } from '@/lib/hooks/use-coach-clients';
 
 export function CoachClientsPage() {
@@ -11,7 +12,7 @@ export function CoachClientsPage() {
   const clients = useCoachClients();
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 pt-10 pb-16 sm:px-6">
+    <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
       <h1 className="font-heading text-4xl leading-none text-ink uppercase">
         {t('title')}
       </h1>
@@ -95,7 +96,12 @@ function ClientRow({
         className="block font-medium text-ink sm:table-cell sm:px-4 sm:py-3"
         scope="row"
       >
-        {client.name?.trim() ? client.name : t('unnamed')}
+        <Link
+          href={`/coach/clients/${client.id}`}
+          className="underline decoration-line underline-offset-4 hover:text-teal hover:decoration-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {client.name?.trim() ? client.name : t('unnamed')}
+        </Link>
       </th>
       <td className="mt-1 block break-all text-ink sm:mt-0 sm:table-cell sm:break-normal sm:px-4 sm:py-3">
         {client.email}

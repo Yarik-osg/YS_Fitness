@@ -219,4 +219,166 @@ describeWithDatabase('coach clients (e2e)', () => {
     );
     expect(waiting).toMatchObject({ subscriptionActive: false });
   });
+
+  it('returns one client file to a coach and hides everyone else', async () => {
+    const clientAccount = await createUser('detail-client@example.com');
+    const bare = await createUser('detail-bare@example.com');
+    const pending = await createUser('detail-pending@example.com');
+    const trainer = await createUser(
+      'detail-trainer@example.com',
+      UserRole.TRAINER,
+    );
+    const admin = await createUser('detail-admin@example.com', UserRole.ADMIN);
+
+    await prisma.userProfile.create({
+      data: {
+        userId: clientAccount.id,
+        name: 'Olena Koval',
+        dateOfBirth: new Date('1994-04-12'),
+        biologicalSexForCalculation: 'FEMALE',
+        heightCm: 168,
+        activityLevel: 'MODERATELY_ACTIVE',
+        goal: 'MAINTAIN_WEIGHT',
+        onboardingCompletedAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    });
+    await prisma.onboardingResponses.create({
+      data: {
+        userId: clientAccount.id,
+        programTrack: 'FEMALE',
+        currentBody: '2',
+        desiredBody: '4',
+        mainGoal: 'MAINTAIN',
+        experience: 'BEGINNER',
+        trainingFrequency: '3',
+        focusAreas: ['glutes'],
+        nutritionCurrent: 'BALANCED',
+        mealsPerDay: '3',
+        eatingHabits: ['none'],
+      },
+    });
+    const template = await prisma.programTemplate.findFirst({
+      where: { active: true },
+    });
+    if (!template) throw new Error('seeded template missing');
+    await prisma.workoutProgram.create({
+      data: { userId: clientAccount.id, templateId: template.id },
+    });
+    const plan = await prisma.plan.create({
+      data: {
+        code: 'COACH_DETAIL_E2E',
+        name: 'Coach detail',
+        priceAmount: 100,
+        currency: 'UAH',
+        intervalMonths: 1,
+      },
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: clientAccount.id,
+        planId: plan.id,
+        status: 'ACTIVE',
+        provider: 'MANUAL',
+        currentPeriodEnd: new Date('2027-06-01T00:00:00.000Z'),
+      },
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: bare.id,
+        planId: plan.id,
+        status: 'ACTIVE',
+        provider: 'MANUAL',
+        currentPeriodEnd: new Date('2020-01-01T00:00:00.000Z'),
+      },
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: pending.id,
+        planId: plan.id,
+        status: 'PENDING',
+        provider: 'MOCK',
+        currentPeriodEnd: new Date('2027-06-01T00:00:00.000Z'),
+      },
+    });
+
+    const path = `/api/v1/coach/clients/${clientAccount.id}`;
+    await request(app.getHttpServer()).get(path).expect(401);
+    await request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', clientAccount.authorization)
+      .expect(403);
+    const invalid = await request(app.getHttpServer())
+      .get('/api/v1/coach/clients/not-a-uuid')
+      .set('Authorization', trainer.authorization)
+      .expect(400);
+    expect(invalid.body.code).toBe('VALIDATION_ERROR');
+    const missing = await request(app.getHttpServer())
+      .get('/api/v1/coach/clients/00000000-0000-4000-8000-000000000000')
+      .set('Authorization', trainer.authorization)
+      .expect(404);
+    expect(missing.body.code).toBe('CLIENT_NOT_FOUND');
+    const trainerAsClient = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${trainer.id}`)
+      .set('Authorization', trainer.authorization)
+      .expect(404);
+    expect(trainerAsClient.body.code).toBe('CLIENT_NOT_FOUND');
+
+    const trainerFile = await request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    const adminFile = await request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+    expect(adminFile.body).toEqual(trainerFile.body);
+    expect(Object.keys(trainerFile.body).sort()).toEqual([
+      'createdAt',
+      'email',
+      'id',
+      'name',
+      'onboarding',
+      'onboardingCompleted',
+      'profile',
+      'program',
+      'subscription',
+    ]);
+    expect(trainerFile.body).toMatchObject({
+      email: 'detail-client@example.com',
+      name: 'Olena Koval',
+      onboardingCompleted: true,
+      onboarding: { mainGoal: 'maintain', focusAreas: ['glutes'] },
+      program: {
+        templateCode: template.code,
+        accent: template.accent,
+      },
+      subscription: {
+        active: true,
+        status: 'ACTIVE',
+        planName: 'Coach detail',
+      },
+    });
+    expect(JSON.stringify(trainerFile.body)).not.toContain('passwordHash');
+    expect(trainerFile.body.profile.healthRestrictions).toBeUndefined();
+
+    const bareFile = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${bare.id}`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(bareFile.body).toMatchObject({
+      profile: null,
+      onboarding: null,
+      program: null,
+      subscription: { active: false, status: 'ACTIVE' },
+    });
+
+    const pendingFile = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${pending.id}`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(pendingFile.body.subscription).toMatchObject({
+      active: false,
+      status: 'PENDING',
+    });
+  });
 });

@@ -20,7 +20,7 @@ const PROGRAM_TRACK_TO_PRISMA = {
   male: 'MALE',
 } as const satisfies Record<ProgramTrack, PrismaProgramTrack>;
 
-const PROGRAM_TRACK_FROM_PRISMA = {
+export const PROGRAM_TRACK_FROM_PRISMA = {
   FEMALE: 'female',
   MALE: 'male',
 } as const satisfies Record<PrismaProgramTrack, ProgramTrack>;
@@ -109,7 +109,22 @@ export function sameOnboardingResponses(
 }
 
 export function toOnboardingResponsesRecord(
-  row: OnboardingResponses,
+  row: Pick<
+    OnboardingResponses,
+    | 'programTrack'
+    | 'currentBody'
+    | 'desiredBody'
+    | 'mainGoal'
+    | 'experience'
+    | 'trainingFrequency'
+    | 'focusAreas'
+    | 'nutritionCurrent'
+    | 'mealsPerDay'
+    | 'eatingHabits'
+    | 'physiqueLevel'
+    | 'createdAt'
+    | 'updatedAt'
+  >,
 ): OnboardingResponsesRecord {
   return {
     programTrack: PROGRAM_TRACK_FROM_PRISMA[row.programTrack],
