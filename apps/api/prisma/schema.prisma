@@ -9,7 +9,6 @@ datasource db {
 
 enum UserRole {
   CLIENT
-  TRAINER
   ADMIN
 }
 

@@ -268,7 +268,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
     expect(await prisma.subscription.count()).toBe(1);
   });
 
-  it('rejects a client grant and records grantedByUserId for a trainer', async () => {
+  it('rejects a client grant and records grantedByUserId for an admin', async () => {
     const client = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({
@@ -292,7 +292,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
       data: {
         email: 'trainer-grant@example.com',
         passwordHash: await hash('strong-password'),
-        role: UserRole.TRAINER,
+        role: UserRole.ADMIN,
       },
     });
     const trainerLogin = await request(app.getHttpServer())
@@ -407,7 +407,7 @@ describeWithDatabase('subscriptions (e2e)', () => {
     });
     const trainer = await createUser(
       'trainer-past-grant@example.com',
-      UserRole.TRAINER,
+      UserRole.ADMIN,
     );
 
     await request(app.getHttpServer())

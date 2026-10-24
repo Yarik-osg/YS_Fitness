@@ -59,10 +59,7 @@ export class TrainerTemplatesService {
   ): Promise<TrainerProgramTemplateListResponse> {
     this.assertCoach(actor);
     const templates = await this.prisma.programTemplate.findMany({
-      where: {
-        origin: 'TRAINER',
-        ...(actor.role === 'TRAINER' ? { ownerId: actor.id } : {}),
-      },
+      where: { origin: 'TRAINER' },
       orderBy: [{ updatedAt: 'desc' }, { name: 'asc' }],
     });
     return { templates: templates.map(toSummary) };
@@ -77,7 +74,7 @@ export class TrainerTemplatesService {
       where: { id: templateId },
       include: detailInclude,
     });
-    this.assertVisible(actor, template);
+    this.assertVisible(template);
     return toDetail(template);
   }
 
@@ -99,7 +96,7 @@ export class TrainerTemplatesService {
     this.assertCoach(actor);
     return this.prisma.$transaction(async (db) => {
       const locked = await lockTemplate(db, templateId);
-      this.assertVisible(actor, locked);
+      this.assertVisible(locked);
       const logs = await db.workoutLog.count({ where: { templateId } });
       if (logs > 0) {
         throw new ConflictException({
@@ -129,12 +126,12 @@ export class TrainerTemplatesService {
     this.assertCoach(actor);
     return this.write(async (db) => {
       const locked = await lockTemplate(db, templateId);
-      this.assertVisible(actor, locked);
+      this.assertVisible(locked);
       const source = await db.programTemplate.findUnique({
         where: { id: templateId },
         include: detailInclude,
       });
-      this.assertVisible(actor, source);
+      this.assertVisible(source);
       return this.insert(db, bodyFromTemplate(source), {
         ownerId: source.ownerId,
         active: source.active,
@@ -146,7 +143,7 @@ export class TrainerTemplatesService {
     this.assertCoach(actor);
     await this.prisma.$transaction(async (db) => {
       const locked = await lockTemplate(db, templateId);
-      this.assertVisible(actor, locked);
+      this.assertVisible(locked);
       const [programs, logs] = await Promise.all([
         db.workoutProgram.count({ where: { templateId } }),
         db.workoutLog.count({ where: { templateId } }),
@@ -219,8 +216,8 @@ export class TrainerTemplatesService {
 
   private assertCoach(
     actor: TrainerTemplateActor,
-  ): asserts actor is TrainerTemplateActor & { role: 'TRAINER' | 'ADMIN' } {
-    if (actor.role === 'TRAINER' || actor.role === 'ADMIN') return;
+  ): asserts actor is TrainerTemplateActor & { role: 'ADMIN' } {
+    if (actor.role === 'ADMIN') return;
     throw new ForbiddenException({
       code: 'FORBIDDEN',
       message: 'You do not have permission to perform this action',
@@ -228,15 +225,9 @@ export class TrainerTemplatesService {
   }
 
   private assertVisible<T extends LockedTemplate>(
-    actor: TrainerTemplateActor,
     template: T | null,
   ): asserts template is T & { origin: 'TRAINER'; ownerId: string } {
-    if (
-      !template ||
-      template.origin !== 'TRAINER' ||
-      !template.ownerId ||
-      (actor.role === 'TRAINER' && template.ownerId !== actor.id)
-    ) {
+    if (!template || template.origin !== 'TRAINER' || !template.ownerId) {
       throw new NotFoundException({
         code: 'TEMPLATE_NOT_FOUND',
         message: 'Program template not found',

@@ -1,19 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
-  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { TrainerTemplatesService } from './trainer-templates.service.js';
 
-const trainerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const coachId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const adminId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const templateId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const exerciseId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
-const trainer = { id: trainerId, role: 'TRAINER' as const };
+const coach = { id: coachId, role: 'ADMIN' as const };
 const admin = { id: adminId, role: 'ADMIN' as const };
 
 const input = {
@@ -37,7 +37,7 @@ const input = {
   })),
 };
 
-function stored(ownerId = trainerId) {
+function stored(ownerId = coachId) {
   return {
     id: templateId,
     code: 'Tabcdef01234567',
@@ -82,7 +82,7 @@ function createService() {
     $queryRaw: vi
       .fn()
       .mockResolvedValue([
-        { id: templateId, origin: 'TRAINER', ownerId: trainerId },
+        { id: templateId, origin: 'TRAINER', ownerId: coachId },
       ]),
     exercise: {
       findMany: vi.fn().mockResolvedValue([{ id: exerciseId }]),
@@ -116,24 +116,20 @@ function createService() {
 }
 
 describe('TrainerTemplatesService ownership', () => {
-  it('rejects update, delete, and duplicate of another trainer template', async () => {
+  it('rejects a client before changing a template', async () => {
     const { service, tx } = createService();
-    tx.$queryRaw.mockResolvedValue([
-      { id: templateId, origin: 'TRAINER', ownerId: otherId },
-    ]);
+    const client = { id: coachId, role: 'CLIENT' as const };
 
     await expect(
-      service.update(trainer, templateId, input),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(service.remove(trainer, templateId)).rejects.toMatchObject({
-      response: { code: 'TEMPLATE_NOT_FOUND' },
+      service.update(client, templateId, input),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.remove(client, templateId)).rejects.toMatchObject({
+      response: { code: 'FORBIDDEN' },
     });
-    await expect(service.duplicate(trainer, templateId)).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.duplicate(client, templateId)).rejects.toBeInstanceOf(
+      ForbiddenException,
     );
-    expect(tx.programTemplate.update).not.toHaveBeenCalled();
-    expect(tx.programTemplate.delete).not.toHaveBeenCalled();
-    expect(tx.programTemplate.create).not.toHaveBeenCalled();
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 
   it('rejects a system template', async () => {
@@ -150,7 +146,7 @@ describe('TrainerTemplatesService ownership', () => {
     expect(tx.programTemplate.update).not.toHaveBeenCalled();
   });
 
-  it('lets an admin change a trainer template they do not own', async () => {
+  it('lets an admin change a coach template they do not own', async () => {
     const { service, tx } = createService();
     tx.$queryRaw.mockResolvedValue([
       { id: templateId, origin: 'TRAINER', ownerId: otherId },
@@ -188,10 +184,10 @@ describe('TrainerTemplatesService conflicts', () => {
     tx.workoutLog.count.mockResolvedValue(1);
 
     await expect(
-      service.update(trainer, templateId, input),
+      service.update(coach, templateId, input),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
-      service.update(trainer, templateId, input),
+      service.update(coach, templateId, input),
     ).rejects.toMatchObject({
       response: { code: 'TEMPLATE_HAS_LOGS' },
     });
@@ -202,7 +198,7 @@ describe('TrainerTemplatesService conflicts', () => {
     const { service, tx } = createService();
     tx.workoutProgram.count.mockResolvedValue(1);
 
-    await expect(service.remove(trainer, templateId)).rejects.toMatchObject({
+    await expect(service.remove(coach, templateId)).rejects.toMatchObject({
       response: { code: 'TEMPLATE_IN_USE' },
     });
     expect(tx.programTemplate.delete).not.toHaveBeenCalled();
@@ -214,7 +210,7 @@ describe('TrainerTemplatesService conflicts', () => {
       .mockRejectedValueOnce(collision(['code']))
       .mockResolvedValueOnce(stored());
 
-    await service.create(trainer, input);
+    await service.create(coach, input);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
   });
@@ -225,7 +221,7 @@ describe('TrainerTemplatesService conflicts', () => {
       collision(['templateId', 'dayNumber']),
     );
 
-    await expect(service.create(trainer, input)).rejects.toMatchObject({
+    await expect(service.create(coach, input)).rejects.toMatchObject({
       code: 'P2002',
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -235,7 +231,7 @@ describe('TrainerTemplatesService conflicts', () => {
     const { service, prisma } = createService();
     prisma.$transaction.mockRejectedValueOnce(collision());
 
-    await expect(service.create(trainer, input)).rejects.toMatchObject({
+    await expect(service.create(coach, input)).rejects.toMatchObject({
       code: 'P2002',
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -245,10 +241,10 @@ describe('TrainerTemplatesService conflicts', () => {
     const { service, tx } = createService();
     tx.exercise.findMany.mockResolvedValue([]);
 
-    await expect(service.create(trainer, input)).rejects.toBeInstanceOf(
+    await expect(service.create(coach, input)).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    await expect(service.create(trainer, input)).rejects.toMatchObject({
+    await expect(service.create(coach, input)).rejects.toMatchObject({
       response: { code: 'EXERCISE_NOT_FOUND' },
     });
   });

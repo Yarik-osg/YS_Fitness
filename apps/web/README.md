@@ -20,11 +20,11 @@ Landing plan buttons load prices from `GET /subscriptions/plans` and persist the
 
 `/profile` is a protected client route. Completed users reach it from the nav and dashboard. It loads `GET /users/me`, `GET /users/me/onboarding-responses`, `GET /subscriptions/me`, and `GET /programs/assigned`. Saving posts `PATCH /users/me/profile`. Renewing posts `POST /subscriptions/renew` with `{ planId }`. Mock confirmation is immediate, same as checkout, so the page stays on profile.
 
-Login may include a safe internal `next` path (pathname plus query). After a successful login, an onboarded member is sent there instead of the default dashboard/checkout path. A trainer or admin is sent to `/coach` before that path.
+Login may include a safe internal `next` path (pathname plus query). After a successful login, an onboarded member is sent there instead of the default dashboard/checkout path. An admin is sent to `/coach` before that path.
 
 ## Coach
 
-`/coach` lists clients. A name opens `/coach/clients/:userId`, a read-only file of the saved profile, quiz, assigned program, and subscription access. Below that, sessions, weight, strength, and progress photos load on their own. A failed section stays on the page and can be retried without hiding the others. Session pages do not drop workouts from an earlier program. Photo bytes are loaded with the signed-in request and dropped when the client changes. The header links back to `/coach`, switches locale, and logs out through `POST /auth/logout`. Success opens `/login`. A failed logout stays on the page and shows the error. `ys_web_session=coach` keeps a trainer or admin on the coach pages. It is not sent to the API.
+`/coach` lists clients. A name opens `/coach/clients/:userId`, a read-only file of the saved profile, quiz, assigned program, and subscription access. Below that, sessions, weight, strength, and progress photos load on their own. A failed section stays on the page and can be retried without hiding the others. Session pages do not drop workouts from an earlier program. Photo bytes are loaded with the signed-in request and dropped when the client changes. The header links back to `/coach`, switches locale, and logs out through `POST /auth/logout`. Success opens `/login`. A failed logout stays on the page and shows the error. `ys_web_session=coach` keeps an admin on the coach pages. It is not sent to the API. The user role is `ADMIN`. A template with origin `TRAINER` is a coach-authored program, not a user role.
 
 ## Onboarding persistence
 

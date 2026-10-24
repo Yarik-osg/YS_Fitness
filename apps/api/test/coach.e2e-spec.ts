@@ -101,7 +101,7 @@ describeWithDatabase('coach clients (e2e)', () => {
     );
     const trainer = await createUser(
       'roster-trainer@example.com',
-      UserRole.TRAINER,
+      UserRole.ADMIN,
     );
     const admin = await createUser('roster-admin@example.com', UserRole.ADMIN);
 
@@ -226,7 +226,7 @@ describeWithDatabase('coach clients (e2e)', () => {
     const pending = await createUser('detail-pending@example.com');
     const trainer = await createUser(
       'detail-trainer@example.com',
-      UserRole.TRAINER,
+      UserRole.ADMIN,
     );
     const admin = await createUser('detail-admin@example.com', UserRole.ADMIN);
 

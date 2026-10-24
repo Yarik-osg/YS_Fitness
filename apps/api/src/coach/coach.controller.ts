@@ -27,7 +27,7 @@ import { CoachService } from './coach.service.js';
 
 @Controller('coach')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('TRAINER', 'ADMIN')
+@Roles('ADMIN')
 export class CoachController {
   constructor(private readonly coach: CoachService) {}
 

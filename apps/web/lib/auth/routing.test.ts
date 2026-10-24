@@ -52,10 +52,22 @@ describe('getPostAuthPath', () => {
     );
   });
 
-  it('sends a trainer to the coach roster before onboarding', () => {
-    const trainer = user(null);
-    trainer.role = 'TRAINER';
-    expect(getPostAuthPath(trainer, 'plan-3')).toBe('/coach');
+  it('does not treat the removed trainer role as a coach', () => {
+    expect(
+      getPostAuthPath(
+        {
+          role: 'TRAINER',
+          profile: null,
+        },
+        'plan-3',
+      ),
+    ).toBe('/onboarding');
+  });
+
+  it('sends an admin to the coach roster before onboarding', () => {
+    const admin = user(null);
+    admin.role = 'ADMIN';
+    expect(getPostAuthPath(admin, 'plan-3')).toBe('/coach');
   });
 
   it('sends an admin to the coach roster', () => {
@@ -104,10 +116,10 @@ describe('resolvePostLoginPath', () => {
     );
   });
 
-  it('sends a trainer to the coach roster even when next points at the dashboard', () => {
-    const trainer = user(null);
-    trainer.role = 'TRAINER';
-    expect(resolvePostLoginPath(trainer, '/uk/dashboard')).toBe('/coach');
+  it('sends an admin to the coach roster even when next points at the dashboard', () => {
+    const admin = user(null);
+    admin.role = 'ADMIN';
+    expect(resolvePostLoginPath(admin, '/uk/dashboard')).toBe('/coach');
   });
 });
 

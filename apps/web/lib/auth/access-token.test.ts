@@ -34,11 +34,11 @@ describe('isAccessTokenFresh', () => {
     expect(isAccessTokenFresh('not-a-jwt')).toBe(false);
   });
 
-  it('reads an unpadded TRAINER-shaped payload', () => {
+  it('reads an unpadded admin-shaped payload', () => {
     const token = unpaddedToken({
       sub: '11111111-1111-4111-8111-111111111111',
       sessionId: '22222222-2222-4222-8222-222222222222',
-      role: 'TRAINER',
+      role: 'ADMIN',
       iat: 1_700_000_000,
       exp: 1_700_000_060,
     });

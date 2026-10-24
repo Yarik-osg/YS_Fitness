@@ -2,9 +2,12 @@ import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { hash } from 'argon2';
-import { readSeedEnvironment } from '../src/config/seed-environment.js';
+import {
+  ownerAccountRole,
+  readSeedEnvironment,
+} from '../src/config/seed-environment.js';
 import { CATALOG_PLANS } from './catalog-plans.js';
 import { mergeProgramFiles } from './merge-program-files.js';
 import { parseProgramCsv } from './parse-program-csv.js';
@@ -46,11 +49,11 @@ async function main(): Promise<void> {
     create: {
       email,
       passwordHash,
-      role: UserRole.TRAINER,
+      role: ownerAccountRole,
     },
     update: {
       passwordHash,
-      role: UserRole.TRAINER,
+      role: ownerAccountRole,
       isActive: true,
     },
   });
@@ -58,7 +61,7 @@ async function main(): Promise<void> {
   await seedPlans();
   await seedPrograms();
 
-  console.log(`Trainer account is ready: ${email}`);
+  console.log(`Owner account is ready: ${email}`);
 }
 
 const PROGRAM_FILES = ['Ys_women.csv', 'Ys_men.csv'] as const;

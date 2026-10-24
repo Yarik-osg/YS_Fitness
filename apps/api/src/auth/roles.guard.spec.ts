@@ -19,18 +19,18 @@ function contextFor(role?: UserRole) {
 }
 
 describe('RolesGuard', () => {
-  it('allows a trainer to pass a trainer/admin role requirement', () => {
+  it('allows an admin to pass an admin role requirement', () => {
     const reflector = {
-      getAllAndOverride: vi.fn().mockReturnValue(['TRAINER', 'ADMIN']),
+      getAllAndOverride: vi.fn().mockReturnValue(['ADMIN']),
     };
     const guard = new RolesGuard(reflector as unknown as Reflector);
 
-    expect(guard.canActivate(contextFor(UserRole.TRAINER) as never)).toBe(true);
+    expect(guard.canActivate(contextFor(UserRole.ADMIN) as never)).toBe(true);
   });
 
-  it('forbids a client from trainer-only routes', () => {
+  it('forbids a client from coach routes', () => {
     const reflector = {
-      getAllAndOverride: vi.fn().mockReturnValue(['TRAINER', 'ADMIN']),
+      getAllAndOverride: vi.fn().mockReturnValue(['ADMIN']),
     };
     const guard = new RolesGuard(reflector as unknown as Reflector);
 

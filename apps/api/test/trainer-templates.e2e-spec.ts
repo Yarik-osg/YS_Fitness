@@ -83,8 +83,8 @@ describeWithDatabase('trainer program templates (e2e)', () => {
     });
     planId = plan.id;
     [trainer, otherTrainer, admin, client] = await Promise.all([
-      createUser('tpl-trainer@example.com', UserRole.TRAINER),
-      createUser('tpl-other@example.com', UserRole.TRAINER),
+      createUser('tpl-trainer@example.com', UserRole.ADMIN),
+      createUser('tpl-other@example.com', UserRole.ADMIN),
       createUser('tpl-admin@example.com', UserRole.ADMIN),
       createUser('tpl-client@example.com', UserRole.CLIENT),
     ]);
@@ -143,33 +143,37 @@ describeWithDatabase('trainer program templates (e2e)', () => {
     expect(response.body.code).toBe('FORBIDDEN');
   });
 
-  it('hides another trainer template and every system template', async () => {
+  it('lets any admin manage a trainer-origin template and hides system templates', async () => {
     const created = await createTemplate(trainer.authorization);
+    const updated = await request(app.getHttpServer())
+      .put(`/api/v1/coach/program-templates/${created.body.id}`)
+      .set('authorization', otherTrainer.authorization)
+      .send(templateBody(exerciseId));
+    expect(updated.status).toBe(200);
+
     const system = await prisma.programTemplate.findFirst({
       where: { origin: 'SYSTEM' },
     });
     if (!system) throw new Error('seeded system template missing');
 
-    for (const id of [created.body.id as string, system.id]) {
-      for (const method of ['put', 'delete', 'duplicate'] as const) {
-        const call =
-          method === 'put'
-            ? request(app.getHttpServer()).put(
-                `/api/v1/coach/program-templates/${id}`,
+    for (const method of ['put', 'delete', 'duplicate'] as const) {
+      const call =
+        method === 'put'
+          ? request(app.getHttpServer()).put(
+              `/api/v1/coach/program-templates/${system.id}`,
+            )
+          : method === 'delete'
+            ? request(app.getHttpServer()).delete(
+                `/api/v1/coach/program-templates/${system.id}`,
               )
-            : method === 'delete'
-              ? request(app.getHttpServer()).delete(
-                  `/api/v1/coach/program-templates/${id}`,
-                )
-              : request(app.getHttpServer()).post(
-                  `/api/v1/coach/program-templates/${id}/duplicate`,
-                );
-        const response = await call
-          .set('authorization', otherTrainer.authorization)
-          .send(templateBody(exerciseId));
-        expect(response.status).toBe(404);
-        expect(response.body.code).toBe('TEMPLATE_NOT_FOUND');
-      }
+            : request(app.getHttpServer()).post(
+                `/api/v1/coach/program-templates/${system.id}/duplicate`,
+              );
+      const response = await call
+        .set('authorization', otherTrainer.authorization)
+        .send(templateBody(exerciseId));
+      expect(response.status).toBe(404);
+      expect(response.body.code).toBe('TEMPLATE_NOT_FOUND');
     }
   });
 
