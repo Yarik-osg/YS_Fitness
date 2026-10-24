@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type ProgramTemplate, type UserRole } from '@prisma/client';
 import type {
+  ExerciseResponse,
   MuscleGroup,
   ProgramAccent,
   ProgramDayResponse,
@@ -16,7 +17,10 @@ import type {
   TrainerProgramTemplateSummary,
   TrainingExperience,
 } from '@repo/shared-types';
-import type { TrainerTemplateBody } from '@repo/validation';
+import {
+  trainerTemplateBodySchema,
+  type TrainerTemplateBody,
+} from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const CODE_ATTEMPTS = 5;
@@ -59,8 +63,11 @@ export class TrainerTemplatesService {
   ): Promise<TrainerProgramTemplateListResponse> {
     this.assertCoach(actor);
     const templates = await this.prisma.programTemplate.findMany({
-      where: { origin: 'TRAINER' },
-      orderBy: [{ updatedAt: 'desc' }, { name: 'asc' }],
+      where: { origin: { in: ['SYSTEM', 'TRAINER'] } },
+      orderBy: [{ origin: 'asc' }, { name: 'asc' }],
+      include: {
+        days: { select: { _count: { select: { exercises: true } } } },
+      },
     });
     return { templates: templates.map(toSummary) };
   }
@@ -74,8 +81,26 @@ export class TrainerTemplatesService {
       where: { id: templateId },
       include: detailInclude,
     });
-    this.assertVisible(template);
+    this.assertReadable(template);
     return toDetail(template);
+  }
+
+  async listExercises(
+    actor: TrainerTemplateActor,
+  ): Promise<ExerciseResponse[]> {
+    this.assertCoach(actor);
+    const exercises = await this.prisma.exercise.findMany({
+      orderBy: [{ name: 'asc' }, { code: 'asc' }],
+    });
+    return exercises.map((exercise) => ({
+      id: exercise.id,
+      code: exercise.code,
+      name: exercise.name,
+      nameEn: exercise.nameEn,
+      muscleGroups: exercise.muscleGroups as MuscleGroup[],
+      repsMin: exercise.repsMin,
+      repsMax: exercise.repsMax,
+    }));
   }
 
   async create(
@@ -124,6 +149,17 @@ export class TrainerTemplatesService {
     templateId: string,
   ): Promise<TrainerProgramTemplateDetail> {
     this.assertCoach(actor);
+    const preview = await this.prisma.programTemplate.findUnique({
+      where: { id: templateId },
+      include: detailInclude,
+    });
+    if (preview?.origin === 'SYSTEM') {
+      this.assertReadable(preview);
+      const body = { ...copiedBody(preview), name: copyName(preview.name) };
+      return this.write((db) =>
+        this.insert(db, body, { ownerId: actor.id, active: true }),
+      );
+    }
     return this.write(async (db) => {
       const locked = await lockTemplate(db, templateId);
       this.assertVisible(locked);
@@ -132,10 +168,15 @@ export class TrainerTemplatesService {
         include: detailInclude,
       });
       this.assertVisible(source);
-      return this.insert(db, bodyFromTemplate(source), {
-        ownerId: source.ownerId,
-        active: source.active,
-      });
+      const body = bodyFromTemplate(source);
+      return this.insert(
+        db,
+        { ...body, name: copyName(body.name) },
+        {
+          ownerId: source.ownerId,
+          active: source.active,
+        },
+      );
     });
   }
 
@@ -224,6 +265,26 @@ export class TrainerTemplatesService {
     });
   }
 
+  private assertReadable<T extends LockedTemplate>(
+    template: T | null,
+  ): asserts template is T &
+    (
+      | { origin: 'SYSTEM'; ownerId: null }
+      | { origin: 'TRAINER'; ownerId: string }
+    ) {
+    if (
+      template &&
+      ((template.origin === 'SYSTEM' && template.ownerId === null) ||
+        (template.origin === 'TRAINER' && template.ownerId))
+    ) {
+      return;
+    }
+    throw new NotFoundException({
+      code: 'TEMPLATE_NOT_FOUND',
+      message: 'Program template not found',
+    });
+  }
+
   private assertVisible<T extends LockedTemplate>(
     template: T | null,
   ): asserts template is T & { origin: 'TRAINER'; ownerId: string } {
@@ -303,6 +364,28 @@ function dayCreates(input: TrainerTemplateBody) {
   }));
 }
 
+function copyName(name: string) {
+  const suffix = ' - copy';
+  const base = name
+    .trim()
+    .slice(0, 200 - suffix.length)
+    .trimEnd();
+  return `${base}${suffix}`;
+}
+
+function copiedBody(template: TemplateDetail): TrainerTemplateBody {
+  const parsed = trainerTemplateBodySchema.safeParse(
+    bodyFromTemplate(template),
+  );
+  if (!parsed.success) {
+    throw new BadRequestException({
+      code: 'TEMPLATE_NOT_COPYABLE',
+      message: 'This template cannot be copied into a custom program',
+    });
+  }
+  return parsed.data;
+}
+
 function bodyFromTemplate(template: TemplateDetail): TrainerTemplateBody {
   return {
     name: template.name,
@@ -324,8 +407,30 @@ function bodyFromTemplate(template: TemplateDetail): TrainerTemplateBody {
   };
 }
 
-function toSummary(template: ProgramTemplate): TrainerProgramTemplateSummary {
-  if (!template.ownerId || template.origin !== 'TRAINER') {
+type SummaryDay = {
+  exercises?: readonly unknown[];
+  _count?: { exercises: number };
+};
+
+type SummaryTemplate = {
+  id: string;
+  code: string;
+  name: string;
+  gender: ProgramTemplate['gender'];
+  level: ProgramTemplate['level'];
+  frequencyPerWeek: number;
+  accent: ProgramTemplate['accent'];
+  origin: ProgramTemplate['origin'];
+  ownerId: string | null;
+  active: boolean;
+  days: SummaryDay[];
+};
+
+function toSummary(template: SummaryTemplate): TrainerProgramTemplateSummary {
+  if (!(
+    (template.origin === 'SYSTEM' && template.ownerId === null) ||
+    (template.origin === 'TRAINER' && template.ownerId)
+  )) {
     throw new NotFoundException({
       code: 'TEMPLATE_NOT_FOUND',
       message: 'Program template not found',
@@ -339,8 +444,14 @@ function toSummary(template: ProgramTemplate): TrainerProgramTemplateSummary {
     level: template.level.toLowerCase() as TrainingExperience,
     frequencyPerWeek: template.frequencyPerWeek,
     accent: template.accent as ProgramAccent,
+    origin: template.origin,
     active: template.active,
     ownerId: template.ownerId,
+    dayCount: template.days.length,
+    exerciseCount: template.days.reduce((sum, day) => {
+      if (day.exercises) return sum + day.exercises.length;
+      return sum + (day._count?.exercises ?? 0);
+    }, 0),
   };
 }
 

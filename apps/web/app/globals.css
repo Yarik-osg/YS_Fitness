@@ -9,7 +9,8 @@
   --color-muted: #9c9d9f;
   --color-panel: #17191c;
   --color-line: #34373b;
-  --color-background: #0b0b0b;
+  --color-background: #0c1212;
+  --shadow-overlay: 0 4px 8px rgb(0 0 0 / 60%);
   --color-lime: #c8ff2e;
   --color-teal: #35f5e8;
   --color-cyan: #00c7c8;
@@ -83,7 +84,7 @@ a {
 
 /* Coach pages only. Public and client surfaces keep the root palette. */
 .coach-app {
-  --color-background: #121416;
+  --color-background: #141a1b;
   --color-panel: #1b1e22;
   --color-line: #2c3036;
   --color-teal: #5ebfb6;

@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type {
+  ExerciseResponse,
   TrainerProgramTemplateDetail,
   TrainerProgramTemplateListResponse,
 } from '@repo/shared-types';
@@ -43,6 +44,13 @@ export class TrainerTemplatesController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<TrainerProgramTemplateListResponse> {
     return this.templates.list(actor(user));
+  }
+
+  @Get('exercises')
+  listExercises(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ExerciseResponse[]> {
+    return this.templates.listExercises(actor(user));
   }
 
   @Get(':templateId')

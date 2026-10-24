@@ -19,6 +19,7 @@ export function CoachShell({ children }: { children: ReactNode }) {
   const logout = useLogout();
   const [error, setError] = useState<string | null>(null);
   const onRoster = pathname === '/coach';
+  const onPrograms = pathname.startsWith('/coach/programs');
 
   async function signOut() {
     setError(null);
@@ -51,6 +52,17 @@ export function CoachShell({ children }: { children: ReactNode }) {
               }`}
             >
               {t('roster')}
+            </Link>
+            <Link
+              href="/coach/programs"
+              aria-current={onPrograms ? 'page' : undefined}
+              className={`font-label text-xs font-semibold motion-safe:transition-colors ${focusRing} ${
+                onPrograms
+                  ? 'text-ink shadow-[inset_0_-1px_0_0_var(--color-teal)]'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              {t('catalog.nav')}
             </Link>
           </div>
           <div className="flex items-center gap-2">

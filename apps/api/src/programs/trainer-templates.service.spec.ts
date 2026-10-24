@@ -37,7 +37,7 @@ const input = {
   })),
 };
 
-function stored(ownerId = coachId) {
+function stored(ownerId: string | null = coachId) {
   return {
     id: templateId,
     code: 'Tabcdef01234567',
@@ -132,6 +132,68 @@ describe('TrainerTemplatesService ownership', () => {
     expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 
+  it('returns a system template for inspection', async () => {
+    const { service, prisma } = createService();
+    prisma.programTemplate.findUnique.mockResolvedValue({
+      ...stored(null),
+      origin: 'SYSTEM',
+      ownerId: null,
+    });
+
+    const detail = await service.get(admin, templateId);
+
+    expect(detail.origin).toBe('SYSTEM');
+    expect(detail.ownerId).toBeNull();
+    expect(detail.dayCount).toBe(2);
+    expect(detail.exerciseCount).toBe(2);
+  });
+
+  it('lists system and custom templates', async () => {
+    const { service, prisma } = createService();
+    prisma.programTemplate.findMany.mockResolvedValue([
+      {
+        ...stored(null),
+        origin: 'SYSTEM',
+        ownerId: null,
+        days: [{ _count: { exercises: 4 } }, { _count: { exercises: 3 } }],
+      },
+    ]);
+
+    const listed = await service.list(admin);
+
+    expect(listed.templates[0]).toMatchObject({
+      origin: 'SYSTEM',
+      ownerId: null,
+      dayCount: 2,
+      exerciseCount: 7,
+    });
+  });
+
+  it('copies a system template without locking or changing it', async () => {
+    const { service, prisma, tx } = createService();
+    prisma.programTemplate.findUnique.mockResolvedValue({
+      ...stored(null),
+      origin: 'SYSTEM',
+      ownerId: null,
+      active: false,
+    });
+
+    await service.duplicate(admin, templateId);
+
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+    expect(tx.programTemplate.update).not.toHaveBeenCalled();
+    expect(tx.programTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          origin: 'TRAINER',
+          ownerId: adminId,
+          active: true,
+          name: 'Upper - copy',
+        }),
+      }),
+    );
+  });
+
   it('rejects a system template', async () => {
     const { service, tx } = createService();
     tx.$queryRaw.mockResolvedValue([
@@ -172,6 +234,7 @@ describe('TrainerTemplatesService ownership', () => {
           origin: 'TRAINER',
           ownerId: otherId,
           active: true,
+          name: 'Upper - copy',
         }),
       }),
     );

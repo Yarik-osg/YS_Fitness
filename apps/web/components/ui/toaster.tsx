@@ -18,7 +18,7 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            'font-label border border-white/10 bg-panel text-white shadow-[0_12px_32px_rgb(0_0_0_/_45%)]',
+            'font-label border border-white/10 bg-panel text-white shadow-overlay',
           success: 'border-l-2 border-l-lime',
           error: 'border-l-2 border-l-red-400 text-red-300',
           title: 'text-[13px]',
