@@ -114,6 +114,12 @@ function createService(
 ) {
   const workouts = {
     transaction: vi.fn((work: (client: unknown) => unknown) => work({})),
+    lockTemplateDays: vi.fn().mockResolvedValue([
+      {
+        dayNumber: 1,
+        exercises: [{ exerciseId, order: 1, sets: 3 }],
+      },
+    ]),
     create: vi.fn().mockResolvedValue(logRecord()),
     list: vi.fn().mockResolvedValue([]),
     listBetween: vi.fn().mockResolvedValue([]),
@@ -273,6 +279,37 @@ describe('WorkoutsService.log', () => {
     });
 
     expect(workouts.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not insert when the locked template row is gone', async () => {
+    const { service, workouts } = createService(
+      { getAssignedProgram: vi.fn().mockResolvedValue({ program }) },
+      { lockTemplateDays: vi.fn().mockResolvedValue(null) },
+    );
+
+    await expect(service.log(userId, input)).rejects.toMatchObject({
+      response: { code: 'PROGRAM_DAY_NOT_FOUND' },
+    });
+    expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('checks the locked day tree again before inserting', async () => {
+    const { service, workouts } = createService(
+      { getAssignedProgram: vi.fn().mockResolvedValue({ program }) },
+      {
+        lockTemplateDays: vi.fn().mockResolvedValue([
+          {
+            dayNumber: 1,
+            exercises: [{ exerciseId: otherExerciseId, order: 1, sets: 3 }],
+          },
+        ]),
+      },
+    );
+
+    await expect(service.log(userId, input)).rejects.toMatchObject({
+      response: { code: 'EXERCISE_NOT_ON_DAY' },
+    });
+    expect(workouts.create).not.toHaveBeenCalled();
   });
 });
 
