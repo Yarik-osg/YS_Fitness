@@ -16,6 +16,7 @@ import {
   PAYMENT_PROVIDER,
   type PaymentProvider,
 } from './providers/payment-provider.interface.js';
+import { grantsActiveAccess } from './subscription-access.js';
 import {
   SubscriptionsRepository,
   type SubscriptionWithPlan,
@@ -332,13 +333,7 @@ function isPostgresUniqueViolation(error: unknown): boolean {
 }
 
 function isActiveAccess(subscription: SubscriptionWithPlan | null): boolean {
-  if (!subscription || subscription.status !== SubscriptionStatus.ACTIVE) {
-    return false;
-  }
-  if (!subscription.currentPeriodEnd) {
-    return false;
-  }
-  return subscription.currentPeriodEnd > new Date();
+  return grantsActiveAccess(subscription, new Date());
 }
 
 function toPlanResponse(plan: Plan): PlanResponse {

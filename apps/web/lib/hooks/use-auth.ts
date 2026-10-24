@@ -19,7 +19,11 @@ import { ONBOARDING_WIZARD_STEPS } from '@/features/onboarding/program-track';
 import * as authApi from '@/lib/api/auth';
 import { ApiClientError } from '@/lib/api/client';
 import { getMe, saveOnboarding } from '@/lib/api/users';
-import { getPostAuthPath, getPostRegisterPath } from '@/lib/auth/routing';
+import {
+  getPostAuthPath,
+  getPostRegisterPath,
+  sessionHintFor,
+} from '@/lib/auth/routing';
 import { clearCsrfToken } from '@/lib/auth/csrf-token';
 import { clearSessionHint, writeSessionHint } from '@/lib/auth/session-cookie';
 import { normalizeSessionUser, useAuthStore } from '@/lib/stores/auth-store';
@@ -34,9 +38,7 @@ async function hydrateAuthenticatedUser(
   useAuthStore
     .getState()
     .setSession(response.tokens.accessToken, normalizeSessionUser(user));
-  writeSessionHint(
-    user.profile?.onboardingCompletedAt ? 'complete' : 'onboarding',
-  );
+  writeSessionHint(sessionHintFor(user));
   syncOnboardingDraft(user, options);
   return { user, destination: getPostAuthPath(user) };
 }
@@ -91,9 +93,9 @@ export async function persistGuestOnboardingIfReady(): Promise<GuestOnboardingRe
       },
     });
   }
-  writeSessionHint('complete');
   resetOnboardingDraft();
   const user = await getMe();
+  writeSessionHint(sessionHintFor(user));
   useAuthStore
     .getState()
     .setSession(

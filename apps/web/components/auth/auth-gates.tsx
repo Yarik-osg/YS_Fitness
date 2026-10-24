@@ -15,9 +15,11 @@ import { isAccessTokenFresh } from '@/lib/auth/access-token';
 import {
   getPostAuthPath,
   getPostRegisterPath,
+  isCoachRole,
   loginPathWithNext,
   resolveIncompleteGuestDestination,
   resolvePostLoginPath,
+  sessionHintFor,
   type OnboardingStatusUser,
 } from '@/lib/auth/routing';
 import { clearCsrfToken } from '@/lib/auth/csrf-token';
@@ -30,9 +32,7 @@ function applyMe(
   options: { claimGuest?: boolean } = {},
 ) {
   useAuthStore.getState().setSession(accessToken, normalizeSessionUser(user));
-  writeSessionHint(
-    user.profile?.onboardingCompletedAt ? 'complete' : 'onboarding',
-  );
+  writeSessionHint(sessionHintFor(user));
   if (user.profile?.onboardingCompletedAt) {
     resetOnboardingDraft();
   } else {
@@ -44,7 +44,10 @@ function applyMe(
 function storeOnboardingUser(): OnboardingStatusUser | null {
   const user = useAuthStore.getState().user;
   if (!user) return null;
-  return { profile: { onboardingCompletedAt: user.onboardingCompletedAt } };
+  return {
+    profile: { onboardingCompletedAt: user.onboardingCompletedAt },
+    role: user.role,
+  };
 }
 
 async function loadMe(
@@ -120,6 +123,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }
       if (!active) return;
 
+      if (isCoachRole(sessionUser.role)) {
+        if (!pathname.startsWith('/coach')) {
+          router.replace('/coach');
+          return;
+        }
+        setReadyPath(pathname);
+        return;
+      }
+
       if (
         pathname.startsWith('/checkout') &&
         !sessionUser.profile?.onboardingCompletedAt
@@ -156,6 +168,44 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return readyPath === pathname ? children : <LoadingScreen />;
 }
 
+export function CoachGate({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [readyPath, setReadyPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function validate() {
+      let sessionUser: OnboardingStatusUser;
+      try {
+        sessionUser = await currentSessionUser();
+      } catch {
+        if (!active) return;
+        useAuthStore.getState().clearSession();
+        clearSessionHint();
+        clearCsrfToken();
+        router.replace(loginPathWithNext(pathname, window.location.search));
+        return;
+      }
+      if (!active) return;
+      if (!isCoachRole(sessionUser.role)) {
+        writeSessionHint(sessionHintFor(sessionUser));
+        router.replace(getPostAuthPath(sessionUser));
+        return;
+      }
+      setReadyPath(pathname);
+    }
+
+    void validate();
+    return () => {
+      active = false;
+    };
+  }, [pathname, router]);
+
+  return readyPath === pathname ? children : <LoadingScreen />;
+}
+
 export function GuestGate({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -166,6 +216,10 @@ export function GuestGate({ children }: { children: ReactNode }) {
     currentSessionUser()
       .then(async (user) => {
         if (!active) return;
+        if (isCoachRole(user.role)) {
+          router.replace('/coach');
+          return;
+        }
         if (user.profile?.onboardingCompletedAt) {
           const next = new URLSearchParams(window.location.search).get('next');
           router.replace(

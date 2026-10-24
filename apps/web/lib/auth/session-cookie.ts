@@ -1,11 +1,13 @@
-export type SessionHint = 'onboarding' | 'complete';
+export type SessionHint = 'onboarding' | 'complete' | 'coach';
 
 const COOKIE_NAME = 'ys_web_session';
 
 export function parseSessionHint(
   value: string | undefined | null,
 ): SessionHint | null {
-  return value === 'onboarding' || value === 'complete' ? value : null;
+  return value === 'onboarding' || value === 'complete' || value === 'coach'
+    ? value
+    : null;
 }
 
 export function readSessionHint(): SessionHint | null {

@@ -7,6 +7,7 @@ import type {
   ProfileUpdateInput,
 } from '@repo/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { sessionHintFor } from '@/lib/auth/routing';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import {
   createProgressPhoto,
@@ -129,7 +130,12 @@ export function useSaveOnboarding() {
           },
         });
       }
-      writeSessionHint('complete');
+      writeSessionHint(
+        sessionHintFor({
+          role: currentUser?.role,
+          onboardingCompletedAt: response.profile.onboardingCompletedAt,
+        }),
+      );
     },
   });
 }

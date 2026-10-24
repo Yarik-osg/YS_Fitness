@@ -194,4 +194,45 @@ describe('applyAuthRedirect', () => {
       }),
     ).toBe('/uk/onboarding');
   });
+
+  it('sends a signed-out coach visit to login', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/coach',
+        locale: 'uk',
+        fullPathname: '/uk/coach',
+        hint: null,
+      }),
+    ).toBe('/uk/login?next=%2Fuk%2Fcoach');
+  });
+
+  it('keeps a coach session on the roster in both locales', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/coach',
+        locale: 'en',
+        fullPathname: '/en/coach',
+        hint: 'coach',
+      }),
+    ).toBeNull();
+  });
+
+  it('sends a coach away from login and the client dashboard', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/login',
+        locale: 'uk',
+        fullPathname: '/uk/login',
+        hint: 'coach',
+      }),
+    ).toBe('/uk/coach');
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/dashboard',
+        locale: 'en',
+        fullPathname: '/en/dashboard',
+        hint: 'coach',
+      }),
+    ).toBe('/en/coach');
+  });
 });

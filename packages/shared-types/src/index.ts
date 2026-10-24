@@ -91,6 +91,20 @@ export interface StrengthChangesResponse {
   changes: StrengthChange[];
 }
 
+export interface CoachClientSummary {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+  onboardingCompleted: boolean;
+  programAssigned: boolean;
+  subscriptionActive: boolean;
+}
+
+export interface CoachClientsResponse {
+  clients: CoachClientSummary[];
+}
+
 export interface MeResponse {
   id: string;
   email: string;

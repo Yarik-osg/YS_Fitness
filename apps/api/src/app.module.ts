@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module.js';
+import { CoachModule } from './coach/coach.module.js';
 import { UsersModule } from './users/users.module.js';
 import { ProgramsModule } from './programs/programs.module.js';
 import { WorkoutsModule } from './workouts/workouts.module.js';
@@ -18,6 +19,7 @@ import { ApiExceptionFilter } from './common/api-exception.filter.js';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     AuthModule,
+    CoachModule,
     UsersModule,
     SubscriptionsModule,
     ProgramsModule,

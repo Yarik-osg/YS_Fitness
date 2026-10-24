@@ -10,6 +10,15 @@ const PROTECTED_ROUTES = [
   '/training',
   '/workout',
   '/progress',
+  '/coach',
+];
+
+const CLIENT_APP_ROUTES = [
+  '/dashboard',
+  '/profile',
+  '/training',
+  '/workout',
+  '/progress',
 ];
 
 export function splitLocalePath(pathname: string): {
@@ -64,6 +73,22 @@ export function applyAuthRedirect({
   const checkoutPath = planId
     ? `/checkout?planId=${encodeURIComponent(planId)}`
     : '/checkout';
+
+  if (hint === 'coach') {
+    const onCoach =
+      pathnameWithoutLocale === '/coach' ||
+      pathnameWithoutLocale.startsWith('/coach/');
+    if (onCoach) return null;
+    if (
+      isAuthRoute ||
+      pathnameWithoutLocale.startsWith('/onboarding') ||
+      pathnameWithoutLocale.startsWith('/checkout') ||
+      CLIENT_APP_ROUTES.some((route) => pathnameWithoutLocale.startsWith(route))
+    ) {
+      return prefixed('/coach');
+    }
+    return null;
+  }
 
   if (isAuthRoute && hint) {
     if (hint === 'onboarding') {
