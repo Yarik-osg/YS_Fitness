@@ -385,5 +385,219 @@ describeWithDatabase('coach clients (e2e)', () => {
       active: false,
       status: 'PENDING',
     });
+
+    await prisma.exercise.deleteMany({ where: { code: 'COACH_HIST_ROW' } });
+    const exercise = await prisma.exercise.create({
+      data: {
+        code: 'COACH_HIST_ROW',
+        name: 'Тяга',
+        nameEn: 'Row',
+        muscleGroups: ['BACK'],
+        repsMin: 8,
+        repsMax: 12,
+      },
+    });
+    const olderTemplate = await prisma.programTemplate.findFirst({
+      where: { id: { not: template.id } },
+      orderBy: { code: 'asc' },
+    });
+    if (!olderTemplate) throw new Error('second template missing');
+    const sameTime = new Date('2026-02-01T10:00:00.000Z');
+    const newerLog = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+    const tiedLog = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+    await prisma.workoutLog.create({
+      data: {
+        id: tiedLog,
+        userId: clientAccount.id,
+        templateId: olderTemplate.id,
+        dayNumber: 1,
+        completedAt: sameTime,
+        sets: {
+          create: [
+            {
+              exerciseId: exercise.id,
+              order: 1,
+              setNumber: 1,
+              repsCompleted: 8,
+              weightKg: 20,
+            },
+          ],
+        },
+      },
+    });
+    await prisma.workoutLog.create({
+      data: {
+        id: newerLog,
+        userId: clientAccount.id,
+        templateId: template.id,
+        dayNumber: 2,
+        completedAt: sameTime,
+        sets: {
+          create: [
+            {
+              exerciseId: exercise.id,
+              order: 1,
+              setNumber: 1,
+              repsCompleted: 6,
+              weightKg: 30,
+            },
+          ],
+        },
+      },
+    });
+    await prisma.bodyMeasurement.create({
+      data: {
+        userId: clientAccount.id,
+        weightKg: 64.5,
+        measuredAt: new Date('2026-02-02T00:00:00.000Z'),
+      },
+    });
+    const ownPhoto = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2';
+    const otherPhoto = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
+    await prisma.progressPhoto.createMany({
+      data: [
+        {
+          id: ownPhoto,
+          userId: clientAccount.id,
+          contentType: 'image/jpeg',
+          storageKey: `${clientAccount.id}/${ownPhoto}.jpg`,
+          width: 2,
+          height: 2,
+        },
+        {
+          id: otherPhoto,
+          userId: bare.id,
+          contentType: 'image/jpeg',
+          storageKey: `${bare.id}/${otherPhoto}.jpg`,
+          width: 2,
+          height: 2,
+        },
+      ],
+    });
+
+    const reads = [
+      `/api/v1/coach/clients/${clientAccount.id}/workouts`,
+      `/api/v1/coach/clients/${clientAccount.id}/measurements`,
+      `/api/v1/coach/clients/${clientAccount.id}/strength`,
+      `/api/v1/coach/clients/${clientAccount.id}/progress-photos`,
+      `/api/v1/coach/clients/${clientAccount.id}/progress-photos/${ownPhoto}`,
+    ];
+    for (const path of reads) {
+      await request(app.getHttpServer()).get(path).expect(401);
+      await request(app.getHttpServer())
+        .get(path)
+        .set('Authorization', clientAccount.authorization)
+        .expect(403);
+    }
+
+    const hidden = [
+      '/api/v1/coach/clients/00000000-0000-4000-8000-000000000000/workouts',
+      `/api/v1/coach/clients/${trainer.id}/measurements`,
+      `/api/v1/coach/clients/${admin.id}/strength`,
+      `/api/v1/coach/clients/${trainer.id}/progress-photos`,
+    ];
+    for (const path of hidden) {
+      const response = await request(app.getHttpServer())
+        .get(path)
+        .set('Authorization', trainer.authorization)
+        .expect(404);
+      expect(response.body.code).toBe('CLIENT_NOT_FOUND');
+      expect(JSON.stringify(response.body)).not.toContain('storageKey');
+    }
+
+    const page = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}/workouts?limit=1`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(page.body.total).toBe(2);
+    expect(page.body.logs).toHaveLength(1);
+    expect(page.body.logs[0].id).toBe(newerLog);
+    expect(Object.keys(page.body.logs[0]).sort()).toEqual([
+      'completedAt',
+      'dayNumber',
+      'id',
+      'sets',
+      'templateCode',
+      'templateName',
+    ]);
+    expect(Object.keys(page.body.logs[0].sets[0]).sort()).toEqual([
+      'exercise',
+      'order',
+      'repsCompleted',
+      'setNumber',
+      'weightKg',
+    ]);
+
+    const trainerHistory = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}/workouts`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    const adminHistory = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}/workouts`)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+    expect(adminHistory.body).toEqual(trainerHistory.body);
+    expect(
+      trainerHistory.body.logs.map(
+        (log: { templateCode: string }) => log.templateCode,
+      ),
+    ).toEqual([template.code, olderTemplate.code]);
+    expect(JSON.stringify(trainerHistory.body)).not.toContain('recommendation');
+    expect(JSON.stringify(trainerHistory.body)).not.toContain('storageKey');
+    const older = trainerHistory.body.logs[1];
+    expect(older.sets[0]).toMatchObject({
+      repsCompleted: 8,
+      weightKg: 20,
+      exercise: { name: 'Тяга', nameEn: 'Row' },
+    });
+
+    const weights = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}/measurements`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(weights.body.measurements[0].weightKg).toBe(64.5);
+    const bareWeights = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${bare.id}/measurements`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(bareWeights.body).toEqual({
+      measurements: [],
+      firstMeasurement: null,
+    });
+
+    const strength = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}/strength`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(strength.body.changes).toEqual([
+      expect.objectContaining({
+        exerciseId: exercise.id,
+        name: 'Тяга',
+        nameEn: 'Row',
+        fromKg: 20,
+        toKg: 30,
+      }),
+    ]);
+
+    const photos = await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}/progress-photos`)
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(Object.keys(photos.body.photos[0]).sort()).toEqual([
+      'contentType',
+      'createdAt',
+      'height',
+      'id',
+      'width',
+    ]);
+    expect(JSON.stringify(photos.body)).not.toContain('storageKey');
+    const foreignPhoto = await request(app.getHttpServer())
+      .get(
+        `/api/v1/coach/clients/${clientAccount.id}/progress-photos/${otherPhoto}`,
+      )
+      .set('Authorization', trainer.authorization)
+      .expect(404);
+    expect(foreignPhoto.body.code).toBe('PHOTO_NOT_FOUND');
+    expect(JSON.stringify(foreignPhoto.body)).not.toContain('storageKey');
   });
 });

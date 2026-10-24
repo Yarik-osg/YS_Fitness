@@ -947,7 +947,11 @@
       "profile": "Profile",
       "questionnaire": "Questionnaire",
       "program": "Program",
-      "subscription": "Access"
+      "subscription": "Access",
+      "workouts": "Sessions",
+      "measurements": "Weight",
+      "strength": "Strength",
+      "photos": "Photos"
     },
     "fields": {
       "birthDate": "Date of birth",
@@ -979,6 +983,21 @@
       "ACTIVE": "Active",
       "CANCELED": "Canceled",
       "EXPIRED": "Expired"
-    }
+    },
+    "noWorkouts": "No sessions yet.",
+    "noMeasurements": "No weight entries yet.",
+    "noStrength": "No loaded sets yet.",
+    "noPhotos": "No progress photos yet.",
+    "historyError": "This section could not be loaded.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading",
+    "showMore": "Show all",
+    "showLess": "Show less",
+    "exerciseCount": "{count, plural, one {# exercise} other {# exercises}}",
+    "day": "Day {day}",
+    "reps": "{count, plural, one {# rep} other {# reps}}",
+    "kg": "kg",
+    "photoFailed": "This photo could not be loaded.",
+    "chartLabel": "Weight over time"
   }
 }

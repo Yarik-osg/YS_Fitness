@@ -10,5 +10,6 @@ import { WorkoutsService } from './workouts.service.js';
   imports: [AuthModule, ProgramsModule, SubscriptionsModule],
   controllers: [WorkoutsController],
   providers: [WorkoutsRepository, WorkoutsService],
+  exports: [WorkoutsService],
 })
 export class WorkoutsModule {}

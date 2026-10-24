@@ -1,8 +1,12 @@
 import type {
   CoachClientDetail,
+  CoachClientWorkoutsResponse,
   CoachClientsResponse,
+  ProgressPhotosResponse,
+  StrengthChangesResponse,
+  WeightMeasurementsResponse,
 } from '@repo/shared-types';
-import { apiRequest } from './client';
+import { apiBlob, apiRequest } from './client';
 
 export function listCoachClients() {
   return apiRequest<CoachClientsResponse>('/coach/clients');
@@ -11,5 +15,41 @@ export function listCoachClients() {
 export function getCoachClient(userId: string) {
   return apiRequest<CoachClientDetail>(
     `/coach/clients/${encodeURIComponent(userId)}`,
+  );
+}
+
+function clientPath(userId: string, suffix: string) {
+  return `/coach/clients/${encodeURIComponent(userId)}${suffix}`;
+}
+
+export function listCoachWorkouts(
+  userId: string,
+  limit: number,
+  offset: number,
+) {
+  return apiRequest<CoachClientWorkoutsResponse>(
+    `${clientPath(userId, '/workouts')}?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export function listCoachMeasurements(userId: string) {
+  return apiRequest<WeightMeasurementsResponse>(
+    clientPath(userId, '/measurements'),
+  );
+}
+
+export function listCoachStrength(userId: string) {
+  return apiRequest<StrengthChangesResponse>(clientPath(userId, '/strength'));
+}
+
+export function listCoachProgressPhotos(userId: string) {
+  return apiRequest<ProgressPhotosResponse>(
+    clientPath(userId, '/progress-photos'),
+  );
+}
+
+export function getCoachProgressPhotoBlob(userId: string, photoId: string) {
+  return apiBlob(
+    clientPath(userId, `/progress-photos/${encodeURIComponent(photoId)}`),
   );
 }
