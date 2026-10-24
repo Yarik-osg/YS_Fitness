@@ -110,7 +110,7 @@ describe('CoachClientsPage', () => {
     expect(screen.getByText('olena@example.com')).toBeInTheDocument();
     expect(screen.getByText('Заповнена')).toBeInTheDocument();
     expect(screen.getByText('Призначена')).toBeInTheDocument();
-    expect(screen.getByText('Неактивний')).toBeInTheDocument();
+    expect(screen.getByText('Підписки немає.')).toBeInTheDocument();
 
     view.rerender(
       <I18nTestProvider locale="en">
@@ -122,7 +122,7 @@ describe('CoachClientsPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Complete')).toBeInTheDocument();
     expect(screen.getByText('Assigned')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getByText('No subscription on file.')).toBeInTheDocument();
   });
 
   it('shows an error and retries', async () => {

@@ -91,14 +91,16 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
           yes={t('programAssigned')}
           no={t('programMissing')}
         />
-        {detail.subscription ? (
-          <StatusPill
-            label={t('subscription')}
-            on={detail.subscription.active}
-            yes={t('subscriptionActive')}
-            no={t('subscriptionInactive')}
-          />
-        ) : null}
+        <StatusPill
+          label={t('subscription')}
+          on={detail.subscription?.active === true}
+          yes={t('subscriptionActive')}
+          no={
+            detail.subscription
+              ? t('subscriptionInactive')
+              : t('noSubscription')
+          }
+        />
       </div>
 
       <Section title={t('sections.profile')}>

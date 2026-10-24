@@ -141,7 +141,7 @@ describe('CoachClientPage', () => {
       screen.getByText('No questionnaire answers yet.'),
     ).toBeInTheDocument();
     expect(screen.getByText('No program assigned.')).toBeInTheDocument();
-    expect(screen.getByText('No subscription on file.')).toBeInTheDocument();
+    expect(screen.getAllByText('No subscription on file.')).toHaveLength(2);
   });
 
   it('shows not found without a retry', () => {
