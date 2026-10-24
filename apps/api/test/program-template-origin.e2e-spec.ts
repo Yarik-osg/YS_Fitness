@@ -135,26 +135,55 @@ describeWithDatabase('program template origin (e2e)', () => {
         finished = true;
       });
 
-      const deadline = Date.now() + 2000;
-      let waiting = 0;
-      while (waiting === 0 && Date.now() < deadline) {
-        const rows = await prisma.$queryRaw<{ waiting: number }[]>`
-          SELECT COUNT(*)::int AS waiting
-          FROM pg_stat_activity
-          WHERE datname = current_database()
-            AND wait_event = 'advisory'
-        `;
-        waiting = Number(rows[0]?.waiting ?? 0);
-        if (waiting === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 20));
-        }
-      }
+      const waiting = await waitForAdvisoryWait(prisma);
       expect(waiting).toBeGreaterThan(0);
       expect(entered).toBe(true);
       expect(finished).toBe(false);
 
       releaseFirst();
       await first;
+      await second;
+      expect(finished).toBe(true);
+    } finally {
+      releaseFirst();
+      await Promise.allSettled([first, second]);
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
+
+  it('releases the assignment lock when the transaction rolls back', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `origin-lock-${randomBytes(4).toString('hex')}@example.com`,
+        passwordHash: 'not-a-login',
+        role: 'CLIENT',
+      },
+    });
+    let releaseFirst: () => void = () => undefined;
+    const firstMayFinish = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let finished = false;
+    let first: Promise<unknown> | undefined;
+    let second: Promise<unknown> | undefined;
+
+    try {
+      first = prisma.$transaction(async (tx) => {
+        await lockAssignment(tx, user.id);
+        await firstMayFinish;
+        throw new Error('rollback');
+      });
+      second = prisma.$transaction(async (tx) => {
+        await lockAssignment(tx, user.id);
+        finished = true;
+      });
+
+      const waiting = await waitForAdvisoryWait(prisma);
+      expect(waiting).toBeGreaterThan(0);
+      expect(finished).toBe(false);
+
+      releaseFirst();
+      await expect(first).rejects.toThrow('rollback');
       await second;
       expect(finished).toBe(true);
     } finally {
@@ -175,4 +204,26 @@ function identityCopy(system: ProgramTemplate, code: string) {
     accent: system.accent,
     origin: 'SYSTEM' as const,
   };
+}
+
+async function advisoryWaitCount(prisma: PrismaClient): Promise<number> {
+  const rows = await prisma.$queryRaw<{ waiting: number }[]>`
+    SELECT COUNT(*)::int AS waiting
+    FROM pg_stat_activity
+    WHERE datname = current_database()
+      AND wait_event = 'advisory'
+  `;
+  return Number(rows[0]?.waiting ?? 0);
+}
+
+async function waitForAdvisoryWait(prisma: PrismaClient): Promise<number> {
+  const deadline = Date.now() + 2000;
+  let waiting = 0;
+  while (waiting === 0 && Date.now() < deadline) {
+    waiting = await advisoryWaitCount(prisma);
+    if (waiting === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+  return waiting;
 }

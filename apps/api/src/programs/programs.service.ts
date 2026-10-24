@@ -563,11 +563,15 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-// Serializes every assignment writer for this user until the surrounding
-// transaction commits, including when no workout_programs row exists.
-// FOR UPDATE alone cannot lock a missing row. assign, unassign, and a future
-// trainer assignment must call this before creating, updating, or deleting
-// that row. A writer that skips it can still change the row underneath them.
+// Serializes every assignment writer for this user until that transaction
+// commits or rolls back, including when no workout_programs row exists.
+// FOR UPDATE alone cannot lock a missing row. pg_advisory_xact_lock returns
+// void, which this Prisma client's $queryRaw cannot decode; $executeRaw still
+// runs the statement on the surrounding transaction's connection.
+// assign, unassign, and a future trainer assignment must call this on the
+// same transaction client that creates, updates, or deletes the row. The root
+// client would release the lock before the next statement. A writer that
+// skips it can still change the row underneath them.
 export async function lockAssignment(
   db: ProgramStore,
   userId: string,
