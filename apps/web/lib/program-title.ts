@@ -37,3 +37,18 @@ export function useProgramTitle(accent: string): string {
     home('programFallback'),
   );
 }
+
+export function useClientProgramTitle(
+  program:
+    | {
+        accent: string;
+        templateOrigin: 'SYSTEM' | 'TRAINER';
+        templateName: string;
+      }
+    | null
+    | undefined,
+): string {
+  const accentTitle = useProgramTitle(program?.accent ?? '');
+  if (program?.templateOrigin === 'TRAINER') return program.templateName;
+  return accentTitle;
+}

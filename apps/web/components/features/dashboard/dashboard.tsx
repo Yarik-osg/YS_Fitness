@@ -18,7 +18,7 @@ import { ProgramPromotionSheet } from '@/components/features/programs/program-pr
 import { useAssignProgram, useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
 import { useMeasurements } from '@/lib/hooks/use-users';
-import { useProgramTitle } from '@/lib/program-title';
+import { useClientProgramTitle } from '@/lib/program-title';
 import {
   formatDelta,
   formatWeight,
@@ -79,7 +79,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
     day?.exercises.reduce((total, row) => total + row.sets, 0) ?? 0;
   const dayNumber = String(day?.dayNumber ?? 1).padStart(2, '0');
   const dayLabel = t('home.firstDay', { number: dayNumber });
-  const programTitle = useProgramTitle(program.accent);
+  const programTitle = useClientProgramTitle(program);
   const quotes = messages.dashboard.home.quotes;
   const quote = quotes[new Date().getDay() % quotes.length] ?? quotes[0];
 
@@ -149,8 +149,10 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
 
         <ProgramPromotionSheet
           enabled={
+            program.templateOrigin === 'SYSTEM' &&
+            program.assignmentSource === 'MATCHED' &&
             program.programProgress.completed >=
-            program.programProgress.expected
+              program.programProgress.expected
           }
         />
 

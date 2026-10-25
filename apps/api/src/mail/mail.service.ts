@@ -5,6 +5,7 @@ import {
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
 } from './password-emails.js';
+import { buildProgramAssignedEmail } from './program-assigned-email.js';
 import { buildWelcomeEmail, type MailLocale } from './welcome-email.js';
 
 @Injectable()
@@ -68,6 +69,35 @@ export class MailService {
         resetUrl: `${this.appUrl}/${locale}/reset-password?token=${encodeURIComponent(token)}`,
       }),
       'Password reset email',
+    );
+  }
+
+  /**
+   * Tells the client their program changed. Never throws: a mail outage must
+   * not undo an assignment that has already committed.
+   */
+  async sendProgramAssigned(input: {
+    to: string;
+    kind: 'assigned' | 'updated';
+    name: string;
+    origin: 'SYSTEM' | 'TRAINER';
+    frequencyPerWeek: number;
+    days: { exercises: { name: string; nameEn: string }[] }[];
+    locale?: MailLocale;
+  }): Promise<void> {
+    const locale = input.locale ?? 'uk';
+    await this.send(
+      input.to,
+      buildProgramAssignedEmail({
+        locale,
+        kind: input.kind,
+        name: input.name,
+        origin: input.origin === 'SYSTEM' ? 'system' : 'custom',
+        frequencyPerWeek: input.frequencyPerWeek,
+        days: input.days,
+        workoutUrl: `${this.appUrl}/${locale}/workout`,
+      }),
+      'Program assigned email',
     );
   }
 

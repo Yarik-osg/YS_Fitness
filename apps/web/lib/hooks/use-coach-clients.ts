@@ -1,8 +1,14 @@
 'use client';
 
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { ApiClientError } from '@/lib/api/client';
 import {
+  assignCoachProgram,
   getCoachClient,
   listCoachClients,
   listCoachMeasurements,
@@ -17,6 +23,19 @@ export function useCoachClients() {
   return useQuery({
     queryKey: ['coach', 'clients'],
     queryFn: listCoachClients,
+  });
+}
+
+export function useAssignCoachProgram(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (templateId: string) => assignCoachProgram(userId, templateId),
+    onSuccess: async (detail) => {
+      queryClient.setQueryData(['coach', 'clients', userId], detail);
+      await queryClient.invalidateQueries({
+        queryKey: ['coach', 'clients', userId],
+      });
+    },
   });
 }
 

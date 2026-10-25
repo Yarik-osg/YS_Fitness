@@ -18,6 +18,13 @@ export function getCoachClient(userId: string) {
   );
 }
 
+export function assignCoachProgram(userId: string, templateId: string) {
+  return apiRequest<CoachClientDetail>(
+    `/coach/clients/${encodeURIComponent(userId)}/program`,
+    { method: 'POST', body: { templateId } },
+  );
+}
+
 function clientPath(userId: string, suffix: string) {
   return `/coach/clients/${encodeURIComponent(userId)}${suffix}`;
 }

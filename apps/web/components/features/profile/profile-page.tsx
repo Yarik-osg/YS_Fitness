@@ -28,7 +28,7 @@ import { NumberField } from '@/components/features/profile/number-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
-import { useProgramTitle } from '@/lib/program-title';
+import { useClientProgramTitle } from '@/lib/program-title';
 import {
   Select,
   SelectContent,
@@ -537,7 +537,7 @@ function ProgramCard({
   const onboarding = useTranslations('onboarding');
   const locale = useLocale();
   const male = track === 'male';
-  const programTitle = useProgramTitle(program?.accent ?? '');
+  const programTitle = useClientProgramTitle(program);
 
   return (
     <section className="border border-teal/18 bg-teal/4 px-4 py-4">

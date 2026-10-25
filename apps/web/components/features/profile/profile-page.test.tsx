@@ -29,6 +29,8 @@ const PROGRAM = {
   level: 'beginner',
   frequencyPerWeek: 2,
   accent: 'UPPER',
+  templateOrigin: 'SYSTEM',
+  assignmentSource: 'MATCHED',
   assignedAt: '2026-09-27T00:00:00.000Z',
   nextDayNumber: 1,
   programProgress: { completed: 9, expected: 16 },

@@ -287,6 +287,11 @@ enum ProgramOrigin {
   TRAINER
 }
 
+enum AssignmentSource {
+  MATCHED
+  ADMIN
+}
+
 model Exercise {
   id           String        @id @default(uuid()) @db.Uuid
   code         String        @unique @db.VarChar(16)
@@ -366,10 +371,11 @@ model ProgramTemplateExercise {
 }
 
 model WorkoutProgram {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @unique @map("user_id") @db.Uuid
-  templateId String   @map("template_id") @db.Uuid
-  assignedAt DateTime @default(now()) @map("assigned_at")
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @unique @map("user_id") @db.Uuid
+  templateId       String           @map("template_id") @db.Uuid
+  assignedAt       DateTime         @default(now()) @map("assigned_at")
+  assignmentSource AssignmentSource @default(MATCHED) @map("assignment_source")
 
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   template ProgramTemplate @relation(fields: [templateId], references: [id])

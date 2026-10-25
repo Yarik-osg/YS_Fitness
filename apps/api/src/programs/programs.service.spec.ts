@@ -26,6 +26,7 @@ function assignedProgram() {
     userId,
     templateId: 'template-1',
     assignedAt: new Date('2026-09-27T00:00:00.000Z'),
+    assignmentSource: 'MATCHED' as 'MATCHED' | 'ADMIN',
     template: {
       id: 'template-1',
       code: 'WB2U',
@@ -34,6 +35,7 @@ function assignedProgram() {
       level: 'BEGINNER',
       frequencyPerWeek: 2,
       accent: 'UPPER',
+      origin: 'SYSTEM' as 'SYSTEM' | 'TRAINER',
       days: [
         {
           dayNumber: 1,
@@ -64,7 +66,12 @@ function assignedProgram() {
 function createService() {
   const prisma = {
     onboardingResponses: { findUnique: vi.fn(), update: vi.fn() },
-    programTemplate: { findFirst: vi.fn(), findMany: vi.fn() },
+    programTemplate: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+    },
+    user: { findUnique: vi.fn() },
     workoutProgram: {
       upsert: vi.fn(),
       create: vi.fn(),
@@ -371,6 +378,60 @@ describe('ProgramsService', () => {
     const { prisma, service } = createService();
     prisma.$queryRaw.mockResolvedValue([
       { origin: 'TRAINER', templateId: 'trainer-template' },
+    ]);
+
+    await service.unassign(userId);
+
+    expect(prisma.workoutProgram.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('does not replace an admin-pinned program from the client assign route', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        origin: 'SYSTEM',
+        templateId: 'template-1',
+        assignmentSource: 'ADMIN',
+      },
+    ]);
+
+    await expect(service.assign(userId)).rejects.toMatchObject({
+      response: { code: 'ADMIN_PROGRAM_ASSIGNED' },
+    });
+    expect(prisma.programTemplate.findFirst).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps an admin-pinned program when the profile asks to reassign', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        origin: 'SYSTEM',
+        templateId: 'template-1',
+        assignmentSource: 'ADMIN',
+      },
+    ]);
+    const program = assignedProgram();
+    program.assignmentSource = 'ADMIN';
+    prisma.workoutProgram.findUnique.mockResolvedValue(program);
+
+    const result = await service.assign(userId, undefined, {
+      onTrainerProgram: 'keep',
+    });
+
+    expect(result.assignmentSource).toBe('ADMIN');
+    expect(result.templateId).toBe('template-1');
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('does not delete an admin-pinned program', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        origin: 'SYSTEM',
+        templateId: 'template-1',
+        assignmentSource: 'ADMIN',
+      },
     ]);
 
     await service.unassign(userId);
@@ -942,5 +1003,269 @@ describe('program promotion', () => {
     ).rejects.toMatchObject({ code: 'P2034' });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('returns no offer for an admin-pinned system program', async () => {
+    const { prisma, service } = createService();
+    prisma.workoutProgram.findUnique.mockResolvedValue({
+      assignmentSource: 'ADMIN',
+      template: { origin: 'SYSTEM' },
+    });
+
+    await expect(service.getPromotion(userId)).resolves.toBeNull();
+    expect(prisma.programTemplate.findFirst).not.toHaveBeenCalled();
+
+    await expect(
+      service.acceptPromotion(userId, nextTemplate.id),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.onboardingResponses.update).not.toHaveBeenCalled();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProgramsService.assignTemplate', () => {
+  const clientId = '33333333-3333-4333-8333-333333333333';
+  const templateId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  function template(overrides: Record<string, unknown> = {}) {
+    return {
+      id: templateId,
+      name: 'Upper',
+      origin: 'TRAINER' as const,
+      active: true,
+      frequencyPerWeek: 4,
+      days: [
+        {
+          id: 'day-1',
+          exercises: [
+            { exercise: { name: 'Тяга', nameEn: 'Row' } },
+            { exercise: { name: 'Жим', nameEn: 'Press' } },
+          ],
+        },
+        {
+          id: 'day-2',
+          exercises: [{ exercise: { name: 'Тяга', nameEn: 'Row' } }],
+        },
+        { id: 'day-3', exercises: [] },
+        { id: 'day-4', exercises: [] },
+      ],
+      ...overrides,
+    };
+  }
+
+  it('assigns a trainer template and does not touch workout logs', async () => {
+    const { prisma, service } = createService();
+    const order: string[] = [];
+    prisma.$executeRaw.mockImplementation(async () => {
+      order.push('lock');
+      return 0;
+    });
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'CLIENT',
+      email: 'olena@example.com',
+    });
+    prisma.programTemplate.findUnique.mockResolvedValue(template());
+    prisma.workoutProgram.create.mockImplementation(async () => {
+      order.push('create');
+      const created = assignedProgram();
+      created.assignmentSource = 'ADMIN';
+      created.template.origin = 'TRAINER';
+      return created;
+    });
+
+    const result = await service.assignTemplate(clientId, templateId);
+
+    expect(order).toEqual(['lock', 'create']);
+    expect(prisma.workoutProgram.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: clientId,
+          templateId,
+          assignmentSource: 'ADMIN',
+        }),
+      }),
+    );
+    expect(result.change).toBe('assigned');
+    expect(result.notice).toMatchObject({
+      to: 'olena@example.com',
+      kind: 'assigned',
+      name: 'Upper',
+      origin: 'TRAINER',
+      frequencyPerWeek: 4,
+      days: [
+        {
+          exercises: [
+            { name: 'Тяга', nameEn: 'Row' },
+            { name: 'Жим', nameEn: 'Press' },
+          ],
+        },
+        { exercises: [{ name: 'Тяга', nameEn: 'Row' }] },
+        { exercises: [] },
+        { exercises: [] },
+      ],
+    });
+    expect(prisma.workoutLog.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('assigns a system template', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'CLIENT',
+      email: 'olena@example.com',
+    });
+    prisma.programTemplate.findUnique.mockResolvedValue(
+      template({ origin: 'SYSTEM', name: 'WB2U full' }),
+    );
+    prisma.workoutProgram.create.mockResolvedValue(assignedProgram());
+
+    const result = await service.assignTemplate(clientId, templateId);
+
+    expect(result.change).toBe('assigned');
+    expect(result.notice?.origin).toBe('SYSTEM');
+    expect(result.program.templateOrigin).toBe('SYSTEM');
+  });
+
+  it('replaces the current template and leaves existing logs alone', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        origin: 'SYSTEM',
+        templateId: 'template-1',
+        assignmentSource: 'MATCHED',
+      },
+    ]);
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'CLIENT',
+      email: 'olena@example.com',
+    });
+    prisma.programTemplate.findUnique.mockResolvedValue(template());
+    prisma.workoutProgram.update.mockResolvedValue(assignedProgram());
+
+    const result = await service.assignTemplate(clientId, templateId);
+
+    expect(result.change).toBe('replaced');
+    expect(result.notice?.kind).toBe('updated');
+    expect(prisma.workoutProgram.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          templateId,
+          assignmentSource: 'ADMIN',
+        }),
+      }),
+    );
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+    expect(prisma.workoutLog.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('pins a matched program when the same template is selected again', async () => {
+    const { prisma, service } = createService();
+    const program = assignedProgram();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        origin: 'SYSTEM',
+        templateId,
+        assignmentSource: 'MATCHED',
+      },
+    ]);
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'CLIENT',
+      email: 'olena@example.com',
+    });
+    prisma.programTemplate.findUnique.mockResolvedValue(
+      template({ origin: 'SYSTEM' }),
+    );
+    prisma.workoutProgram.update.mockResolvedValue({
+      ...program,
+      assignmentSource: 'ADMIN',
+    });
+
+    const result = await service.assignTemplate(clientId, templateId);
+
+    expect(result.change).toBe('unchanged');
+    expect(result.notice).toBeNull();
+    expect(prisma.workoutProgram.update).toHaveBeenCalledWith({
+      where: { userId: clientId },
+      data: { assignmentSource: 'ADMIN' },
+      include: expect.any(Object),
+    });
+    expect(result.program.assignmentSource).toBe('ADMIN');
+    expect(result.program.assignedAt).toBe(program.assignedAt.toISOString());
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+    expect(prisma.workoutLog.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('leaves an already pinned template unchanged', async () => {
+    const { prisma, service } = createService();
+    const program = assignedProgram();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        origin: 'SYSTEM',
+        templateId,
+        assignmentSource: 'ADMIN',
+      },
+    ]);
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'CLIENT',
+      email: 'olena@example.com',
+    });
+    prisma.programTemplate.findUnique.mockResolvedValue(
+      template({ active: true }),
+    );
+    prisma.workoutProgram.findUnique.mockResolvedValue(program);
+
+    const result = await service.assignTemplate(clientId, templateId);
+
+    expect(result.change).toBe('unchanged');
+    expect(result.notice).toBeNull();
+    expect(prisma.workoutProgram.update).not.toHaveBeenCalled();
+    expect(result.program.assignedAt).toBe(program.assignedAt.toISOString());
+  });
+
+  it('rejects a missing client, a missing template, and an inactive template', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue({ role: 'ADMIN', email: 'a@b.c' });
+
+    await expect(
+      service.assignTemplate(clientId, templateId),
+    ).rejects.toMatchObject({ response: { code: 'CLIENT_NOT_FOUND' } });
+
+    prisma.user.findUnique.mockResolvedValue({
+      role: 'CLIENT',
+      email: 'olena@example.com',
+    });
+    prisma.programTemplate.findUnique.mockResolvedValue(null);
+    await expect(
+      service.assignTemplate(clientId, templateId),
+    ).rejects.toMatchObject({ response: { code: 'TEMPLATE_NOT_FOUND' } });
+
+    prisma.programTemplate.findUnique.mockResolvedValue(
+      template({ active: false }),
+    );
+    await expect(
+      service.assignTemplate(clientId, templateId),
+    ).rejects.toMatchObject({ response: { code: 'TEMPLATE_INACTIVE' } });
+    expect(prisma.workoutProgram.create).not.toHaveBeenCalled();
+  });
+
+  it('counts trainer sessions past the planned target', async () => {
+    const { prisma, service } = createService();
+    const program = assignedProgram();
+    program.template.origin = 'TRAINER';
+    program.template.frequencyPerWeek = 4;
+    prisma.workoutProgram.findUnique.mockResolvedValue(program);
+
+    for (const completed of [31, 32, 33, 40]) {
+      prisma.workoutLog.groupBy.mockResolvedValue([
+        { dayNumber: 1, _count: { _all: completed } },
+      ]);
+      const current = await service.getMine(clientId);
+      expect(current.program?.programProgress).toEqual({
+        completed,
+        expected: 32,
+      });
+    }
   });
 });

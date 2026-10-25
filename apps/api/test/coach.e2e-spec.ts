@@ -386,6 +386,62 @@ describeWithDatabase('coach clients (e2e)', () => {
       status: 'PENDING',
     });
 
+    const firstAssign = await request(app.getHttpServer())
+      .post(`/api/v1/coach/clients/${bare.id}/program`)
+      .set('Authorization', admin.authorization)
+      .send({ templateId: template.id })
+      .expect(201);
+    expect(firstAssign.body.program).toMatchObject({
+      templateCode: template.code,
+      origin: template.origin,
+      assignmentSource: 'ADMIN',
+    });
+
+    const replacement = await prisma.programTemplate.findFirst({
+      where: { active: true, id: { not: template.id } },
+    });
+    if (!replacement) throw new Error('second seeded template missing');
+    const assignPath = `/api/v1/coach/clients/${clientAccount.id}/program`;
+    await request(app.getHttpServer())
+      .post(assignPath)
+      .set('Authorization', clientAccount.authorization)
+      .send({ templateId: replacement.id })
+      .expect(403);
+    const log = await prisma.workoutLog.create({
+      data: {
+        userId: clientAccount.id,
+        templateId: template.id,
+        dayNumber: 1,
+      },
+    });
+    const replaced = await request(app.getHttpServer())
+      .post(assignPath)
+      .set('Authorization', admin.authorization)
+      .send({ templateId: replacement.id })
+      .expect(201);
+    expect(replaced.body.program).toMatchObject({
+      templateCode: replacement.code,
+      origin: replacement.origin,
+      assignmentSource: 'ADMIN',
+    });
+    const replacedAt = replaced.body.program.assignedAt as string;
+    const same = await request(app.getHttpServer())
+      .post(assignPath)
+      .set('Authorization', admin.authorization)
+      .send({ templateId: replacement.id })
+      .expect(201);
+    expect(same.body.program.assignedAt).toBe(replacedAt);
+    const history = await prisma.workoutLog.findUnique({
+      where: { id: log.id },
+    });
+    expect(history?.templateId).toBe(template.id);
+    expect(
+      await prisma.workoutProgram.count({
+        where: { userId: clientAccount.id },
+      }),
+    ).toBe(1);
+    await prisma.workoutLog.delete({ where: { id: log.id } });
+
     await prisma.exercise.deleteMany({ where: { code: 'COACH_HIST_ROW' } });
     const exercise = await prisma.exercise.create({
       data: {
