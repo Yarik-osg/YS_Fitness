@@ -52,6 +52,7 @@ vi.mock('@/lib/hooks/use-coach-programs', () => ({
             ownerId: 'admin-1',
             dayCount: 4,
             exerciseCount: 8,
+            assignedCount: 0,
           },
         ],
       },
@@ -79,6 +80,7 @@ const DETAIL: CoachClientDetail = {
   name: 'Olena Koval',
   createdAt: '2026-03-04T00:00:00.000Z',
   onboardingCompleted: true,
+  archived: false,
   profile: {
     dateOfBirth: '1994-04-12',
     biologicalSexForCalculation: 'FEMALE',

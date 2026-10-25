@@ -62,14 +62,27 @@ export class TrainerTemplatesService {
     actor: TrainerTemplateActor,
   ): Promise<TrainerProgramTemplateListResponse> {
     this.assertCoach(actor);
-    const templates = await this.prisma.programTemplate.findMany({
-      where: { origin: { in: ['SYSTEM', 'TRAINER'] } },
-      orderBy: [{ origin: 'asc' }, { name: 'asc' }],
-      include: {
-        days: { select: { _count: { select: { exercises: true } } } },
-      },
-    });
-    return { templates: templates.map(toSummary) };
+    const [templates, assigned] = await Promise.all([
+      this.prisma.programTemplate.findMany({
+        where: { origin: { in: ['SYSTEM', 'TRAINER'] } },
+        orderBy: [{ origin: 'asc' }, { name: 'asc' }],
+        include: {
+          days: { select: { _count: { select: { exercises: true } } } },
+        },
+      }),
+      this.prisma.workoutProgram.groupBy({
+        by: ['templateId'],
+        _count: { _all: true },
+      }),
+    ]);
+    const assignedCount = new Map(
+      assigned.map((row) => [row.templateId, row._count._all]),
+    );
+    return {
+      templates: templates.map((template) =>
+        toSummary(template, assignedCount.get(template.id) ?? 0),
+      ),
+    };
   }
 
   async get(
@@ -82,7 +95,10 @@ export class TrainerTemplatesService {
       include: detailInclude,
     });
     this.assertReadable(template);
-    return toDetail(template);
+    const assignedCount = await this.prisma.workoutProgram.count({
+      where: { templateId },
+    });
+    return toDetail(template, assignedCount);
   }
 
   async listExercises(
@@ -148,7 +164,7 @@ export class TrainerTemplatesService {
         },
         include: detailInclude,
       });
-      return toDetail(template);
+      return toDetail(template, 0);
     });
   }
 
@@ -238,7 +254,7 @@ export class TrainerTemplatesService {
       },
       include: detailInclude,
     });
-    return toDetail(template);
+    return toDetail(template, 0);
   }
 
   private async assertExercises(
@@ -435,7 +451,10 @@ type SummaryTemplate = {
   days: SummaryDay[];
 };
 
-function toSummary(template: SummaryTemplate): TrainerProgramTemplateSummary {
+function toSummary(
+  template: SummaryTemplate,
+  assignedCount: number,
+): TrainerProgramTemplateSummary {
   if (!(
     (template.origin === 'SYSTEM' && template.ownerId === null) ||
     (template.origin === 'TRAINER' && template.ownerId)
@@ -456,6 +475,7 @@ function toSummary(template: SummaryTemplate): TrainerProgramTemplateSummary {
     origin: template.origin,
     active: template.active,
     ownerId: template.ownerId,
+    assignedCount,
     dayCount: template.days.length,
     exerciseCount: template.days.reduce((sum, day) => {
       if (day.exercises) return sum + day.exercises.length;
@@ -464,9 +484,12 @@ function toSummary(template: SummaryTemplate): TrainerProgramTemplateSummary {
   };
 }
 
-function toDetail(template: TemplateDetail): TrainerProgramTemplateDetail {
+function toDetail(
+  template: TemplateDetail,
+  assignedCount: number,
+): TrainerProgramTemplateDetail {
   return {
-    ...toSummary(template),
+    ...toSummary(template, assignedCount),
     days: template.days.map((day): ProgramDayResponse => ({
       dayNumber: day.dayNumber,
       exercises: day.exercises.map((row) => ({

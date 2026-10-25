@@ -102,6 +102,8 @@ export interface CoachClientSummary {
   programName: string | null;
   /** Latest WorkoutLog.completedAt. Null when the client has no logs. */
   lastWorkoutAt: string | null;
+  /** True when the client can no longer sign in. History is kept. */
+  archived: boolean;
   /** True when any subscription row exists, including one that no longer grants access. */
   subscriptionOnFile: boolean;
   subscriptionActive: boolean;
@@ -159,6 +161,7 @@ export interface CoachClientDetail {
   name: string | null;
   createdAt: string;
   onboardingCompleted: boolean;
+  archived: boolean;
   profile: CoachClientProfile | null;
   onboarding: CoachClientOnboarding | null;
   program: CoachClientProgram | null;
@@ -429,6 +432,8 @@ export interface TrainerProgramTemplateSummary {
   ownerId: string | null;
   dayCount: number;
   exerciseCount: number;
+  /** Workout programs currently pointing at this template, including archived clients. */
+  assignedCount: number;
 }
 
 export interface TrainerProgramTemplateDetail extends TrainerProgramTemplateSummary {

@@ -6,18 +6,32 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
-import { useCoachClients } from '@/lib/hooks/use-coach-clients';
+import {
+  useArchiveClient,
+  useCoachClients,
+} from '@/lib/hooks/use-coach-clients';
 import { programCatalogName } from '@/lib/program-catalog-name';
 
 export function CoachClientsPage() {
   const t = useTranslations('coach');
   const locale = useLocale();
   const clients = useCoachClients();
+  const archive = useArchiveClient();
   const [search, setSearch] = useState('');
-  const visible = useMemo(
-    () => filterClients(clients.data?.clients ?? [], search),
-    [clients.data, search],
+  const [view, setView] = useState<'active' | 'archived'>('active');
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const inView = useMemo(
+    () =>
+      (clients.data?.clients ?? []).filter((client) =>
+        view === 'archived' ? client.archived : !client.archived,
+      ),
+    [clients.data, view],
   );
+  const visible = useMemo(
+    () => filterClients(inView, search),
+    [inView, search],
+  );
+  const pending = inView.find((client) => client.id === pendingId) ?? null;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
@@ -26,7 +40,7 @@ export function CoachClientsPage() {
       </h1>
       {clients.data ? (
         <p className="mt-2 text-sm text-muted">
-          {t('count', { count: visible.length })}
+          {t('count', { count: inView.length })}
         </p>
       ) : null}
 
@@ -61,15 +75,84 @@ export function CoachClientsPage() {
 
       {clients.data && clients.data.clients.length > 0 ? (
         <>
+          <div className="mt-6 flex gap-2">
+            <Button
+              size="sm"
+              variant={view === 'active' ? 'primary' : 'outline'}
+              className="rounded-lg"
+              aria-pressed={view === 'active'}
+              onClick={() => {
+                setView('active');
+                setPendingId(null);
+                archive.reset();
+              }}
+            >
+              {t('rosterActive')}
+            </Button>
+            <Button
+              size="sm"
+              variant={view === 'archived' ? 'primary' : 'outline'}
+              className="rounded-lg"
+              aria-pressed={view === 'archived'}
+              onClick={() => {
+                setView('archived');
+                setPendingId(null);
+                archive.reset();
+              }}
+            >
+              {t('rosterArchived')}
+            </Button>
+          </div>
           <input
             type="search"
             value={search}
             aria-label={t('searchClients')}
             placeholder={t('searchClients')}
             onChange={(event) => setSearch(event.target.value)}
-            className="mt-6 h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="mt-4 h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
-          {visible.length === 0 ? (
+          {pending ? (
+            <div className="mt-4 flex flex-col items-start gap-3 rounded-lg border border-line bg-panel px-4 py-3">
+              <p className="text-sm text-ink">
+                {t('archiveConfirm', {
+                  name: pending.name?.trim() ? pending.name : t('unnamed'),
+                })}
+              </p>
+              <p className="text-sm text-muted">{t('archiveBody')}</p>
+              {archive.isError ? (
+                <p role="alert" className="text-sm text-amber">
+                  {t('archiveError')}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-lg"
+                  disabled={archive.isPending}
+                  onClick={() => archive.mutate(pending.id)}
+                >
+                  {archive.isPending ? t('archiving') : t('archive')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  disabled={archive.isPending}
+                  onClick={() => {
+                    setPendingId(null);
+                    archive.reset();
+                  }}
+                >
+                  {t('archiveCancel')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {inView.length === 0 ? (
+            <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
+              {view === 'archived' ? t('archivedEmpty') : t('activeEmpty')}
+            </p>
+          ) : visible.length === 0 ? (
             <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
               {t('searchEmpty')}
             </p>
@@ -96,6 +179,9 @@ export function CoachClientsPage() {
                     <th className="px-4 py-3 font-medium" scope="col">
                       {t('subscription')}
                     </th>
+                    <th className="px-4 py-3 font-medium" scope="col">
+                      <span className="sr-only">{t('archive')}</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -104,6 +190,16 @@ export function CoachClientsPage() {
                       key={client.id}
                       client={client}
                       locale={locale}
+                      busy={archive.isPending}
+                      onArchive={
+                        client.archived
+                          ? null
+                          : () => {
+                              if (archive.isPending) return;
+                              archive.reset();
+                              setPendingId(client.id);
+                            }
+                      }
                     />
                   ))}
                 </tbody>
@@ -119,9 +215,13 @@ export function CoachClientsPage() {
 function ClientRow({
   client,
   locale,
+  onArchive,
+  busy,
 }: {
   client: CoachClientSummary;
   locale: string;
+  onArchive: (() => void) | null;
+  busy: boolean;
 }) {
   const t = useTranslations('coach');
   const joined = formatDay(locale, client.createdAt);
@@ -180,6 +280,24 @@ function ClientRow({
               : t('noSubscription')
           }
         />
+      </td>
+      <td className="mt-3 block sm:mt-0 sm:table-cell sm:px-4 sm:py-3">
+        {client.archived ? (
+          <span className="text-xs text-muted">{t('archived')}</span>
+        ) : onArchive ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            aria-label={t('archiveNamed', {
+              name: client.name?.trim() ? client.name : t('unnamed'),
+            })}
+            disabled={busy}
+            onClick={onArchive ?? undefined}
+          >
+            {t('archive')}
+          </Button>
+        ) : null}
       </td>
     </tr>
   );

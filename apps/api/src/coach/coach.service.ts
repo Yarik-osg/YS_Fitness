@@ -27,6 +27,7 @@ import { grantsActiveAccess } from '../subscriptions/subscription-access.js';
 const clientDetailSelect = {
   id: true,
   email: true,
+  isActive: true,
   createdAt: true,
   profile: {
     select: {
@@ -122,6 +123,37 @@ export class CoachService {
     return this.getClient(userId);
   }
 
+  async archiveClient(userId: string): Promise<{ id: string }> {
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const client = await tx.user.findFirst({
+        where: { id: userId, role: UserRole.CLIENT },
+        select: { id: true, isActive: true },
+      });
+      if (!client) {
+        throw new NotFoundException({
+          code: 'CLIENT_NOT_FOUND',
+          message: 'Client not found.',
+        });
+      }
+      if (client.isActive) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { isActive: false },
+        });
+      }
+      await tx.authSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      await tx.authRefreshToken.updateMany({
+        where: { session: { userId }, revokedAt: null },
+        data: { revokedAt: now },
+      });
+    });
+    return { id: userId };
+  }
+
   async listClients(): Promise<CoachClientsResponse> {
     const now = new Date();
     const users = await this.prisma.user.findMany({
@@ -130,6 +162,7 @@ export class CoachService {
       select: {
         id: true,
         email: true,
+        isActive: true,
         createdAt: true,
         profile: { select: { name: true, onboardingCompletedAt: true } },
         workoutProgram: { select: { template: { select: { name: true } } } },
@@ -235,6 +268,7 @@ function toSummary(
   user: {
     id: string;
     email: string;
+    isActive: boolean;
     createdAt: Date;
     profile: { name: string | null; onboardingCompletedAt: Date | null } | null;
     workoutProgram: { template: { name: string } } | null;
@@ -255,6 +289,7 @@ function toSummary(
     programAssigned: user.workoutProgram != null,
     programName: user.workoutProgram?.template.name ?? null,
     lastWorkoutAt: lastWorkoutAt?.toISOString() ?? null,
+    archived: user.isActive === false,
     subscriptionOnFile: user.subscriptions.length > 0,
     subscriptionActive: user.subscriptions.some((subscription) =>
       grantsActiveAccess(subscription, now),
@@ -322,6 +357,7 @@ function toDetail(user: ClientDetailRow, now: Date): CoachClientDetail {
     name: user.profile?.name ?? null,
     createdAt: user.createdAt.toISOString(),
     onboardingCompleted: user.profile?.onboardingCompletedAt != null,
+    archived: user.isActive === false,
     profile: user.profile
       ? {
           dateOfBirth: user.profile.dateOfBirth.toISOString().slice(0, 10),

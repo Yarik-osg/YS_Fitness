@@ -49,6 +49,7 @@ const PROGRAMS: TrainerProgramTemplateListResponse = {
       ownerId: null,
       dayCount: 2,
       exerciseCount: 8,
+      assignedCount: 5,
     },
   ],
 };
@@ -176,6 +177,10 @@ describe('CoachProgramsPage', () => {
       screen.queryByRole('columnheader', { name: 'Frequency' }),
     ).not.toBeInTheDocument();
     expect(screen.getAllByText('System').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('columnheader', { name: 'Clients' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
     await userEvent.selectOptions(
       screen.getByRole('combobox', { name: 'Source' }),
       'TRAINER',

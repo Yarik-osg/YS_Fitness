@@ -107,6 +107,10 @@ function createService() {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn(),
     },
+    workoutProgram: {
+      groupBy: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+    },
   };
   return {
     tx,
@@ -166,7 +170,31 @@ describe('TrainerTemplatesService ownership', () => {
       ownerId: null,
       dayCount: 2,
       exerciseCount: 7,
+      assignedCount: 0,
     });
+  });
+
+  it('counts clients assigned to each template in one query', async () => {
+    const { service, prisma } = createService();
+    prisma.programTemplate.findMany.mockResolvedValue([
+      {
+        ...stored(null),
+        origin: 'SYSTEM',
+        ownerId: null,
+        days: [{ _count: { exercises: 1 } }],
+      },
+    ]);
+    prisma.workoutProgram.groupBy.mockResolvedValue([
+      { templateId, _count: { _all: 3 } },
+    ]);
+
+    const listed = await service.list(admin);
+
+    expect(prisma.workoutProgram.groupBy).toHaveBeenCalledWith({
+      by: ['templateId'],
+      _count: { _all: true },
+    });
+    expect(listed.templates[0]?.assignedCount).toBe(3);
   });
 
   it('copies a system template without locking or changing it', async () => {

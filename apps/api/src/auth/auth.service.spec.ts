@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service.js';
@@ -112,5 +112,43 @@ describe('AuthService.register welcome email', () => {
     );
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(mail.sendWelcome).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.login', () => {
+  it('rejects an inactive client before issuing a session', async () => {
+    const { verify } = await import('argon2');
+    vi.mocked(verify).mockResolvedValue(true);
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'user-1',
+          email: input.email,
+          passwordHash: 'hashed',
+          isActive: false,
+          role: 'CLIENT',
+          profile: null,
+        }),
+      },
+    };
+    const service = new AuthService(
+      prisma as never,
+      {} as never,
+      {
+        get: (key: string) => secrets[key],
+        getOrThrow: (key: string) => secrets[key],
+      } as never,
+      { sendWelcome: vi.fn() } as never,
+    );
+    const session = vi.spyOn(
+      service as unknown as { createSessionResponse: () => unknown },
+      'createSessionResponse',
+    );
+
+    await expect(service.login(input, request)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(session).not.toHaveBeenCalled();
+    expect(verify).not.toHaveBeenCalled();
   });
 });

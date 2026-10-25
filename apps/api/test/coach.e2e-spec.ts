@@ -12,6 +12,7 @@ const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
 
 const SUMMARY_FIELDS = [
+  'archived',
   'createdAt',
   'email',
   'id',
@@ -74,6 +75,7 @@ describeWithDatabase('coach clients (e2e)', () => {
     await prisma.workoutProgram.deleteMany();
     await prisma.authRefreshToken.deleteMany();
     await prisma.authSession.deleteMany();
+    await prisma.progressPhoto.deleteMany();
     await prisma.bodyMeasurement.deleteMany();
     await prisma.onboardingResponses.deleteMany();
     await prisma.userProfile.deleteMany();
@@ -222,6 +224,7 @@ describeWithDatabase('coach clients (e2e)', () => {
       programAssigned: true,
       programName: template.name,
       lastWorkoutAt: '2026-05-02T00:00:00.000Z',
+      archived: false,
       subscriptionActive: true,
     });
     const unnamed = trainerRoster.body.clients.find(
@@ -234,6 +237,7 @@ describeWithDatabase('coach clients (e2e)', () => {
       programAssigned: false,
       programName: null,
       lastWorkoutAt: null,
+      archived: false,
       subscriptionActive: false,
     });
     const waiting = trainerRoster.body.clients.find(
@@ -241,6 +245,91 @@ describeWithDatabase('coach clients (e2e)', () => {
         client.email === 'roster-pending@example.com',
     );
     expect(waiting).toMatchObject({ subscriptionActive: false });
+
+    await prisma.bodyMeasurement.create({
+      data: { userId: clientAccount.id, weightKg: 70 },
+    });
+    await prisma.progressPhoto.create({
+      data: {
+        userId: clientAccount.id,
+        contentType: 'image/jpeg',
+        storageKey: `e2e/${clientAccount.id}.jpg`,
+        width: 8,
+        height: 8,
+      },
+    });
+    const archivePath = `/api/v1/coach/clients/${clientAccount.id}/archive`;
+    await request(app.getHttpServer())
+      .post(archivePath)
+      .set('Authorization', clientAccount.authorization)
+      .expect(403);
+    await request(app.getHttpServer()).post(archivePath).expect(401);
+    await request(app.getHttpServer())
+      .post(`/api/v1/coach/clients/${trainer.id}/archive`)
+      .set('Authorization', admin.authorization)
+      .expect(404);
+    await request(app.getHttpServer())
+      .post(archivePath)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(archivePath)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+
+    const archivedUser = await prisma.user.findUniqueOrThrow({
+      where: { id: clientAccount.id },
+    });
+    expect(archivedUser.isActive).toBe(false);
+    expect(archivedUser.email).toBe('roster-client@example.com');
+    const sessions = await prisma.authSession.findMany({
+      where: { userId: clientAccount.id },
+    });
+    expect(sessions.length).toBeGreaterThan(0);
+    expect(sessions.every((session) => session.revokedAt)).toBe(true);
+    const tokens = await prisma.authRefreshToken.findMany({
+      where: { session: { userId: clientAccount.id } },
+    });
+    expect(tokens.length).toBeGreaterThan(0);
+    expect(tokens.every((token) => token.revokedAt)).toBe(true);
+    expect(
+      await prisma.workoutProgram.count({
+        where: { userId: clientAccount.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.workoutLog.count({ where: { userId: clientAccount.id } }),
+    ).toBe(2);
+    expect(
+      await prisma.subscription.count({ where: { userId: clientAccount.id } }),
+    ).toBe(1);
+    expect(
+      await prisma.bodyMeasurement.count({
+        where: { userId: clientAccount.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.progressPhoto.count({ where: { userId: clientAccount.id } }),
+    ).toBe(1);
+
+    const afterArchive = await request(app.getHttpServer())
+      .get('/api/v1/coach/clients')
+      .set('Authorization', admin.authorization)
+      .expect(200);
+    expect(
+      afterArchive.body.clients.find(
+        (client: { email: string }) =>
+          client.email === 'roster-client@example.com',
+      ),
+    ).toMatchObject({ archived: true });
+    await request(app.getHttpServer())
+      .get(`/api/v1/coach/clients/${clientAccount.id}`)
+      .set('Authorization', admin.authorization)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.archived).toBe(true);
+        expect(response.body.program).not.toBeNull();
+      });
   });
 
   it('returns one client file to a coach and hides everyone else', async () => {
@@ -361,6 +450,7 @@ describeWithDatabase('coach clients (e2e)', () => {
       .expect(200);
     expect(adminFile.body).toEqual(trainerFile.body);
     expect(Object.keys(trainerFile.body).sort()).toEqual([
+      'archived',
       'createdAt',
       'email',
       'id',
@@ -373,6 +463,7 @@ describeWithDatabase('coach clients (e2e)', () => {
     ]);
     expect(trainerFile.body).toMatchObject({
       email: 'detail-client@example.com',
+      archived: false,
       name: 'Olena Koval',
       onboardingCompleted: true,
       onboarding: { mainGoal: 'maintain', focusAreas: ['glutes'] },

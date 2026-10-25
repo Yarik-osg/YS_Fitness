@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { ApiClientError } from '@/lib/api/client';
 import {
+  archiveCoachClient,
   assignCoachProgram,
   getCoachClient,
   listCoachClients,
@@ -23,6 +24,16 @@ export function useCoachClients() {
   return useQuery({
     queryKey: ['coach', 'clients'],
     queryFn: listCoachClients,
+  });
+}
+
+export function useArchiveClient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => archiveCoachClient(userId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['coach', 'clients'] });
+    },
   });
 }
 
