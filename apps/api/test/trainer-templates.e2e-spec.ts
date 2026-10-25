@@ -289,6 +289,34 @@ describeWithDatabase('trainer program templates (e2e)', () => {
     await prisma.workoutProgram.create({
       data: { userId: client.id, templateId },
     });
+    const before = await prisma.programTemplate.findUniqueOrThrow({
+      where: { id: templateId },
+      include: {
+        days: {
+          orderBy: { dayNumber: 'asc' },
+          include: { exercises: { orderBy: { order: 'asc' } } },
+        },
+      },
+    });
+    const editedWhileAssigned = await request(app.getHttpServer())
+      .put(`/api/v1/coach/program-templates/${templateId}`)
+      .set('authorization', trainer.authorization)
+      .send({ ...templateBody(exerciseId), name: 'Changed while assigned' });
+    expect(editedWhileAssigned.status).toBe(409);
+    expect(editedWhileAssigned.body.code).toBe('TEMPLATE_IN_USE');
+    const after = await prisma.programTemplate.findUniqueOrThrow({
+      where: { id: templateId },
+      include: {
+        days: {
+          orderBy: { dayNumber: 'asc' },
+          include: { exercises: { orderBy: { order: 'asc' } } },
+        },
+      },
+    });
+    expect(after.updatedAt).toEqual(before.updatedAt);
+    expect(after.name).toBe(before.name);
+    expect(after.days).toEqual(before.days);
+
     const assigned = await request(app.getHttpServer())
       .delete(`/api/v1/coach/program-templates/${templateId}`)
       .set('authorization', trainer.authorization);

@@ -242,6 +242,18 @@ describe('TrainerTemplatesService ownership', () => {
 });
 
 describe('TrainerTemplatesService conflicts', () => {
+  it('rejects an edit while a client is assigned and has no logs', async () => {
+    const { service, tx } = createService();
+    tx.workoutProgram.count.mockResolvedValue(1);
+    tx.workoutLog.count.mockResolvedValue(0);
+
+    await expect(
+      service.update(coach, templateId, input),
+    ).rejects.toMatchObject({ response: { code: 'TEMPLATE_IN_USE' } });
+    expect(tx.programTemplateDay.deleteMany).not.toHaveBeenCalled();
+    expect(tx.programTemplate.update).not.toHaveBeenCalled();
+  });
+
   it('rejects an edit once a workout log exists', async () => {
     const { service, tx } = createService();
     tx.workoutLog.count.mockResolvedValue(1);

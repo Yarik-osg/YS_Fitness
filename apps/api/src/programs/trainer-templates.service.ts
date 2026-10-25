@@ -122,11 +122,20 @@ export class TrainerTemplatesService {
     return this.prisma.$transaction(async (db) => {
       const locked = await lockTemplate(db, templateId);
       this.assertVisible(locked);
-      const logs = await db.workoutLog.count({ where: { templateId } });
+      const [programs, logs] = await Promise.all([
+        db.workoutProgram.count({ where: { templateId } }),
+        db.workoutLog.count({ where: { templateId } }),
+      ]);
       if (logs > 0) {
         throw new ConflictException({
           code: 'TEMPLATE_HAS_LOGS',
           message: 'A template with workout logs cannot be edited',
+        });
+      }
+      if (programs > 0) {
+        throw new ConflictException({
+          code: 'TEMPLATE_IN_USE',
+          message: 'An assigned template cannot be edited',
         });
       }
       await this.assertExercises(db, input);

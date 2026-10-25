@@ -100,7 +100,7 @@ export function CoachProgramsPage() {
           cell: (context) => (
             <Link
               href={`/coach/programs/${context.row.original.id}`}
-              className="font-medium text-ink underline-offset-4 hover:underline"
+              className="font-medium text-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {context.getValue()}
             </Link>

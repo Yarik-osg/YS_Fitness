@@ -165,6 +165,9 @@ describe('CoachProgramsPage', () => {
       'href',
       '/coach/programs/system-1',
     );
+    expect(screen.getByRole('link', { name: 'WB2U' })).toHaveClass(
+      'focus-visible:outline-accent',
+    );
     expect(
       screen.getByRole('columnheader', { name: 'Track' }),
     ).toBeInTheDocument();
