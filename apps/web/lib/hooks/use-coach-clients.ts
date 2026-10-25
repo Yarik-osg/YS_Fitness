@@ -27,12 +27,23 @@ export function useCoachClients() {
   });
 }
 
+export function isArchiveRefreshKey(
+  key: readonly unknown[],
+  userId: string,
+): boolean {
+  if (key[0] !== 'coach' || key[1] !== 'clients') return false;
+  if (key.length === 2) return true;
+  return key.length === 3 && key[2] === userId;
+}
+
 export function useArchiveClient() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => archiveCoachClient(userId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['coach', 'clients'] });
+    onSuccess: async (_result, userId) => {
+      await queryClient.invalidateQueries({
+        predicate: (query) => isArchiveRefreshKey(query.queryKey, userId),
+      });
     },
   });
 }

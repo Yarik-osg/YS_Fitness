@@ -285,7 +285,7 @@ describe('CoachClientsPage', () => {
       screen.getByText('This client could not be archived.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Olena Koval' }),
+      screen.getByRole('link', { name: 'Olena Koval', hidden: true }),
     ).toBeInTheDocument();
   });
 
@@ -347,6 +347,41 @@ describe('CoachClientsPage', () => {
     expect(screen.getByText('Inactive')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.queryByText('No subscription on file.')).toBeNull();
+  });
+
+  it('sorts the roster by name, then reverses it', async () => {
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          CLIENTS.clients[0]!,
+          { ...CLIENTS.clients[0]!, id: 'client-2', name: 'Anna' },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+    const clientLinks = () =>
+      screen
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href'))
+        .filter((href) => href?.startsWith('/coach/clients/'));
+    expect(clientLinks()).toEqual([
+      '/coach/clients/client-1',
+      '/coach/clients/client-2',
+    ]);
+    const nameSort = () => screen.getAllByRole('button', { name: 'Name' })[0]!;
+    await userEvent.click(nameSort());
+    expect(clientLinks()).toEqual([
+      '/coach/clients/client-2',
+      '/coach/clients/client-1',
+    ]);
+    await userEvent.click(nameSort());
+    expect(clientLinks()).toEqual([
+      '/coach/clients/client-1',
+      '/coach/clients/client-2',
+    ]);
   });
 
   it('shows an error and retries', async () => {
