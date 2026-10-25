@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { CoachService } from './coach.service.js';
@@ -531,6 +531,7 @@ describe('CoachService.getClient', () => {
       status: 'ACTIVE',
       planName: 'Basic',
     });
+    expect(detail.note).toBe('');
     expect(detail.profile?.heightCm).toBe(168);
     expect(detail.profile?.dateOfBirth).toBe('1994-04-12');
 
@@ -864,5 +865,65 @@ describe('CoachService.assignProgram', () => {
       email: 'olena@example.com',
     });
     expect(sendProgramAssigned).toHaveBeenCalledOnce();
+  });
+});
+
+describe('CoachService.updateNote', () => {
+  const userId = '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10';
+  const saved = {
+    id: userId,
+    email: 'olena@example.com',
+    isActive: true,
+    coachNote: 'knee pain',
+    createdAt: new Date('2026-03-04T00:00:00.000Z'),
+    profile: null,
+    onboardingResponses: null,
+    workoutProgram: null,
+    subscriptions: [],
+  };
+
+  it('writes the note when the loaded text still matches and clears it back to empty', async () => {
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(saved)
+      .mockResolvedValueOnce({ ...saved, coachNote: null });
+    const service = createService({ user: { updateMany, findFirst } });
+
+    await expect(
+      service.updateNote(userId, { note: 'knee pain', base: '' }),
+    ).resolves.toMatchObject({ note: 'knee pain' });
+    await expect(
+      service.updateNote(userId, { note: '', base: 'knee pain' }),
+    ).resolves.toMatchObject({ note: '' });
+
+    expect(updateMany).toHaveBeenNthCalledWith(1, {
+      where: { id: userId, role: UserRole.CLIENT, coachNote: null },
+      data: { coachNote: 'knee pain' },
+    });
+    expect(updateMany).toHaveBeenNthCalledWith(2, {
+      where: { id: userId, role: UserRole.CLIENT, coachNote: 'knee pain' },
+      data: { coachNote: null },
+    });
+  });
+
+  it('rejects a stale note and a missing client', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce({ id: userId })
+      .mockResolvedValueOnce(null);
+    const service = createService({ user: { updateMany, findFirst } });
+
+    await expect(
+      service.updateNote(userId, { note: 'newer', base: 'older' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      service.updateNote(userId, { note: 'newer', base: 'older' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(updateMany).toHaveBeenCalledTimes(2);
   });
 });

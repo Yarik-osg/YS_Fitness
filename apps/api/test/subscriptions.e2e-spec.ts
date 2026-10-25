@@ -7,6 +7,7 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
+import { addCalendarMonths } from '../src/subscriptions/period.js';
 import { MockPaymentProvider } from '../src/subscriptions/providers/mock-payment-provider.js';
 import {
   PAYMENT_PROVIDER,
@@ -420,5 +421,138 @@ describeWithDatabase('subscriptions (e2e)', () => {
       })
       .expect(400);
     expect(await prisma.subscription.count({ where: { userId } })).toBe(0);
+  });
+
+  it('rejects a grant with no session', async () => {
+    const plan = await prisma.plan.findUniqueOrThrow({
+      where: { code: '1_MONTH' },
+    });
+    await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/grant')
+      .send({
+        userId: '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10',
+        planId: plan.id,
+      })
+      .expect(401);
+  });
+
+  it('grants over canceled and expired rows without a payment reference', async () => {
+    const admin = await createUser('grant-history@example.com', UserRole.ADMIN);
+    const plan = await prisma.plan.findUniqueOrThrow({
+      where: { code: '1_MONTH' },
+    });
+    const canceled = await createUser('grant-canceled@example.com');
+    const expired = await prisma.user.create({
+      data: {
+        email: 'grant-expired@example.com',
+        passwordHash: await hash('strong-password'),
+      },
+    });
+    const pending = await prisma.user.create({
+      data: {
+        email: 'grant-pending@example.com',
+        passwordHash: await hash('strong-password'),
+      },
+    });
+    const open = await prisma.user.create({
+      data: {
+        email: 'grant-open@example.com',
+        passwordHash: await hash('strong-password'),
+      },
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: canceled.userId,
+        planId: plan.id,
+        status: 'CANCELED',
+        provider: 'MOCK',
+        providerReference: 'pay-canceled',
+      },
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: expired.id,
+        planId: plan.id,
+        status: 'EXPIRED',
+        provider: 'MOCK',
+        providerReference: 'pay-expired',
+        currentPeriodEnd: new Date('2020-01-01T00:00:00.000Z'),
+      },
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: pending.id,
+        planId: plan.id,
+        status: 'PENDING',
+        provider: 'MOCK',
+      },
+    });
+
+    const before = Date.now();
+    const granted = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/grant')
+      .set('Authorization', admin.authorization)
+      .send({ userId: canceled.userId, planId: plan.id })
+      .expect(201);
+    expect(granted.body).toMatchObject({
+      status: 'ACTIVE',
+      provider: 'MANUAL',
+      providerReference: null,
+      grantedByUserId: admin.userId,
+    });
+    const end = Date.parse(granted.body.currentPeriodEnd);
+    const expected = addCalendarMonths(new Date(), 1).getTime();
+    expect(end).toBeGreaterThan(before);
+    expect(Math.abs(end - expected)).toBeLessThan(5_000);
+
+    const history = await prisma.subscription.findMany({
+      where: { userId: canceled.userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(history.map((row) => row.status)).toEqual(['CANCELED', 'ACTIVE']);
+    expect(history[1]?.providerReference).toBeNull();
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/subscriptions/me')
+      .set('Authorization', canceled.authorization)
+      .expect(200);
+    expect(mine.body.subscription).toMatchObject({
+      status: 'ACTIVE',
+      provider: 'MANUAL',
+      providerReference: null,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/grant')
+      .set('Authorization', admin.authorization)
+      .send({ userId: canceled.userId, planId: plan.id })
+      .expect(409);
+
+    const renewed = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/grant')
+      .set('Authorization', admin.authorization)
+      .send({ userId: expired.id, planId: plan.id })
+      .expect(201);
+    expect(renewed.body.provider).toBe('MANUAL');
+    expect(renewed.body.providerReference).toBeNull();
+
+    await request(app.getHttpServer())
+      .post('/api/v1/subscriptions/grant')
+      .set('Authorization', admin.authorization)
+      .send({ userId: pending.id, planId: plan.id })
+      .expect(409);
+
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/api/v1/subscriptions/grant')
+        .set('Authorization', admin.authorization)
+        .send({ userId: open.id, planId: plan.id }),
+      request(app.getHttpServer())
+        .post('/api/v1/subscriptions/grant')
+        .set('Authorization', admin.authorization)
+        .send({ userId: open.id, planId: plan.id }),
+    ]);
+    expect([first.status, second.status].sort((a, b) => a - b)).toEqual([
+      201, 409,
+    ]);
   });
 });

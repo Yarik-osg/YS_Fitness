@@ -422,6 +422,17 @@ export type CreateProgressPhotoInput = z.infer<
 >;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type GrantSubscriptionInput = z.infer<typeof grantSubscriptionSchema>;
+
+export const COACH_NOTE_MAX_LENGTH = 2000;
+
+export const updateCoachNoteSchema = z
+  .object({
+    note: z.string().max(COACH_NOTE_MAX_LENGTH),
+    base: z.string().max(COACH_NOTE_MAX_LENGTH),
+  })
+  .strict();
+
+export type UpdateCoachNoteInput = z.infer<typeof updateCoachNoteSchema>;
 export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
 export type ListWorkoutLogsQuery = z.infer<typeof listWorkoutLogsQuerySchema>;
 export type WorkoutCalendarQuery = z.infer<typeof workoutCalendarQuerySchema>;

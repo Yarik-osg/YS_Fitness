@@ -1,5 +1,5 @@
 import type { CoachClientDetail } from '@repo/shared-types';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,40 @@ const assign = vi.hoisted(() => ({
   isPending: false,
 }));
 
+const noteSave = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  isPending: false,
+  isError: false,
+  isSuccess: false,
+  error: null as Error | null,
+}));
+
+const grant = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  reset: vi.fn(),
+  isPending: false,
+  isError: false,
+  error: null as Error | null,
+}));
+
+const plans = vi.hoisted(() => ({
+  current: {
+    isPending: false,
+    isError: false,
+    data: [
+      {
+        id: 'plan-1',
+        code: '1_MONTH',
+        name: 'One month',
+        priceAmount: 100,
+        currency: 'UAH',
+        intervalMonths: 1,
+        isActive: true,
+      },
+    ],
+  },
+}));
+
 const catalog = vi.hoisted(() => ({
   enabled: true,
 }));
@@ -29,6 +63,12 @@ const catalog = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-coach-clients', () => ({
   useCoachClient: () => client.current,
   useAssignCoachProgram: () => assign,
+  useUpdateCoachNote: () => noteSave,
+  useGrantClientAccess: () => grant,
+}));
+
+vi.mock('@/lib/hooks/use-subscriptions', () => ({
+  usePlans: () => plans.current,
 }));
 
 vi.mock('@/lib/hooks/use-coach-programs', () => ({
@@ -119,6 +159,7 @@ const DETAIL: CoachClientDetail = {
     planName: 'Progress',
     currentPeriodEnd: '2027-06-01T00:00:00.000Z',
   },
+  note: '',
 };
 
 function renderPage(locale: 'uk' | 'en' = 'en') {
@@ -141,6 +182,16 @@ describe('CoachClientPage', () => {
     };
     assign.mutate.mockReset();
     assign.isPending = false;
+    noteSave.mutate.mockReset();
+    noteSave.isPending = false;
+    noteSave.isError = false;
+    noteSave.isSuccess = false;
+    noteSave.error = null;
+    grant.mutate.mockReset();
+    grant.reset.mockReset();
+    grant.isPending = false;
+    grant.isError = false;
+    grant.error = null;
     catalog.enabled = true;
   });
 
@@ -380,5 +431,88 @@ describe('CoachClientPage', () => {
     expect(
       screen.getByRole('searchbox', { name: 'Search programs' }),
     ).toBeInTheDocument();
+  });
+
+  it('saves a private note and shows a failure', async () => {
+    client.current.data = { ...DETAIL, subscription: null, note: '' };
+    renderPage();
+    const field = screen.getByRole('textbox', { name: 'Private note' });
+    expect(field).toHaveValue('');
+    await userEvent.type(field, 'Knee');
+    await userEvent.click(screen.getByRole('button', { name: 'Save note' }));
+    expect(noteSave.mutate).toHaveBeenCalledWith(
+      { note: 'Knee', base: '' },
+      expect.any(Object),
+    );
+
+    cleanup();
+    noteSave.isError = true;
+    noteSave.error = new ApiClientError(500, 'NOTE_FAILED', 'failed');
+    renderPage();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The note could not be saved.',
+    );
+  });
+
+  it('keeps the draft when a note reload does not succeed', async () => {
+    client.current.data = { ...DETAIL, subscription: null, note: '' };
+    client.current.refetch
+      .mockResolvedValueOnce({ isSuccess: false, data: { note: '' } })
+      .mockResolvedValueOnce({
+        isSuccess: true,
+        data: { note: 'From server' },
+      });
+    noteSave.isError = true;
+    noteSave.error = new ApiClientError(409, 'NOTE_CONFLICT', 'newer');
+    renderPage();
+    const field = screen.getByRole('textbox', { name: 'Private note' });
+    await userEvent.type(field, 'Knee');
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(field).toHaveValue('Knee');
+    expect(
+      screen.getByText('The note could not be reloaded.'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(field).toHaveValue('From server');
+    expect(screen.queryByText('The note could not be reloaded.')).toBeNull();
+  });
+
+  it('asks before granting access and reports a conflict', async () => {
+    client.current.data = { ...DETAIL, subscription: null };
+    grant.mutate.mockImplementation((_planId, options) => {
+      options.onSuccess();
+    });
+    renderPage();
+    expect(
+      screen.queryByText('A checkout is still open, so a grant waits.'),
+    ).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    expect(screen.getByText(/does not take a payment/i)).toBeInTheDocument();
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Grant access',
+      }),
+    );
+    expect(grant.mutate).toHaveBeenCalledWith('plan-1', expect.any(Object));
+
+    cleanup();
+    grant.isError = true;
+    grant.error = new ApiClientError(409, 'SUBSCRIPTION_ALREADY_ACTIVE', 'no');
+    grant.mutate.mockReset();
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This client already has access or an open checkout.',
+    );
+  });
+
+  it('waits while a checkout is open', () => {
+    client.current.data = DETAIL;
+    renderPage();
+    expect(
+      screen.getByText('A checkout is still open, so a grant waits.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Grant access' })).toBeNull();
   });
 });

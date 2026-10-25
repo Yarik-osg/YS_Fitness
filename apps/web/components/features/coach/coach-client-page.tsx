@@ -1,23 +1,34 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type {
   CoachClientDetail,
   CoachClientOnboarding,
   TrainerProgramTemplateSummary,
 } from '@repo/shared-types';
+import { COACH_NOTE_MAX_LENGTH } from '@repo/validation';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
 import { CoachClientHistory } from '@/components/features/coach/coach-client-history';
 import { programCatalogName } from '@/lib/program-catalog-name';
 import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import {
   useAssignCoachProgram,
   useCoachClient,
+  useGrantClientAccess,
+  useUpdateCoachNote,
 } from '@/lib/hooks/use-coach-clients';
 import { useCoachPrograms } from '@/lib/hooks/use-coach-programs';
+import { usePlans } from '@/lib/hooks/use-subscriptions';
 
 export function CoachClientPage({ userId }: { userId: string }) {
   const t = useTranslations('coach');
@@ -63,12 +74,20 @@ export function CoachClientPage({ userId }: { userId: string }) {
         </div>
       ) : null}
 
-      {client.data ? <ClientDetail detail={client.data} /> : null}
+      {client.data ? (
+        <ClientDetail detail={client.data} onReload={() => client.refetch()} />
+      ) : null}
     </main>
   );
 }
 
-function ClientDetail({ detail }: { detail: CoachClientDetail }) {
+function ClientDetail({
+  detail,
+  onReload,
+}: {
+  detail: CoachClientDetail;
+  onReload: () => Promise<unknown>;
+}) {
   const t = useTranslations('coach');
   const locale = useLocale();
   const title = detail.program
@@ -200,6 +219,8 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
         <ProgramAssign userId={detail.id} currentName={title} />
       </Section>
 
+      <CoachNote userId={detail.id} note={detail.note} onReload={onReload} />
+
       <Section title={t('sections.subscription')}>
         {detail.subscription ? (
           <div>
@@ -227,10 +248,241 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
         ) : (
           <p className="text-sm text-muted">{t('noSubscription')}</p>
         )}
+        <AccessGrant detail={detail} />
       </Section>
 
       <CoachClientHistory userId={detail.id} />
     </>
+  );
+}
+
+function savedNote(result: unknown): string | null {
+  if (!result || typeof result !== 'object' || !('isSuccess' in result)) {
+    return null;
+  }
+  if (result.isSuccess !== true) return null;
+  if (!('data' in result) || !result.data || typeof result.data !== 'object') {
+    return null;
+  }
+  if (!('note' in result.data) || typeof result.data.note !== 'string') {
+    return null;
+  }
+  return result.data.note;
+}
+
+function CoachNote({
+  userId,
+  note,
+  onReload,
+}: {
+  userId: string;
+  note: string;
+  onReload: () => Promise<unknown>;
+}) {
+  const t = useTranslations('coach');
+  const save = useUpdateCoachNote(userId);
+  const [base, setBase] = useState(note);
+  const [draft, setDraft] = useState(note);
+  const [seen, setSeen] = useState(note);
+  const [reloadError, setReloadError] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const dirty = draft !== base;
+
+  if (note !== seen) {
+    setSeen(note);
+    if (draft === base) {
+      setBase(note);
+      setDraft(note);
+    }
+  }
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const conflict =
+    save.error instanceof ApiClientError && save.error.status === 409;
+
+  async function reload() {
+    setReloading(true);
+    setReloadError(false);
+    try {
+      const next = savedNote(await onReload());
+      if (next === null) {
+        setReloadError(true);
+        return;
+      }
+      setBase(next);
+      setDraft(next);
+    } catch {
+      setReloadError(true);
+    } finally {
+      setReloading(false);
+    }
+  }
+
+  return (
+    <Section title={t('noteLabel')}>
+      <p className="text-sm text-muted">{t('noteHint')}</p>
+      <textarea
+        value={draft}
+        maxLength={COACH_NOTE_MAX_LENGTH}
+        aria-label={t('noteLabel')}
+        placeholder={t('notePlaceholder')}
+        disabled={save.isPending}
+        onChange={(event) => setDraft(event.target.value)}
+        className="mt-3 min-h-28 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      />
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button
+          size="sm"
+          className="rounded-lg whitespace-nowrap"
+          disabled={!dirty || save.isPending}
+          onClick={() =>
+            save.mutate(
+              { note: draft, base },
+              {
+                onSuccess: (detail) => {
+                  setBase(detail.note);
+                  setDraft(detail.note);
+                },
+              },
+            )
+          }
+        >
+          {save.isPending ? t('noteSaving') : t('noteSave')}
+        </Button>
+        {save.isSuccess && !dirty ? (
+          <p className="text-sm text-muted">{t('noteSaved')}</p>
+        ) : null}
+      </div>
+      {save.isError ? (
+        <p role="alert" className="mt-3 text-sm text-amber">
+          {conflict ? t('noteConflict') : t('noteError')}
+        </p>
+      ) : null}
+      {reloadError ? (
+        <p role="alert" className="mt-3 text-sm text-amber">
+          {t('noteReloadError')}
+        </p>
+      ) : null}
+      {conflict ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-3 rounded-lg whitespace-nowrap"
+          disabled={reloading}
+          onClick={() => void reload()}
+        >
+          {t('retry')}
+        </Button>
+      ) : null}
+    </Section>
+  );
+}
+
+function AccessGrant({ detail }: { detail: CoachClientDetail }) {
+  const t = useTranslations('coach');
+  const plans = usePlans();
+  const grant = useGrantClientAccess(detail.id);
+  const [planId, setPlanId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const choices = plans.data ?? [];
+  const selected =
+    choices.find((plan) => plan.id === planId) ?? choices[0] ?? null;
+  const blocked =
+    detail.subscription?.active === true ||
+    detail.subscription?.status === 'PENDING';
+
+  return (
+    <div className="mt-4">
+      {detail.subscription?.status === 'PENDING' ? (
+        <p className="text-sm text-muted">{t('grantPending')}</p>
+      ) : null}
+      {blocked ? null : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-lg whitespace-nowrap"
+          disabled={plans.isPending || choices.length === 0 || grant.isPending}
+          onClick={() => {
+            grant.reset();
+            setOpen(true);
+          }}
+        >
+          {t('grantAccess')}
+        </Button>
+      )}
+      <Sheet
+        open={open}
+        dismissible={!grant.isPending}
+        onOpenChange={(next) => {
+          if (!next && !grant.isPending) setOpen(false);
+        }}
+      >
+        <SheetContent>
+          <SheetTitle>{t('grantTitle')}</SheetTitle>
+          <SheetDescription>
+            {t('grantBody', {
+              duration: t('grantMonths', {
+                count: selected?.intervalMonths ?? 0,
+              }),
+            })}
+          </SheetDescription>
+          {choices.length > 1 ? (
+            <label className="mb-4 block text-sm text-ink">
+              {t('grantPlan')}
+              <select
+                value={selected?.id ?? ''}
+                aria-label={t('grantPlan')}
+                className="mt-2 h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink"
+                onChange={(event) => setPlanId(event.target.value)}
+              >
+                {choices.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : selected ? (
+            <p className="mb-4 text-center text-sm text-ink">{selected.name}</p>
+          ) : null}
+          {grant.isError ? (
+            <p role="alert" className="mb-4 text-center text-sm text-amber">
+              {grant.error instanceof ApiClientError &&
+              grant.error.status === 409
+                ? t('grantConflict')
+                : t('grantError')}
+            </p>
+          ) : null}
+          <SheetFooter>
+            <Button
+              className="whitespace-nowrap"
+              disabled={grant.isPending || !selected}
+              onClick={() => {
+                if (!selected) return;
+                grant.mutate(selected.id, { onSuccess: () => setOpen(false) });
+              }}
+            >
+              {grant.isPending ? t('grantSaving') : t('grantConfirm')}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={grant.isPending}
+              onClick={() => setOpen(false)}
+            >
+              {t('archiveCancel')}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
 

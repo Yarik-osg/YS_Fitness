@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   StreamableFile,
@@ -27,6 +28,7 @@ import { ListWorkoutLogsQueryDto } from '../workouts/dto/list-workout-logs-query
 import {
   AssignClientProgramDto,
   CoachClientParamsDto,
+  UpdateCoachNoteDto,
   CoachClientPhotoParamsDto,
   CoachProgramParamsDto,
 } from './coach.dto.js';
@@ -69,6 +71,14 @@ export class CoachController {
     @Param() params: CoachClientParamsDto,
   ): Promise<{ id: string }> {
     return this.coach.restoreClient(params.userId);
+  }
+
+  @Patch('clients/:userId/note')
+  updateNote(
+    @Param() params: CoachClientParamsDto,
+    @Body() body: UpdateCoachNoteDto,
+  ): Promise<CoachClientDetail> {
+    return this.coach.updateNote(params.userId, body);
   }
 
   @Post('clients/:userId/program')

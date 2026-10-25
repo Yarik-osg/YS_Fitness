@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SubscriptionStatus, UserRole, type Prisma } from '@prisma/client';
 import type {
   CoachClientDetail,
@@ -12,7 +16,10 @@ import type {
   StrengthChangesResponse,
   WeightMeasurementsResponse,
 } from '@repo/shared-types';
-import type { ListWorkoutLogsQuery } from '@repo/validation';
+import type {
+  ListWorkoutLogsQuery,
+  UpdateCoachNoteInput,
+} from '@repo/validation';
 import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ProgramsService } from '../programs/programs.service.js';
@@ -29,6 +36,7 @@ const clientDetailSelect = {
   id: true,
   email: true,
   isActive: true,
+  coachNote: true,
   createdAt: true,
   profile: {
     select: {
@@ -263,6 +271,24 @@ export class CoachService {
     return toDetail(user, now);
   }
 
+  async updateNote(
+    userId: string,
+    input: UpdateCoachNoteInput,
+  ): Promise<CoachClientDetail> {
+    const base = input.base.length === 0 ? null : input.base;
+    const note = input.note.length === 0 ? null : input.note;
+    const updated = await this.prisma.user.updateMany({
+      where: { id: userId, role: UserRole.CLIENT, coachNote: base },
+      data: { coachNote: note },
+    });
+    if (updated.count === 1) return this.getClient(userId);
+    await this.requireClient(userId);
+    throw new ConflictException({
+      code: 'NOTE_CONFLICT',
+      message: 'A newer note was saved.',
+    });
+  }
+
   async listWorkouts(
     userId: string,
     query: ListWorkoutLogsQuery,
@@ -447,6 +473,7 @@ function toDetail(user: ClientDetailRow, now: Date): CoachClientDetail {
     createdAt: user.createdAt.toISOString(),
     onboardingCompleted: user.profile?.onboardingCompletedAt != null,
     archived: user.isActive === false,
+    note: user.coachNote ?? '',
     profile: user.profile
       ? {
           dateOfBirth: user.profile.dateOfBirth.toISOString().slice(0, 10),
