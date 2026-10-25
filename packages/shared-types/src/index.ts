@@ -98,6 +98,10 @@ export interface CoachClientSummary {
   createdAt: string;
   onboardingCompleted: boolean;
   programAssigned: boolean;
+  /** Template name of the assigned program. Null when none is assigned. */
+  programName: string | null;
+  /** Latest WorkoutLog.completedAt. Null when the client has no logs. */
+  lastWorkoutAt: string | null;
   /** True when any subscription row exists, including one that no longer grants access. */
   subscriptionOnFile: boolean;
   subscriptionActive: boolean;

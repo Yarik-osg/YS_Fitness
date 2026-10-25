@@ -30,7 +30,7 @@ describe('CoachService.listClients', () => {
           name: 'Olena',
           onboardingCompletedAt: new Date('2026-03-05T00:00:00.000Z'),
         },
-        workoutProgram: { id: 'program-1' },
+        workoutProgram: { template: { name: 'Upper split' } },
         subscriptions: [
           {
             status: 'ACTIVE',
@@ -47,7 +47,16 @@ describe('CoachService.listClients', () => {
         subscriptions: [],
       },
     ]);
-    const service = createService({ user: { findMany } });
+    const groupBy = vi.fn().mockResolvedValue([
+      {
+        userId: 'client-1',
+        _max: { completedAt: new Date('2026-04-02T00:00:00.000Z') },
+      },
+    ]);
+    const service = createService({
+      user: { findMany },
+      workoutLog: { groupBy },
+    });
 
     const result = await service.listClients();
 
@@ -55,8 +64,17 @@ describe('CoachService.listClients', () => {
     const query = findMany.mock.calls[0]?.[0];
     expect(query.where).toEqual({ role: UserRole.CLIENT });
     expect(query.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'asc' }]);
+    expect(query.select.workoutProgram).toEqual({
+      select: { template: { select: { name: true } } },
+    });
     expect(query.select.subscriptions).toEqual({
       select: { status: true, currentPeriodEnd: true },
+    });
+    expect(groupBy).toHaveBeenCalledTimes(1);
+    expect(groupBy).toHaveBeenCalledWith({
+      by: ['userId'],
+      where: { userId: { in: ['client-1', 'client-2'] } },
+      _max: { completedAt: true },
     });
     expect(result.clients).toEqual([
       {
@@ -66,6 +84,8 @@ describe('CoachService.listClients', () => {
         createdAt: '2026-03-04T00:00:00.000Z',
         onboardingCompleted: true,
         programAssigned: true,
+        programName: 'Upper split',
+        lastWorkoutAt: '2026-04-02T00:00:00.000Z',
         subscriptionOnFile: true,
         subscriptionActive: true,
       },
@@ -76,6 +96,8 @@ describe('CoachService.listClients', () => {
         createdAt: '2026-01-02T00:00:00.000Z',
         onboardingCompleted: false,
         programAssigned: false,
+        programName: null,
+        lastWorkoutAt: null,
         subscriptionOnFile: false,
         subscriptionActive: false,
       },
@@ -115,7 +137,11 @@ describe('CoachService.listClients', () => {
         ],
       },
     ]);
-    const service = createService({ user: { findMany } });
+    const groupBy = vi.fn().mockResolvedValue([]);
+    const service = createService({
+      user: { findMany },
+      workoutLog: { groupBy },
+    });
 
     const result = await service.listClients();
 

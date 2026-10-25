@@ -43,11 +43,21 @@ const CLIENTS: CoachClientsResponse = {
       createdAt: '2026-03-04T00:00:00.000Z',
       onboardingCompleted: true,
       programAssigned: true,
+      programName: 'Upper split',
+      lastWorkoutAt: '2026-04-02T12:00:00.000Z',
       subscriptionOnFile: false,
       subscriptionActive: false,
     },
   ],
 };
+
+function workoutDay(locale: string, value: string) {
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+}
 
 function renderPage(locale: 'uk' | 'en' = 'uk') {
   return render(
@@ -109,9 +119,9 @@ describe('CoachClientsPage', () => {
       '/coach/clients/client-1',
     );
     expect(screen.getByText('olena@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Заповнена')).toBeInTheDocument();
-    expect(screen.getByText('Призначена')).toBeInTheDocument();
+    expect(screen.getByText('Upper split')).toBeInTheDocument();
     expect(screen.getByText('Підписки немає.')).toBeInTheDocument();
+    expect(screen.queryByText('Заповнена')).toBeNull();
 
     view.rerender(
       <I18nTestProvider locale="en">
@@ -121,9 +131,73 @@ describe('CoachClientsPage', () => {
     expect(
       screen.getByRole('heading', { name: 'Clients' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Complete')).toBeInTheDocument();
-    expect(screen.getByText('Assigned')).toBeInTheDocument();
+    expect(screen.getByText('Upper split')).toBeInTheDocument();
+    expect(
+      screen.getByText(workoutDay('en', '2026-04-02T12:00:00.000Z')),
+    ).toBeInTheDocument();
     expect(screen.getByText('No subscription on file.')).toBeInTheDocument();
+    expect(screen.queryByText('Complete')).toBeNull();
+  });
+
+  it('shows a client with no program and no workouts', () => {
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          {
+            ...CLIENTS.clients[0]!,
+            programAssigned: false,
+            programName: null,
+            lastWorkoutAt: null,
+          },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+    expect(screen.getByText('None')).toBeInTheDocument();
+    expect(screen.getByText('No workouts')).toBeInTheDocument();
+  });
+
+  it('filters by name and email without regard to case', async () => {
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          CLIENTS.clients[0]!,
+          {
+            ...CLIENTS.clients[0]!,
+            id: 'client-2',
+            name: 'Ihor',
+            email: 'ihor@example.com',
+            programName: null,
+            lastWorkoutAt: null,
+          },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+    const search = screen.getByRole('searchbox', { name: 'Search clients' });
+    await userEvent.type(search, 'OLENA');
+    expect(
+      screen.getByRole('link', { name: 'Olena Koval' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ihor' })).toBeNull();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, 'Ihor@Example');
+    expect(screen.getByRole('link', { name: 'Ihor' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Olena Koval' })).toBeNull();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, 'nobody');
+    expect(
+      screen.getByText('No clients match this search.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Olena Koval' })).toBeNull();
   });
 
   it('shows a lapsed plan as inactive and a current plan as active', () => {
