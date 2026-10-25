@@ -43,9 +43,19 @@ const archive = vi.hoisted(() => ({
   },
 }));
 
+const restore = vi.hoisted(() => ({
+  current: {
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    reset: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/hooks/use-coach-clients', () => ({
   useCoachClients: () => roster.current,
   useArchiveClient: () => archive.current,
+  useRestoreClient: () => restore.current,
 }));
 
 const CLIENTS: CoachClientsResponse = {
@@ -94,6 +104,12 @@ describe('CoachClientsPage', () => {
       refetch: vi.fn(),
     };
     archive.current = {
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      reset: vi.fn(),
+    };
+    restore.current = {
       mutate: vi.fn(),
       isPending: false,
       isError: false,
@@ -251,7 +267,9 @@ describe('CoachClientsPage', () => {
     expect(
       screen.getByRole('link', { name: 'Archived Olena' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Archived')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Restore Archived Olena' }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Archive Archived Olena' }),
     ).toBeNull();
@@ -322,6 +340,85 @@ describe('CoachClientsPage', () => {
     );
     expect(screen.queryByRole('link', { name: 'Olena Koval' })).toBeNull();
     expect(screen.getByText('No active clients.')).toBeInTheDocument();
+  });
+
+  it('asks before restoring and keeps the client archived when it fails', async () => {
+    restore.current.mutate.mockImplementation(() => {
+      restore.current.isError = true;
+    });
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [{ ...CLIENTS.clients[0]!, archived: true }],
+      },
+      refetch: vi.fn(),
+    };
+    const view = renderPage('en');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Archived clients' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Restore Olena Koval' }),
+    );
+    expect(restore.current.mutate).not.toHaveBeenCalled();
+    expect(screen.getByText('Restore Olena Koval?')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'They can sign in again. Their program, workouts, and photos stay. This does not renew a subscription.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    expect(restore.current.mutate).toHaveBeenCalledWith('client-1');
+    view.rerender(
+      <I18nTestProvider locale="en">
+        <CoachClientsPage />
+      </I18nTestProvider>,
+    );
+    expect(
+      screen.getByText('This client could not be restored.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Olena Koval', hidden: true }),
+    ).toBeInTheDocument();
+  });
+
+  it('returns a restored client to the active roster', async () => {
+    restore.current.mutate.mockImplementation(() => {
+      roster.current = {
+        ...roster.current,
+        data: {
+          clients: [{ ...CLIENTS.clients[0]!, archived: false }],
+        },
+      };
+    });
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [{ ...CLIENTS.clients[0]!, archived: true }],
+      },
+      refetch: vi.fn(),
+    };
+    const view = renderPage('en');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Archived clients' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Restore Olena Koval' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    view.rerender(
+      <I18nTestProvider locale="en">
+        <CoachClientsPage />
+      </I18nTestProvider>,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Active clients' }),
+    );
+    expect(
+      screen.getByRole('link', { name: 'Olena Koval' }),
+    ).toBeInTheDocument();
   });
 
   it('shows a lapsed plan as inactive and a current plan as active', () => {

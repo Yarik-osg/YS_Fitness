@@ -150,6 +150,18 @@ export function CoachProgramsPage() {
           id: 'assigned',
           header: t('catalog.assignedClients'),
           sortFn: 'basic',
+          cell: ({ row }) => (
+            <Link
+              href={`/coach/programs/${row.original.id}/clients`}
+              className="text-ink underline decoration-line underline-offset-4 hover:text-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              aria-label={t('catalog.assignedClientsLink', {
+                count: row.original.assignedCount,
+                name: programCatalogName(row.original),
+              })}
+            >
+              {row.original.assignedCount}
+            </Link>
+          ),
         }),
       ]),
     [t],

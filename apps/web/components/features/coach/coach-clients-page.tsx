@@ -17,6 +17,7 @@ import { Link } from '@/i18n/navigation';
 import {
   useArchiveClient,
   useCoachClients,
+  useRestoreClient,
 } from '@/lib/hooks/use-coach-clients';
 import { programCatalogName } from '@/lib/program-catalog-name';
 
@@ -38,9 +39,11 @@ export function CoachClientsPage() {
   const locale = useLocale();
   const clients = useCoachClients();
   const archive = useArchiveClient();
+  const restore = useRestoreClient();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'active' | 'archived'>('active');
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [intent, setIntent] = useState<'archive' | 'restore'>('archive');
   const [confirming, setConfirming] = useState<CoachClientSummary | null>(null);
   const [sort, setSort] = useState<ClientSort | null>(null);
   const [workFilters, setWorkFilters] = useState<WorkFilter[]>([]);
@@ -72,17 +75,31 @@ export function CoachClientsPage() {
   const pending = inView.find((client) => client.id === pendingId) ?? null;
   const sheetClient = pending ?? confirming;
 
+  const actionPending = archive.isPending || restore.isPending;
+
   function askArchive(client: CoachClientSummary) {
-    if (archive.isPending) return;
+    if (actionPending) return;
     archive.reset();
+    restore.reset();
+    setIntent('archive');
+    setConfirming(client);
+    setPendingId(client.id);
+  }
+
+  function askRestore(client: CoachClientSummary) {
+    if (actionPending) return;
+    archive.reset();
+    restore.reset();
+    setIntent('restore');
     setConfirming(client);
     setPendingId(client.id);
   }
 
   function dismissArchive() {
-    if (archive.isPending) return;
+    if (actionPending) return;
     setPendingId(null);
     archive.reset();
+    restore.reset();
   }
 
   function toggleSort(column: ClientSort['id']) {
@@ -199,7 +216,7 @@ export function CoachClientsPage() {
           />
           <Sheet
             open={pending !== null}
-            dismissible={!archive.isPending}
+            dismissible={!actionPending}
             onOpenChange={(next) => {
               if (next) return;
               dismissArchive();
@@ -207,32 +224,37 @@ export function CoachClientsPage() {
           >
             <SheetContent>
               <SheetTitle>
-                {t('archiveConfirm', {
+                {t(intent === 'restore' ? 'restoreConfirm' : 'archiveConfirm', {
                   name: sheetClient?.name?.trim()
                     ? sheetClient.name
                     : t('unnamed'),
                 })}
               </SheetTitle>
-              <SheetDescription>{t('archiveBody')}</SheetDescription>
-              {archive.isError ? (
+              <SheetDescription>
+                {t(intent === 'restore' ? 'restoreBody' : 'archiveBody')}
+              </SheetDescription>
+              {archive.isError || restore.isError ? (
                 <p role="alert" className="mb-4 text-center text-sm text-amber">
-                  {t('archiveError')}
+                  {t(intent === 'restore' ? 'restoreError' : 'archiveError')}
                 </p>
               ) : null}
               <SheetFooter>
                 <Button
-                  disabled={archive.isPending || !pending}
+                  disabled={actionPending || !pending}
                   onClick={() => {
                     if (pending && pending.id === confirming?.id) {
-                      archive.mutate(pending.id);
+                      if (intent === 'restore') restore.mutate(pending.id);
+                      else archive.mutate(pending.id);
                     }
                   }}
                 >
-                  {archive.isPending ? t('archiving') : t('archive')}
+                  {actionPending
+                    ? t(intent === 'restore' ? 'restoring' : 'archiving')
+                    : t(intent === 'restore' ? 'restore' : 'archive')}
                 </Button>
                 <Button
                   variant="outline"
-                  disabled={archive.isPending}
+                  disabled={actionPending}
                   onClick={dismissArchive}
                 >
                   {t('archiveCancel')}
@@ -314,7 +336,9 @@ export function CoachClientsPage() {
                       onSort={toggleSort}
                     />
                     <th className="px-4 py-3 font-medium" scope="col">
-                      <span className="sr-only">{t('archive')}</span>
+                      <span className="sr-only">
+                        {t(view === 'archived' ? 'restore' : 'archive')}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -324,9 +348,12 @@ export function CoachClientsPage() {
                       key={client.id}
                       client={client}
                       locale={locale}
-                      busy={archive.isPending}
+                      busy={actionPending}
                       onArchive={
                         client.archived ? null : () => askArchive(client)
+                      }
+                      onRestore={
+                        client.archived ? () => askRestore(client) : null
                       }
                     />
                   ))}
@@ -344,11 +371,13 @@ function ClientRow({
   client,
   locale,
   onArchive,
+  onRestore,
   busy,
 }: {
   client: CoachClientSummary;
   locale: string;
   onArchive: (() => void) | null;
+  onRestore: (() => void) | null;
   busy: boolean;
 }) {
   const t = useTranslations('coach');
@@ -410,8 +439,19 @@ function ClientRow({
         />
       </td>
       <td className="absolute top-4 right-4 sm:static sm:table-cell sm:px-4 sm:py-3">
-        {client.archived ? (
-          <span className="text-xs text-muted">{t('archived')}</span>
+        {client.archived && onRestore ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-8 px-2 text-[11px] tracking-normal"
+            aria-label={t('restoreNamed', {
+              name: client.name?.trim() ? client.name : t('unnamed'),
+            })}
+            disabled={busy}
+            onClick={onRestore}
+          >
+            {t('restore')}
+          </Button>
         ) : onArchive ? (
           <Button
             variant="ghost"

@@ -180,7 +180,9 @@ describe('CoachProgramsPage', () => {
     expect(
       screen.getByRole('columnheader', { name: 'Clients' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /5 clients assigned to WB2U/ }),
+    ).toHaveAttribute('href', '/coach/programs/system-1/clients');
     await userEvent.selectOptions(
       screen.getByRole('combobox', { name: 'Source' }),
       'TRAINER',

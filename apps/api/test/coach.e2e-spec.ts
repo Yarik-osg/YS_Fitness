@@ -336,6 +336,95 @@ describeWithDatabase('coach clients (e2e)', () => {
         expect(response.body.archived).toBe(true);
         expect(response.body.program).not.toBeNull();
       });
+
+    const subscriptionBefore = await prisma.subscription.findFirstOrThrow({
+      where: { userId: clientAccount.id },
+    });
+    const sessionsBefore = await prisma.authSession.count({
+      where: { userId: clientAccount.id },
+    });
+    const restorePath = `/api/v1/coach/clients/${clientAccount.id}/restore`;
+    await request(app.getHttpServer())
+      .post(restorePath)
+      .set('Authorization', pending.authorization)
+      .expect(403);
+    await request(app.getHttpServer()).post(restorePath).expect(401);
+    await request(app.getHttpServer())
+      .post(`/api/v1/coach/clients/${trainer.id}/restore`)
+      .set('Authorization', admin.authorization)
+      .expect(404);
+    await request(app.getHttpServer())
+      .post('/api/v1/coach/clients/not-a-uuid/restore')
+      .set('Authorization', admin.authorization)
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(restorePath)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(restorePath)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+
+    const restoredUser = await prisma.user.findUniqueOrThrow({
+      where: { id: clientAccount.id },
+    });
+    expect(restoredUser.isActive).toBe(true);
+    expect(
+      await prisma.authSession.count({ where: { userId: clientAccount.id } }),
+    ).toBe(sessionsBefore);
+    expect(
+      (
+        await prisma.authSession.findMany({
+          where: { userId: clientAccount.id },
+        })
+      ).every((session) => session.revokedAt),
+    ).toBe(true);
+    const subscriptionAfter = await prisma.subscription.findFirstOrThrow({
+      where: { userId: clientAccount.id },
+    });
+    expect(subscriptionAfter.status).toBe(subscriptionBefore.status);
+    expect(subscriptionAfter.currentPeriodEnd).toEqual(
+      subscriptionBefore.currentPeriodEnd,
+    );
+    expect(
+      await prisma.workoutLog.count({ where: { userId: clientAccount.id } }),
+    ).toBe(2);
+    expect(
+      await prisma.workoutProgram.count({
+        where: { userId: clientAccount.id },
+      }),
+    ).toBe(1);
+
+    await prisma.workoutLog.create({
+      data: {
+        userId: bare.id,
+        templateId: template.id,
+        dayNumber: 1,
+      },
+    });
+    const assigneesPath = `/api/v1/coach/programs/${template.id}/clients`;
+    await request(app.getHttpServer())
+      .get(assigneesPath)
+      .set('Authorization', pending.authorization)
+      .expect(403);
+    await request(app.getHttpServer()).get(assigneesPath).expect(401);
+    await request(app.getHttpServer())
+      .get(
+        '/api/v1/coach/programs/6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10/clients',
+      )
+      .set('Authorization', admin.authorization)
+      .expect(404);
+    const assignees = await request(app.getHttpServer())
+      .get(assigneesPath)
+      .set('Authorization', admin.authorization)
+      .expect(200);
+    expect(assignees.body.programName).toBe(template.name);
+    const assigneeEmails = assignees.body.clients.map(
+      (client: { email: string }) => client.email,
+    );
+    expect(assigneeEmails).toEqual(['roster-client@example.com']);
+    expect(assignees.body.clients[0].archived).toBe(false);
   });
 
   it('returns one client file to a coach and hides everyone else', async () => {

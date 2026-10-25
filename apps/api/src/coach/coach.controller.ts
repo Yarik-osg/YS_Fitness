@@ -15,6 +15,7 @@ import type {
   CoachClientDetail,
   CoachClientWorkoutsResponse,
   CoachClientsResponse,
+  CoachProgramClientsResponse,
   ProgressPhotosResponse,
   StrengthChangesResponse,
   WeightMeasurementsResponse,
@@ -27,6 +28,7 @@ import {
   AssignClientProgramDto,
   CoachClientParamsDto,
   CoachClientPhotoParamsDto,
+  CoachProgramParamsDto,
 } from './coach.dto.js';
 import { CoachService } from './coach.service.js';
 
@@ -41,6 +43,13 @@ export class CoachController {
     return this.coach.listClients();
   }
 
+  @Get('programs/:templateId/clients')
+  listProgramClients(
+    @Param() params: CoachProgramParamsDto,
+  ): Promise<CoachProgramClientsResponse> {
+    return this.coach.listProgramClients(params.templateId);
+  }
+
   @Get('clients/:userId')
   getClient(@Param() params: CoachClientParamsDto): Promise<CoachClientDetail> {
     return this.coach.getClient(params.userId);
@@ -52,6 +61,14 @@ export class CoachController {
     @Param() params: CoachClientParamsDto,
   ): Promise<{ id: string }> {
     return this.coach.archiveClient(params.userId);
+  }
+
+  @Post('clients/:userId/restore')
+  @HttpCode(HttpStatus.OK)
+  restoreClient(
+    @Param() params: CoachClientParamsDto,
+  ): Promise<{ id: string }> {
+    return this.coach.restoreClient(params.userId);
   }
 
   @Post('clients/:userId/program')
