@@ -976,6 +976,7 @@
     "noteSaving": "Saving",
     "noteSaved": "Saved",
     "noteError": "The note could not be saved.",
+    "noteReloadError": "The note could not be reloaded.",
     "noteConflict": "Someone saved a newer note. Reload it and try again.",
     "grantAccess": "Grant access",
     "grantTitle": "Grant access without payment?",

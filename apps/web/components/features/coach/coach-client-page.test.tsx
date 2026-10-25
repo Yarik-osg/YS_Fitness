@@ -454,6 +454,30 @@ describe('CoachClientPage', () => {
     );
   });
 
+  it('keeps the draft when a note reload does not succeed', async () => {
+    client.current.data = { ...DETAIL, subscription: null, note: '' };
+    client.current.refetch
+      .mockResolvedValueOnce({ isSuccess: false, data: { note: '' } })
+      .mockResolvedValueOnce({
+        isSuccess: true,
+        data: { note: 'From server' },
+      });
+    noteSave.isError = true;
+    noteSave.error = new ApiClientError(409, 'NOTE_CONFLICT', 'newer');
+    renderPage();
+    const field = screen.getByRole('textbox', { name: 'Private note' });
+    await userEvent.type(field, 'Knee');
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(field).toHaveValue('Knee');
+    expect(
+      screen.getByText('The note could not be reloaded.'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(field).toHaveValue('From server');
+    expect(screen.queryByText('The note could not be reloaded.')).toBeNull();
+  });
+
   it('asks before granting access and reports a conflict', async () => {
     client.current.data = { ...DETAIL, subscription: null };
     grant.mutate.mockImplementation((_planId, options) => {

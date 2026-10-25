@@ -256,6 +256,20 @@ function ClientDetail({
   );
 }
 
+function savedNote(result: unknown): string | null {
+  if (!result || typeof result !== 'object' || !('isSuccess' in result)) {
+    return null;
+  }
+  if (result.isSuccess !== true) return null;
+  if (!('data' in result) || !result.data || typeof result.data !== 'object') {
+    return null;
+  }
+  if (!('note' in result.data) || typeof result.data.note !== 'string') {
+    return null;
+  }
+  return result.data.note;
+}
+
 function CoachNote({
   userId,
   note,
@@ -269,11 +283,17 @@ function CoachNote({
   const save = useUpdateCoachNote(userId);
   const [base, setBase] = useState(note);
   const [draft, setDraft] = useState(note);
+  const [seen, setSeen] = useState(note);
+  const [reloadError, setReloadError] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const dirty = draft !== base;
 
-  if (note !== base && draft === base) {
-    setBase(note);
-    setDraft(note);
+  if (note !== seen) {
+    setSeen(note);
+    if (draft === base) {
+      setBase(note);
+      setDraft(note);
+    }
   }
 
   useEffect(() => {
@@ -289,19 +309,21 @@ function CoachNote({
     save.error instanceof ApiClientError && save.error.status === 409;
 
   async function reload() {
-    const result = await onReload();
-    const next =
-      result &&
-      typeof result === 'object' &&
-      'data' in result &&
-      result.data &&
-      typeof result.data === 'object' &&
-      'note' in result.data &&
-      typeof result.data.note === 'string'
-        ? result.data.note
-        : note;
-    setBase(next);
-    setDraft(next);
+    setReloading(true);
+    setReloadError(false);
+    try {
+      const next = savedNote(await onReload());
+      if (next === null) {
+        setReloadError(true);
+        return;
+      }
+      setBase(next);
+      setDraft(next);
+    } catch {
+      setReloadError(true);
+    } finally {
+      setReloading(false);
+    }
   }
 
   return (
@@ -344,11 +366,17 @@ function CoachNote({
           {conflict ? t('noteConflict') : t('noteError')}
         </p>
       ) : null}
+      {reloadError ? (
+        <p role="alert" className="mt-3 text-sm text-amber">
+          {t('noteReloadError')}
+        </p>
+      ) : null}
       {conflict ? (
         <Button
           variant="outline"
           size="sm"
           className="mt-3 rounded-lg whitespace-nowrap"
+          disabled={reloading}
           onClick={() => void reload()}
         >
           {t('retry')}
