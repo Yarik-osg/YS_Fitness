@@ -12,6 +12,7 @@ const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
 
 const SUMMARY_FIELDS = [
+  'accessExpired',
   'archived',
   'createdAt',
   'email',
@@ -226,6 +227,7 @@ describeWithDatabase('coach clients (e2e)', () => {
       lastWorkoutAt: '2026-05-02T00:00:00.000Z',
       archived: false,
       subscriptionActive: true,
+      accessExpired: false,
     });
     const unnamed = trainerRoster.body.clients.find(
       (client: { email: string }) => client.email === 'roster-bare@example.com',
@@ -239,12 +241,16 @@ describeWithDatabase('coach clients (e2e)', () => {
       lastWorkoutAt: null,
       archived: false,
       subscriptionActive: false,
+      accessExpired: true,
     });
     const waiting = trainerRoster.body.clients.find(
       (client: { email: string }) =>
         client.email === 'roster-pending@example.com',
     );
-    expect(waiting).toMatchObject({ subscriptionActive: false });
+    expect(waiting).toMatchObject({
+      subscriptionActive: false,
+      accessExpired: false,
+    });
 
     await prisma.bodyMeasurement.create({
       data: { userId: clientAccount.id, weightKg: 70 },

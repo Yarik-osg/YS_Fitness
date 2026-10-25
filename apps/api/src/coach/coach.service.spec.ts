@@ -90,6 +90,7 @@ describe('CoachService.listClients', () => {
         archived: false,
         subscriptionOnFile: true,
         subscriptionActive: true,
+        accessExpired: false,
       },
       {
         id: 'client-2',
@@ -103,6 +104,7 @@ describe('CoachService.listClients', () => {
         archived: false,
         subscriptionOnFile: false,
         subscriptionActive: false,
+        accessExpired: false,
       },
     ]);
   });
@@ -157,13 +159,67 @@ describe('CoachService.listClients', () => {
     expect(result.clients[0]).toMatchObject({
       subscriptionOnFile: true,
       subscriptionActive: false,
+      accessExpired: true,
     });
     expect(result.clients[1]).toMatchObject({
       subscriptionOnFile: true,
       subscriptionActive: true,
+      accessExpired: false,
     });
   });
+
+  it('does not treat pending or canceled subscriptions as expired access', async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      subscriptionUser('pending', [
+        { status: 'PENDING', currentPeriodEnd: null },
+      ]),
+      subscriptionUser('expired', [
+        {
+          status: 'EXPIRED',
+          currentPeriodEnd: new Date('2020-01-01T00:00:00.000Z'),
+        },
+      ]),
+      subscriptionUser('canceled', [
+        {
+          status: 'CANCELED',
+          currentPeriodEnd: new Date('2099-01-01T00:00:00.000Z'),
+        },
+      ]),
+    ]);
+    const service = createService({
+      user: { findMany },
+      workoutLog: { groupBy: vi.fn().mockResolvedValue([]) },
+    });
+
+    const result = await service.listClients();
+
+    expect(result.clients.map((client) => client.accessExpired)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    expect(result.clients.map((client) => client.subscriptionActive)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
 });
+
+function subscriptionUser(
+  id: string,
+  subscriptions: { status: string; currentPeriodEnd: Date | null }[],
+) {
+  return {
+    id,
+    email: `${id}@example.com`,
+    isActive: true,
+    createdAt: new Date('2026-02-01T00:00:00.000Z'),
+    profile: null,
+    workoutProgram: null,
+    subscriptions,
+  };
+}
 
 describe('CoachService.archiveClient', () => {
   const userId = '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10';

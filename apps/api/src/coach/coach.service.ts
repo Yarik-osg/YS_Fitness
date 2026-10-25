@@ -294,7 +294,30 @@ function toSummary(
     subscriptionActive: user.subscriptions.some((subscription) =>
       grantsActiveAccess(subscription, now),
     ),
+    accessExpired: accessHasExpired(user.subscriptions, now),
   };
+}
+
+function accessHasExpired(
+  subscriptions: {
+    status: SubscriptionStatus;
+    currentPeriodEnd: Date | null;
+  }[],
+  now: Date,
+): boolean {
+  if (
+    subscriptions.some((subscription) => grantsActiveAccess(subscription, now))
+  ) {
+    return false;
+  }
+  return subscriptions.some((subscription) => {
+    if (subscription.status === SubscriptionStatus.EXPIRED) return true;
+    if (subscription.status !== SubscriptionStatus.ACTIVE) return false;
+    return (
+      subscription.currentPeriodEnd != null &&
+      subscription.currentPeriodEnd <= now
+    );
+  });
 }
 
 type ClientDetailRow = Prisma.UserGetPayload<{

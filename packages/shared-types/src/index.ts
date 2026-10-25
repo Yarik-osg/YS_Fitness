@@ -107,6 +107,11 @@ export interface CoachClientSummary {
   /** True when any subscription row exists, including one that no longer grants access. */
   subscriptionOnFile: boolean;
   subscriptionActive: boolean;
+  /**
+   * True when no row grants access and one has expired or its paid period has
+   * ended. Pending-only and never-subscribed clients are false.
+   */
+  accessExpired: boolean;
 }
 
 export interface CoachClientsResponse {

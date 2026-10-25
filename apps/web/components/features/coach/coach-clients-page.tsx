@@ -20,6 +20,19 @@ import {
 } from '@/lib/hooks/use-coach-clients';
 import { programCatalogName } from '@/lib/program-catalog-name';
 
+export const QUIET_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+const WORK_FILTERS = ['quiet', 'expired', 'unassigned'] as const;
+type WorkFilter = (typeof WORK_FILTERS)[number];
+
+export function missedRecentWorkout(
+  lastWorkoutAt: string | null,
+  now: number,
+): boolean {
+  if (lastWorkoutAt == null) return true;
+  return Date.parse(lastWorkoutAt) < now - QUIET_WINDOW_MS;
+}
+
 export function CoachClientsPage() {
   const t = useTranslations('coach');
   const locale = useLocale();
@@ -30,6 +43,8 @@ export function CoachClientsPage() {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<CoachClientSummary | null>(null);
   const [sort, setSort] = useState<ClientSort | null>(null);
+  const [workFilters, setWorkFilters] = useState<WorkFilter[]>([]);
+  const [now] = useState(() => Date.now());
   const inView = useMemo(
     () =>
       (clients.data?.clients ?? []).filter((client) =>
@@ -37,8 +52,14 @@ export function CoachClientsPage() {
       ),
     [clients.data, view],
   );
+  const listed = useMemo(() => {
+    if (view !== 'active' || workFilters.length === 0) return inView;
+    return inView.filter((client) =>
+      workFilters.every((filter) => matchesWorkFilter(client, filter, now)),
+    );
+  }, [inView, view, workFilters, now]);
   const visible = useMemo(() => {
-    const filtered = filterClients(inView, search);
+    const filtered = filterClients(listed, search);
     if (!sort) return filtered;
     return [...filtered].sort((left, right) => {
       const result = compareClients(left, right, sort.id, locale, {
@@ -47,7 +68,7 @@ export function CoachClientsPage() {
       });
       return sort.desc ? -result : result;
     });
-  }, [inView, search, sort, locale, t]);
+  }, [listed, search, sort, locale, t]);
   const pending = inView.find((client) => client.id === pendingId) ?? null;
   const sheetClient = pending ?? confirming;
 
@@ -79,7 +100,7 @@ export function CoachClientsPage() {
       </h1>
       {clients.data ? (
         <p className="mt-2 text-sm text-muted">
-          {t('count', { count: inView.length })}
+          {t('count', { count: listed.length })}
         </p>
       ) : null}
 
@@ -140,6 +161,34 @@ export function CoachClientsPage() {
               {t('rosterArchived')}
             </Button>
           </div>
+          {view === 'active' ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {WORK_FILTERS.map((filter) => (
+                <Button
+                  key={filter}
+                  size="sm"
+                  variant={workFilters.includes(filter) ? 'primary' : 'outline'}
+                  className="rounded-lg whitespace-nowrap"
+                  aria-pressed={workFilters.includes(filter)}
+                  onClick={() =>
+                    setWorkFilters((current) =>
+                      current.includes(filter)
+                        ? current.filter((item) => item !== filter)
+                        : [...current, filter],
+                    )
+                  }
+                >
+                  {t(
+                    filter === 'quiet'
+                      ? 'filterQuiet'
+                      : filter === 'expired'
+                        ? 'filterExpired'
+                        : 'filterUnassigned',
+                  )}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <input
             type="search"
             value={search}
@@ -214,6 +263,10 @@ export function CoachClientsPage() {
           {inView.length === 0 ? (
             <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
               {view === 'archived' ? t('archivedEmpty') : t('activeEmpty')}
+            </p>
+          ) : listed.length === 0 ? (
+            <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
+              {t('filterEmpty')}
             </p>
           ) : visible.length === 0 ? (
             <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
@@ -474,6 +527,16 @@ function accessRank(client: CoachClientSummary) {
   if (client.subscriptionActive) return 2;
   if (client.subscriptionOnFile) return 1;
   return 0;
+}
+
+function matchesWorkFilter(
+  client: CoachClientSummary,
+  filter: WorkFilter,
+  now: number,
+): boolean {
+  if (filter === 'quiet') return missedRecentWorkout(client.lastWorkoutAt, now);
+  if (filter === 'expired') return client.accessExpired;
+  return !client.programAssigned;
 }
 
 function filterClients(clients: CoachClientSummary[], search: string) {

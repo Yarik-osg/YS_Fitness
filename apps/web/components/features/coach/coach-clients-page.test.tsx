@@ -4,7 +4,11 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
-import { CoachClientsPage } from './coach-clients-page';
+import {
+  CoachClientsPage,
+  missedRecentWorkout,
+  QUIET_WINDOW_MS,
+} from './coach-clients-page';
 
 vi.mock('@/i18n/navigation', () => ({
   Link: ({
@@ -58,6 +62,7 @@ const CLIENTS: CoachClientsResponse = {
       archived: false,
       subscriptionOnFile: false,
       subscriptionActive: false,
+      accessExpired: false,
     },
   ],
 };
@@ -81,6 +86,7 @@ function renderPage(locale: 'uk' | 'en' = 'uk') {
 describe('CoachClientsPage', () => {
   beforeEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     roster.current = {
       isPending: false,
       isError: false,
@@ -382,6 +388,141 @@ describe('CoachClientsPage', () => {
       '/coach/clients/client-1',
       '/coach/clients/client-2',
     ]);
+  });
+
+  it('keeps a workout on the 14-day cutoff and treats a missing log as quiet', () => {
+    const now = Date.parse('2026-05-16T00:00:00.000Z');
+    expect(missedRecentWorkout(null, now)).toBe(true);
+    expect(
+      missedRecentWorkout(
+        new Date(now - QUIET_WINDOW_MS - 1).toISOString(),
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      missedRecentWorkout(new Date(now - QUIET_WINDOW_MS).toISOString(), now),
+    ).toBe(false);
+  });
+
+  it('filters the active roster and keeps search and sort', async () => {
+    const now = Date.parse('2026-05-16T00:00:00.000Z');
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    const recent = new Date(now - 60_000).toISOString();
+    const quiet = new Date(now - QUIET_WINDOW_MS - 1).toISOString();
+    const edge = new Date(now - QUIET_WINDOW_MS).toISOString();
+    const base = CLIENTS.clients[0]!;
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          { ...base, id: 'recent', name: 'Recent', lastWorkoutAt: recent },
+          { ...base, id: 'quiet', name: 'Quiet', lastWorkoutAt: quiet },
+          {
+            ...base,
+            id: 'none',
+            name: 'None',
+            lastWorkoutAt: null,
+            programAssigned: false,
+            programName: null,
+          },
+          {
+            ...base,
+            id: 'edge',
+            name: 'Edge',
+            lastWorkoutAt: edge,
+          },
+          {
+            ...base,
+            id: 'lapsed',
+            name: 'Lapsed',
+            lastWorkoutAt: recent,
+            subscriptionOnFile: true,
+            subscriptionActive: false,
+            accessExpired: true,
+          },
+          {
+            ...base,
+            id: 'pending',
+            name: 'Pending',
+            lastWorkoutAt: recent,
+            subscriptionOnFile: true,
+            subscriptionActive: false,
+            accessExpired: false,
+          },
+          {
+            ...base,
+            id: 'archived',
+            name: 'Archived',
+            archived: true,
+            lastWorkoutAt: null,
+            programAssigned: false,
+            accessExpired: true,
+          },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'No workout in 14 days' }),
+    );
+    expect(screen.getByRole('link', { name: 'Quiet' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'None' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Edge' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Recent' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Archived' })).toBeNull();
+    expect(screen.getByText('2 clients')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'No program' }));
+    expect(screen.getByRole('link', { name: 'None' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Quiet' })).toBeNull();
+
+    await userEvent.type(screen.getByRole('searchbox'), 'zzz');
+    expect(
+      screen.getByText('No clients match this search.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 client')).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('searchbox'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'No program' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'No workout in 14 days' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Access expired' }),
+    );
+    expect(screen.getByRole('link', { name: 'Lapsed' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Pending' })).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Access expired' }),
+    );
+    const nameSort = () => screen.getAllByRole('button', { name: 'Name' })[0]!;
+    await userEvent.click(nameSort());
+    expect(
+      screen
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href'))
+        .filter((href) => href?.startsWith('/coach/clients/')),
+    ).toEqual([
+      '/coach/clients/edge',
+      '/coach/clients/lapsed',
+      '/coach/clients/none',
+      '/coach/clients/pending',
+      '/coach/clients/quiet',
+      '/coach/clients/recent',
+    ]);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Archived clients' }),
+    );
+    expect(
+      screen.queryByRole('button', { name: 'No workout in 14 days' }),
+    ).toBeNull();
+    expect(screen.getByRole('link', { name: 'Archived' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Quiet' })).toBeNull();
   });
 
   it('shows an error and retries', async () => {
