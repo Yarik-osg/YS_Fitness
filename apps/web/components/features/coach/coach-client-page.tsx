@@ -85,6 +85,9 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
       <p className="mt-1 text-sm text-muted">
         {t('joined')} {joined}
       </p>
+      {detail.archived ? (
+        <p className="mt-2 text-sm text-muted">{t('archived')}</p>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <StatusPill
           label={t('onboarding')}

@@ -1,23 +1,76 @@
 'use client';
 
 import type { CoachClientSummary } from '@repo/shared-types';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
-import { useCoachClients } from '@/lib/hooks/use-coach-clients';
+import {
+  useArchiveClient,
+  useCoachClients,
+} from '@/lib/hooks/use-coach-clients';
 import { programCatalogName } from '@/lib/program-catalog-name';
 
 export function CoachClientsPage() {
   const t = useTranslations('coach');
   const locale = useLocale();
   const clients = useCoachClients();
+  const archive = useArchiveClient();
   const [search, setSearch] = useState('');
-  const visible = useMemo(
-    () => filterClients(clients.data?.clients ?? [], search),
-    [clients.data, search],
+  const [view, setView] = useState<'active' | 'archived'>('active');
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<CoachClientSummary | null>(null);
+  const [sort, setSort] = useState<ClientSort | null>(null);
+  const inView = useMemo(
+    () =>
+      (clients.data?.clients ?? []).filter((client) =>
+        view === 'archived' ? client.archived : !client.archived,
+      ),
+    [clients.data, view],
   );
+  const visible = useMemo(() => {
+    const filtered = filterClients(inView, search);
+    if (!sort) return filtered;
+    return [...filtered].sort((left, right) => {
+      const result = compareClients(left, right, sort.id, locale, {
+        unnamed: t('unnamed'),
+        missing: t('programMissing'),
+      });
+      return sort.desc ? -result : result;
+    });
+  }, [inView, search, sort, locale, t]);
+  const pending = inView.find((client) => client.id === pendingId) ?? null;
+  const sheetClient = pending ?? confirming;
+
+  function askArchive(client: CoachClientSummary) {
+    if (archive.isPending) return;
+    archive.reset();
+    setConfirming(client);
+    setPendingId(client.id);
+  }
+
+  function dismissArchive() {
+    if (archive.isPending) return;
+    setPendingId(null);
+    archive.reset();
+  }
+
+  function toggleSort(column: ClientSort['id']) {
+    setSort((current) => {
+      if (current?.id !== column) return { id: column, desc: false };
+      if (!current.desc) return { id: column, desc: true };
+      return null;
+    });
+  }
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
@@ -26,7 +79,7 @@ export function CoachClientsPage() {
       </h1>
       {clients.data ? (
         <p className="mt-2 text-sm text-muted">
-          {t('count', { count: visible.length })}
+          {t('count', { count: inView.length })}
         </p>
       ) : null}
 
@@ -61,15 +114,108 @@ export function CoachClientsPage() {
 
       {clients.data && clients.data.clients.length > 0 ? (
         <>
+          <div className="mt-6 flex gap-2">
+            <Button
+              size="sm"
+              variant={view === 'active' ? 'primary' : 'outline'}
+              className="rounded-lg"
+              aria-pressed={view === 'active'}
+              onClick={() => {
+                setView('active');
+                dismissArchive();
+              }}
+            >
+              {t('rosterActive')}
+            </Button>
+            <Button
+              size="sm"
+              variant={view === 'archived' ? 'primary' : 'outline'}
+              className="rounded-lg"
+              aria-pressed={view === 'archived'}
+              onClick={() => {
+                setView('archived');
+                dismissArchive();
+              }}
+            >
+              {t('rosterArchived')}
+            </Button>
+          </div>
           <input
             type="search"
             value={search}
             aria-label={t('searchClients')}
             placeholder={t('searchClients')}
             onChange={(event) => setSearch(event.target.value)}
-            className="mt-6 h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="mt-4 h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
-          {visible.length === 0 ? (
+          <Sheet
+            open={pending !== null}
+            dismissible={!archive.isPending}
+            onOpenChange={(next) => {
+              if (next) return;
+              dismissArchive();
+            }}
+          >
+            <SheetContent>
+              <SheetTitle>
+                {t('archiveConfirm', {
+                  name: sheetClient?.name?.trim()
+                    ? sheetClient.name
+                    : t('unnamed'),
+                })}
+              </SheetTitle>
+              <SheetDescription>{t('archiveBody')}</SheetDescription>
+              {archive.isError ? (
+                <p role="alert" className="mb-4 text-center text-sm text-amber">
+                  {t('archiveError')}
+                </p>
+              ) : null}
+              <SheetFooter>
+                <Button
+                  disabled={archive.isPending || !pending}
+                  onClick={() => {
+                    if (pending && pending.id === confirming?.id) {
+                      archive.mutate(pending.id);
+                    }
+                  }}
+                >
+                  {archive.isPending ? t('archiving') : t('archive')}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={archive.isPending}
+                  onClick={dismissArchive}
+                >
+                  {t('archiveCancel')}
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+          <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted sm:hidden">
+            {(
+              [
+                ['name', t('name')],
+                ['email', t('email')],
+                ['joined', t('joined')],
+                ['program', t('program')],
+                ['lastWorkout', t('lastWorkout')],
+                ['subscription', t('subscription')],
+              ] as const
+            ).map(([column, label]) => (
+              <SortButton
+                key={column}
+                label={label}
+                column={column}
+                sort={sort}
+                onSort={toggleSort}
+              />
+            ))}
+          </div>
+          {inView.length === 0 ? (
+            <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
+              {view === 'archived' ? t('archivedEmpty') : t('activeEmpty')}
+            </p>
+          ) : visible.length === 0 ? (
             <p className="mt-4 rounded-lg border border-line bg-panel px-4 py-8 text-sm text-muted">
               {t('searchEmpty')}
             </p>
@@ -78,23 +224,44 @@ export function CoachClientsPage() {
               <table className="w-full text-left text-sm tabular-nums">
                 <thead className="hidden border-b border-line text-xs text-muted sm:table-header-group">
                   <tr>
+                    <SortHeader
+                      label={t('name')}
+                      column="name"
+                      sort={sort}
+                      onSort={toggleSort}
+                    />
+                    <SortHeader
+                      label={t('email')}
+                      column="email"
+                      sort={sort}
+                      onSort={toggleSort}
+                    />
+                    <SortHeader
+                      label={t('joined')}
+                      column="joined"
+                      sort={sort}
+                      onSort={toggleSort}
+                    />
+                    <SortHeader
+                      label={t('program')}
+                      column="program"
+                      sort={sort}
+                      onSort={toggleSort}
+                    />
+                    <SortHeader
+                      label={t('lastWorkout')}
+                      column="lastWorkout"
+                      sort={sort}
+                      onSort={toggleSort}
+                    />
+                    <SortHeader
+                      label={t('subscription')}
+                      column="subscription"
+                      sort={sort}
+                      onSort={toggleSort}
+                    />
                     <th className="px-4 py-3 font-medium" scope="col">
-                      {t('name')}
-                    </th>
-                    <th className="px-4 py-3 font-medium" scope="col">
-                      {t('email')}
-                    </th>
-                    <th className="px-4 py-3 font-medium" scope="col">
-                      {t('joined')}
-                    </th>
-                    <th className="px-4 py-3 font-medium" scope="col">
-                      {t('program')}
-                    </th>
-                    <th className="px-4 py-3 font-medium" scope="col">
-                      {t('lastWorkout')}
-                    </th>
-                    <th className="px-4 py-3 font-medium" scope="col">
-                      {t('subscription')}
+                      <span className="sr-only">{t('archive')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -104,6 +271,10 @@ export function CoachClientsPage() {
                       key={client.id}
                       client={client}
                       locale={locale}
+                      busy={archive.isPending}
+                      onArchive={
+                        client.archived ? null : () => askArchive(client)
+                      }
                     />
                   ))}
                 </tbody>
@@ -119,17 +290,21 @@ export function CoachClientsPage() {
 function ClientRow({
   client,
   locale,
+  onArchive,
+  busy,
 }: {
   client: CoachClientSummary;
   locale: string;
+  onArchive: (() => void) | null;
+  busy: boolean;
 }) {
   const t = useTranslations('coach');
   const joined = formatDay(locale, client.createdAt);
 
   return (
-    <tr className="block border-b border-line px-4 py-4 last:border-b-0 motion-safe:transition-colors sm:table-row sm:px-0 sm:py-0 sm:hover:bg-[var(--color-wash)]">
+    <tr className="relative block border-b border-line px-4 py-4 last:border-b-0 motion-safe:transition-colors sm:table-row sm:px-0 sm:py-0 sm:hover:bg-[var(--color-wash)]">
       <th
-        className="block font-medium text-ink sm:table-cell sm:px-4 sm:py-3"
+        className="block pr-28 font-medium text-ink sm:table-cell sm:px-4 sm:py-3 sm:pr-4"
         scope="row"
       >
         <Link
@@ -181,8 +356,124 @@ function ClientRow({
           }
         />
       </td>
+      <td className="absolute top-4 right-4 sm:static sm:table-cell sm:px-4 sm:py-3">
+        {client.archived ? (
+          <span className="text-xs text-muted">{t('archived')}</span>
+        ) : onArchive ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-8 px-2 text-[11px] tracking-normal"
+            aria-label={t('archiveNamed', {
+              name: client.name?.trim() ? client.name : t('unnamed'),
+            })}
+            disabled={busy}
+            onClick={onArchive ?? undefined}
+          >
+            {t('archive')}
+          </Button>
+        ) : null}
+      </td>
     </tr>
   );
+}
+
+type ClientSort = {
+  id: 'name' | 'email' | 'joined' | 'program' | 'lastWorkout' | 'subscription';
+  desc: boolean;
+};
+
+function SortHeader(props: {
+  label: string;
+  column: ClientSort['id'];
+  sort: ClientSort | null;
+  onSort: (column: ClientSort['id']) => void;
+}) {
+  const direction =
+    props.sort?.id === props.column
+      ? props.sort.desc
+        ? 'desc'
+        : 'asc'
+      : false;
+  return (
+    <th
+      className="px-4 py-3 font-medium"
+      scope="col"
+      aria-sort={
+        direction === 'asc'
+          ? 'ascending'
+          : direction === 'desc'
+            ? 'descending'
+            : 'none'
+      }
+    >
+      <SortButton {...props} />
+    </th>
+  );
+}
+
+function SortButton({
+  label,
+  column,
+  sort,
+  onSort,
+}: {
+  label: string;
+  column: ClientSort['id'];
+  sort: ClientSort | null;
+  onSort: (column: ClientSort['id']) => void;
+}) {
+  const direction = sort?.id === column ? (sort.desc ? 'desc' : 'asc') : false;
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-8 items-center gap-1 px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      onClick={() => onSort(column)}
+    >
+      {label}
+      {direction === 'asc' ? <ArrowUp size={14} aria-hidden /> : null}
+      {direction === 'desc' ? <ArrowDown size={14} aria-hidden /> : null}
+    </button>
+  );
+}
+
+function compareClients(
+  left: CoachClientSummary,
+  right: CoachClientSummary,
+  column: ClientSort['id'],
+  locale: string,
+  labels: { unnamed: string; missing: string },
+) {
+  if (column === 'joined') return left.createdAt.localeCompare(right.createdAt);
+  if (column === 'lastWorkout') {
+    return compareMissingLast(left.lastWorkoutAt, right.lastWorkoutAt);
+  }
+  if (column === 'subscription') {
+    return accessRank(left) - accessRank(right);
+  }
+  const text = (client: CoachClientSummary) => {
+    if (column === 'email') return client.email;
+    if (column === 'program') {
+      return client.programName
+        ? programCatalogName({ name: client.programName })
+        : labels.missing;
+    }
+    return client.name?.trim() ? client.name : labels.unnamed;
+  };
+  return text(left).localeCompare(text(right), locale, { sensitivity: 'base' });
+}
+
+function compareMissingLast(left: string | null, right: string | null) {
+  if (left === right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+  return left.localeCompare(right);
+}
+
+function accessRank(client: CoachClientSummary) {
+  if (client.subscriptionActive) return 2;
+  if (client.subscriptionOnFile) return 1;
+  return 0;
 }
 
 function filterClients(clients: CoachClientSummary[], search: string) {

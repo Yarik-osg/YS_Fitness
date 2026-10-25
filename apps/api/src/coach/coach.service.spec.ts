@@ -41,6 +41,7 @@ describe('CoachService.listClients', () => {
       {
         id: 'client-2',
         email: 'bare@example.com',
+        isActive: true,
         createdAt: new Date('2026-01-02T00:00:00.000Z'),
         profile: null,
         workoutProgram: null,
@@ -86,6 +87,7 @@ describe('CoachService.listClients', () => {
         programAssigned: true,
         programName: 'Upper split',
         lastWorkoutAt: '2026-04-02T00:00:00.000Z',
+        archived: false,
         subscriptionOnFile: true,
         subscriptionActive: true,
       },
@@ -98,6 +100,7 @@ describe('CoachService.listClients', () => {
         programAssigned: false,
         programName: null,
         lastWorkoutAt: null,
+        archived: false,
         subscriptionOnFile: false,
         subscriptionActive: false,
       },
@@ -109,6 +112,7 @@ describe('CoachService.listClients', () => {
       {
         id: 'client-lapsed',
         email: 'lapsed@example.com',
+        isActive: true,
         createdAt: new Date('2026-02-01T00:00:00.000Z'),
         profile: null,
         workoutProgram: null,
@@ -122,6 +126,7 @@ describe('CoachService.listClients', () => {
       {
         id: 'client-both',
         email: 'both@example.com',
+        isActive: true,
         createdAt: new Date('2026-02-02T00:00:00.000Z'),
         profile: null,
         workoutProgram: null,
@@ -157,6 +162,109 @@ describe('CoachService.listClients', () => {
       subscriptionOnFile: true,
       subscriptionActive: true,
     });
+  });
+});
+
+describe('CoachService.archiveClient', () => {
+  const userId = '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10';
+
+  function transaction(options: {
+    client?: { id: string; isActive: boolean } | null;
+    failRevoke?: boolean;
+  }) {
+    let committed = false;
+    const tx = {
+      user: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue(
+            options.client === undefined
+              ? { id: userId, isActive: true }
+              : options.client,
+          ),
+        update: vi.fn().mockResolvedValue({ id: userId }),
+      },
+      authSession: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      authRefreshToken: {
+        updateMany: vi
+          .fn()
+          .mockImplementation(() =>
+            options.failRevoke
+              ? Promise.reject(new Error('down'))
+              : Promise.resolve({ count: 1 }),
+          ),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(
+        async (work: (client: typeof tx) => Promise<void>) => {
+          await work(tx);
+          committed = true;
+        },
+      ),
+      user: { update: vi.fn() },
+    };
+    return { prisma, tx, committed: () => committed };
+  }
+
+  it('deactivates a client and revokes sessions in one transaction', async () => {
+    const { prisma, tx, committed } = transaction({});
+    const service = createService(prisma);
+
+    await expect(service.archiveClient(userId)).resolves.toEqual({
+      id: userId,
+    });
+
+    expect(committed()).toBe(true);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { isActive: false },
+    });
+    expect(tx.authSession.updateMany).toHaveBeenCalledWith({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(tx.authRefreshToken.updateMany).toHaveBeenCalledWith({
+      where: { session: { userId }, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+  });
+
+  it('revokes credentials again without rewriting an archived client', async () => {
+    const { prisma, tx } = transaction({
+      client: { id: userId, isActive: false },
+    });
+    const service = createService(prisma);
+
+    await expect(service.archiveClient(userId)).resolves.toEqual({
+      id: userId,
+    });
+
+    expect(tx.user.update).not.toHaveBeenCalled();
+    expect(tx.authSession.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.authRefreshToken.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not commit when revocation fails', async () => {
+    const { prisma, tx, committed } = transaction({ failRevoke: true });
+    const service = createService(prisma);
+
+    await expect(service.archiveClient(userId)).rejects.toThrow('down');
+
+    expect(committed()).toBe(false);
+    expect(tx.user.update).toHaveBeenCalledTimes(1);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing user and a non-client', async () => {
+    const { prisma, tx } = transaction({ client: null });
+    const service = createService(prisma);
+
+    await expect(service.archiveClient(userId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 });
 

@@ -146,6 +146,11 @@ export function CoachProgramsPage() {
           header: t('catalog.exercises'),
           sortFn: 'basic',
         }),
+        columnHelper.accessor('assignedCount', {
+          id: 'assigned',
+          header: t('catalog.assignedClients'),
+          sortFn: 'basic',
+        }),
       ]),
     [t],
   );

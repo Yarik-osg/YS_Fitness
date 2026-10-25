@@ -30,8 +30,18 @@ const roster = vi.hoisted(() => ({
   },
 }));
 
+const archive = vi.hoisted(() => ({
+  current: {
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    reset: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/hooks/use-coach-clients', () => ({
   useCoachClients: () => roster.current,
+  useArchiveClient: () => archive.current,
 }));
 
 const CLIENTS: CoachClientsResponse = {
@@ -45,6 +55,7 @@ const CLIENTS: CoachClientsResponse = {
       programAssigned: true,
       programName: 'Upper split',
       lastWorkoutAt: '2026-04-02T12:00:00.000Z',
+      archived: false,
       subscriptionOnFile: false,
       subscriptionActive: false,
     },
@@ -75,6 +86,12 @@ describe('CoachClientsPage', () => {
       isError: false,
       data: undefined,
       refetch: vi.fn(),
+    };
+    archive.current = {
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      reset: vi.fn(),
     };
   });
 
@@ -200,6 +217,107 @@ describe('CoachClientsPage', () => {
     expect(screen.queryByRole('link', { name: 'Olena Koval' })).toBeNull();
   });
 
+  it('hides archived clients until that list is opened', async () => {
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          CLIENTS.clients[0]!,
+          {
+            ...CLIENTS.clients[0]!,
+            id: 'archived-1',
+            name: 'Archived Olena',
+            archived: true,
+          },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+    expect(
+      screen.getByRole('link', { name: 'Olena Koval' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Archived Olena' })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Archived clients' }),
+    );
+    expect(
+      screen.getByRole('link', { name: 'Archived Olena' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Archive Archived Olena' }),
+    ).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Olena Koval' })).toBeNull();
+  });
+
+  it('asks before archiving and leaves the client in place when it fails', async () => {
+    archive.current.mutate.mockImplementation(() => {
+      archive.current.isError = true;
+    });
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: CLIENTS,
+      refetch: vi.fn(),
+    };
+    const view = renderPage('en');
+    expect(archive.current.mutate).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Archive Olena Koval' }),
+    );
+    expect(archive.current.mutate).not.toHaveBeenCalled();
+    expect(screen.getByText('Archive Olena Koval?')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'They will not be able to sign in. Their program, workouts, and photos stay.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    expect(archive.current.mutate).toHaveBeenCalledWith('client-1');
+    view.rerender(
+      <I18nTestProvider locale="en">
+        <CoachClientsPage />
+      </I18nTestProvider>,
+    );
+    expect(
+      screen.getByText('This client could not be archived.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Olena Koval', hidden: true }),
+    ).toBeInTheDocument();
+  });
+
+  it('removes an archived client from the active roster after success', async () => {
+    archive.current.mutate.mockImplementation(() => {
+      roster.current = {
+        ...roster.current,
+        data: {
+          clients: [{ ...CLIENTS.clients[0]!, archived: true }],
+        },
+      };
+    });
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: CLIENTS,
+      refetch: vi.fn(),
+    };
+    const view = renderPage('en');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Archive Olena Koval' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    view.rerender(
+      <I18nTestProvider locale="en">
+        <CoachClientsPage />
+      </I18nTestProvider>,
+    );
+    expect(screen.queryByRole('link', { name: 'Olena Koval' })).toBeNull();
+    expect(screen.getByText('No active clients.')).toBeInTheDocument();
+  });
+
   it('shows a lapsed plan as inactive and a current plan as active', () => {
     roster.current = {
       isPending: false,
@@ -229,6 +347,41 @@ describe('CoachClientsPage', () => {
     expect(screen.getByText('Inactive')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.queryByText('No subscription on file.')).toBeNull();
+  });
+
+  it('sorts the roster by name, then reverses it', async () => {
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          CLIENTS.clients[0]!,
+          { ...CLIENTS.clients[0]!, id: 'client-2', name: 'Anna' },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+    const clientLinks = () =>
+      screen
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href'))
+        .filter((href) => href?.startsWith('/coach/clients/'));
+    expect(clientLinks()).toEqual([
+      '/coach/clients/client-1',
+      '/coach/clients/client-2',
+    ]);
+    const nameSort = () => screen.getAllByRole('button', { name: 'Name' })[0]!;
+    await userEvent.click(nameSort());
+    expect(clientLinks()).toEqual([
+      '/coach/clients/client-2',
+      '/coach/clients/client-1',
+    ]);
+    await userEvent.click(nameSort());
+    expect(clientLinks()).toEqual([
+      '/coach/clients/client-1',
+      '/coach/clients/client-2',
+    ]);
   });
 
   it('shows an error and retries', async () => {

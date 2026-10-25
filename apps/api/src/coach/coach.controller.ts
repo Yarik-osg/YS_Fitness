@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -42,6 +44,14 @@ export class CoachController {
   @Get('clients/:userId')
   getClient(@Param() params: CoachClientParamsDto): Promise<CoachClientDetail> {
     return this.coach.getClient(params.userId);
+  }
+
+  @Post('clients/:userId/archive')
+  @HttpCode(HttpStatus.OK)
+  archiveClient(
+    @Param() params: CoachClientParamsDto,
+  ): Promise<{ id: string }> {
+    return this.coach.archiveClient(params.userId);
   }
 
   @Post('clients/:userId/program')
