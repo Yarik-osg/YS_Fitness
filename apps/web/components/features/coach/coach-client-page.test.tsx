@@ -165,6 +165,7 @@ describe('CoachClientPage', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Inactive')).toHaveLength(2);
     expect(screen.getByText(/Pending/)).toBeInTheDocument();
+    expect(screen.queryByText('No subscription on file.')).toBeNull();
     expect(
       screen.getByRole('link', { name: 'Back to clients' }),
     ).toHaveAttribute('href', '/coach');
@@ -185,6 +186,43 @@ describe('CoachClientPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('No program assigned.')).toBeInTheDocument();
     expect(screen.getAllByText('No subscription on file.')).toHaveLength(2);
+    expect(screen.queryByText('Inactive')).toBeNull();
+  });
+
+  it('shows a lapsed plan as ended and a current plan as active', () => {
+    client.current.data = {
+      ...DETAIL,
+      subscription: {
+        active: false,
+        status: 'ACTIVE',
+        planName: 'Progress',
+        currentPeriodEnd: '2020-01-01T00:00:00.000Z',
+      },
+    };
+    const view = renderPage('en');
+    expect(screen.getAllByText('Inactive').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Expired/)).toBeInTheDocument();
+    expect(screen.getByText('Progress')).toBeInTheDocument();
+    expect(screen.queryByText('Active')).toBeNull();
+    expect(screen.queryByText('No subscription on file.')).toBeNull();
+
+    client.current.data = {
+      ...DETAIL,
+      subscription: {
+        active: true,
+        status: 'ACTIVE',
+        planName: 'Progress',
+        currentPeriodEnd: '2099-01-01T00:00:00.000Z',
+      },
+    };
+    view.rerender(
+      <I18nTestProvider locale="en">
+        <CoachClientPage userId="client-1" />
+      </I18nTestProvider>,
+    );
+    expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Expired')).toBeNull();
+    expect(screen.queryByText('No subscription on file.')).toBeNull();
   });
 
   it('shows not found without a retry', () => {
