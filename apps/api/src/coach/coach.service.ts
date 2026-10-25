@@ -132,14 +132,21 @@ export class CoachService {
         email: true,
         createdAt: true,
         profile: { select: { name: true, onboardingCompletedAt: true } },
-        workoutProgram: { select: { id: true } },
+        workoutProgram: { select: { template: { select: { name: true } } } },
         subscriptions: {
           select: { status: true, currentPeriodEnd: true },
         },
       },
     });
+    const lastWorkoutAt = await this.latestWorkouts(
+      users.map((user) => user.id),
+    );
 
-    return { clients: users.map((user) => toSummary(user, now)) };
+    return {
+      clients: users.map((user) =>
+        toSummary(user, lastWorkoutAt.get(user.id) ?? null, now),
+      ),
+    };
   }
 
   async getClient(userId: string): Promise<CoachClientDetail> {
@@ -196,6 +203,20 @@ export class CoachService {
     return this.users.readProgressPhoto(userId, photoId);
   }
 
+  private async latestWorkouts(userIds: string[]): Promise<Map<string, Date>> {
+    if (userIds.length === 0) return new Map();
+    const rows = await this.prisma.workoutLog.groupBy({
+      by: ['userId'],
+      where: { userId: { in: userIds } },
+      _max: { completedAt: true },
+    });
+    const latest = new Map<string, Date>();
+    for (const row of rows) {
+      if (row._max.completedAt) latest.set(row.userId, row._max.completedAt);
+    }
+    return latest;
+  }
+
   private async requireClient(userId: string): Promise<void> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, role: UserRole.CLIENT },
@@ -216,12 +237,13 @@ function toSummary(
     email: string;
     createdAt: Date;
     profile: { name: string | null; onboardingCompletedAt: Date | null } | null;
-    workoutProgram: { id: string } | null;
+    workoutProgram: { template: { name: string } } | null;
     subscriptions: {
       status: SubscriptionStatus;
       currentPeriodEnd: Date | null;
     }[];
   },
+  lastWorkoutAt: Date | null,
   now: Date,
 ): CoachClientSummary {
   return {
@@ -231,6 +253,8 @@ function toSummary(
     createdAt: user.createdAt.toISOString(),
     onboardingCompleted: user.profile?.onboardingCompletedAt != null,
     programAssigned: user.workoutProgram != null,
+    programName: user.workoutProgram?.template.name ?? null,
+    lastWorkoutAt: lastWorkoutAt?.toISOString() ?? null,
     subscriptionOnFile: user.subscriptions.length > 0,
     subscriptionActive: user.subscriptions.some((subscription) =>
       grantsActiveAccess(subscription, now),

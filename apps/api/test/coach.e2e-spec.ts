@@ -15,9 +15,11 @@ const SUMMARY_FIELDS = [
   'createdAt',
   'email',
   'id',
+  'lastWorkoutAt',
   'name',
   'onboardingCompleted',
   'programAssigned',
+  'programName',
   'subscriptionActive',
   'subscriptionOnFile',
 ];
@@ -125,6 +127,22 @@ describeWithDatabase('coach clients (e2e)', () => {
     await prisma.workoutProgram.create({
       data: { userId: clientAccount.id, templateId: template.id },
     });
+    await prisma.workoutLog.createMany({
+      data: [
+        {
+          userId: clientAccount.id,
+          templateId: template.id,
+          dayNumber: 1,
+          completedAt: new Date('2026-04-01T00:00:00.000Z'),
+        },
+        {
+          userId: clientAccount.id,
+          templateId: template.id,
+          dayNumber: 2,
+          completedAt: new Date('2026-05-02T00:00:00.000Z'),
+        },
+      ],
+    });
     const plan = await prisma.plan.create({
       data: {
         code: 'COACH_E2E',
@@ -202,6 +220,8 @@ describeWithDatabase('coach clients (e2e)', () => {
       name: 'Olena Koval',
       onboardingCompleted: true,
       programAssigned: true,
+      programName: template.name,
+      lastWorkoutAt: '2026-05-02T00:00:00.000Z',
       subscriptionActive: true,
     });
     const unnamed = trainerRoster.body.clients.find(
@@ -212,6 +232,8 @@ describeWithDatabase('coach clients (e2e)', () => {
       name: null,
       onboardingCompleted: false,
       programAssigned: false,
+      programName: null,
+      lastWorkoutAt: null,
       subscriptionActive: false,
     });
     const waiting = trainerRoster.body.clients.find(
