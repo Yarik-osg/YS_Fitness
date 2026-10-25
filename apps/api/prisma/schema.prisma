@@ -64,6 +64,8 @@ model User {
   passwordHash String   @map("password_hash")
   role         UserRole @default(CLIENT)
   isActive     Boolean  @default(true) @map("is_active")
+  /// Private coach note. Null when empty. Clients never receive this column.
+  coachNote    String?  @map("coach_note") @db.Text
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

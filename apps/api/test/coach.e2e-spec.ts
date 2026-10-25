@@ -550,6 +550,7 @@ describeWithDatabase('coach clients (e2e)', () => {
       'email',
       'id',
       'name',
+      'note',
       'onboarding',
       'onboardingCompleted',
       'profile',
@@ -559,6 +560,7 @@ describeWithDatabase('coach clients (e2e)', () => {
     expect(trainerFile.body).toMatchObject({
       email: 'detail-client@example.com',
       archived: false,
+      note: '',
       name: 'Olena Koval',
       onboardingCompleted: true,
       onboarding: { mainGoal: 'maintain', focusAreas: ['glutes'] },
@@ -878,5 +880,54 @@ describeWithDatabase('coach clients (e2e)', () => {
       expect(foreignPhoto.body.code).toBe('PHOTO_NOT_FOUND');
       expect(JSON.stringify(foreignPhoto.body)).not.toContain('storageKey');
     }
+
+    const note = 'private knee note';
+    await request(app.getHttpServer())
+      .patch(`/api/v1/coach/clients/${clientAccount.id}/note`)
+      .set('Authorization', clientAccount.authorization)
+      .send({ note, base: '' })
+      .expect(403);
+    const saved = await request(app.getHttpServer())
+      .patch(`/api/v1/coach/clients/${clientAccount.id}/note`)
+      .set('Authorization', trainer.authorization)
+      .send({ note, base: '' })
+      .expect(200);
+    expect(saved.body.note).toBe(note);
+    const roster = await request(app.getHttpServer())
+      .get('/api/v1/coach/clients')
+      .set('Authorization', trainer.authorization)
+      .expect(200);
+    expect(JSON.stringify(roster.body)).not.toContain(note);
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/users/me')
+      .set('Authorization', clientAccount.authorization)
+      .expect(200);
+    expect(mine.body.coachNote).toBeUndefined();
+    expect(JSON.stringify(mine.body)).not.toContain(note);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/coach/clients/${clientAccount.id}/note`)
+      .set('Authorization', trainer.authorization)
+      .send({ note: 'stale', base: '' })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body.code).toBe('NOTE_CONFLICT');
+        expect(JSON.stringify(response.body)).not.toContain(note);
+      });
+    await request(app.getHttpServer())
+      .patch(`/api/v1/coach/clients/${clientAccount.id}/note`)
+      .set('Authorization', trainer.authorization)
+      .send({ note: 'x'.repeat(2001), base: note })
+      .expect(400);
+    const cleared = await request(app.getHttpServer())
+      .patch(`/api/v1/coach/clients/${clientAccount.id}/note`)
+      .set('Authorization', trainer.authorization)
+      .send({ note: '', base: note })
+      .expect(200);
+    expect(cleared.body.note).toBe('');
+    await request(app.getHttpServer())
+      .patch(`/api/v1/coach/clients/${trainer.id}/note`)
+      .set('Authorization', trainer.authorization)
+      .send({ note: 'nope', base: '' })
+      .expect(404);
   });
 });

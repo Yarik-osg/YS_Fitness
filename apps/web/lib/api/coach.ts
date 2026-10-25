@@ -39,6 +39,16 @@ export function restoreCoachClient(userId: string) {
   );
 }
 
+export function updateCoachNote(
+  userId: string,
+  body: { note: string; base: string },
+) {
+  return apiRequest<CoachClientDetail>(
+    `/coach/clients/${encodeURIComponent(userId)}/note`,
+    { method: 'PATCH', body },
+  );
+}
+
 export function assignCoachProgram(userId: string, templateId: string) {
   return apiRequest<CoachClientDetail>(
     `/coach/clients/${encodeURIComponent(userId)}/program`,

@@ -1,3 +1,7 @@
+import {
+  updateCoachNoteSchema,
+  type UpdateCoachNoteInput,
+} from '@repo/validation';
 import { z } from 'zod';
 
 export const coachClientParamsSchema = z.object({
@@ -9,6 +13,13 @@ export const assignClientProgramSchema = z
     templateId: z.string().uuid(),
   })
   .strict();
+
+export class UpdateCoachNoteDto implements UpdateCoachNoteInput {
+  static readonly schema = updateCoachNoteSchema;
+
+  note!: string;
+  base!: string;
+}
 
 export class AssignClientProgramDto {
   static readonly schema = assignClientProgramSchema;

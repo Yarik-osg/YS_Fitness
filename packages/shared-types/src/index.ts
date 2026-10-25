@@ -176,6 +176,7 @@ export interface CoachClientDetail {
   onboarding: CoachClientOnboarding | null;
   program: CoachClientProgram | null;
   subscription: CoachClientSubscription | null;
+  note: string;
 }
 
 export interface CoachClientWorkoutSet {
