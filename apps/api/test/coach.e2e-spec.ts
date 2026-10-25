@@ -19,6 +19,7 @@ const SUMMARY_FIELDS = [
   'onboardingCompleted',
   'programAssigned',
   'subscriptionActive',
+  'subscriptionOnFile',
 ];
 
 describeWithDatabase('coach clients (e2e)', () => {

@@ -43,6 +43,7 @@ const CLIENTS: CoachClientsResponse = {
       createdAt: '2026-03-04T00:00:00.000Z',
       onboardingCompleted: true,
       programAssigned: true,
+      subscriptionOnFile: false,
       subscriptionActive: false,
     },
   ],
@@ -123,6 +124,37 @@ describe('CoachClientsPage', () => {
     expect(screen.getByText('Complete')).toBeInTheDocument();
     expect(screen.getByText('Assigned')).toBeInTheDocument();
     expect(screen.getByText('No subscription on file.')).toBeInTheDocument();
+  });
+
+  it('shows a lapsed plan as inactive and a current plan as active', () => {
+    roster.current = {
+      isPending: false,
+      isError: false,
+      data: {
+        clients: [
+          {
+            ...CLIENTS.clients[0]!,
+            id: 'lapsed',
+            name: 'Lapsed',
+            subscriptionOnFile: true,
+            subscriptionActive: false,
+          },
+          {
+            ...CLIENTS.clients[0]!,
+            id: 'current',
+            name: 'Current',
+            subscriptionOnFile: true,
+            subscriptionActive: true,
+          },
+        ],
+      },
+      refetch: vi.fn(),
+    };
+    renderPage('en');
+    expect(screen.getByRole('link', { name: 'Lapsed' })).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.queryByText('No subscription on file.')).toBeNull();
   });
 
   it('shows an error and retries', async () => {

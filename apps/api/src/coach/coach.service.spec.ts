@@ -1,7 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
-import { activeAccessWhere } from '../subscriptions/subscription-access.js';
 import { CoachService } from './coach.service.js';
 
 function createService(
@@ -32,7 +31,12 @@ describe('CoachService.listClients', () => {
           onboardingCompletedAt: new Date('2026-03-05T00:00:00.000Z'),
         },
         workoutProgram: { id: 'program-1' },
-        subscriptions: [{ id: 'sub-1' }],
+        subscriptions: [
+          {
+            status: 'ACTIVE',
+            currentPeriodEnd: new Date('2099-01-01T00:00:00.000Z'),
+          },
+        ],
       },
       {
         id: 'client-2',
@@ -51,9 +55,9 @@ describe('CoachService.listClients', () => {
     const query = findMany.mock.calls[0]?.[0];
     expect(query.where).toEqual({ role: UserRole.CLIENT });
     expect(query.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'asc' }]);
-    expect(query.select.subscriptions.where).toEqual(
-      activeAccessWhere(query.select.subscriptions.where.currentPeriodEnd.gt),
-    );
+    expect(query.select.subscriptions).toEqual({
+      select: { status: true, currentPeriodEnd: true },
+    });
     expect(result.clients).toEqual([
       {
         id: 'client-1',
@@ -62,6 +66,7 @@ describe('CoachService.listClients', () => {
         createdAt: '2026-03-04T00:00:00.000Z',
         onboardingCompleted: true,
         programAssigned: true,
+        subscriptionOnFile: true,
         subscriptionActive: true,
       },
       {
@@ -71,9 +76,61 @@ describe('CoachService.listClients', () => {
         createdAt: '2026-01-02T00:00:00.000Z',
         onboardingCompleted: false,
         programAssigned: false,
+        subscriptionOnFile: false,
         subscriptionActive: false,
       },
     ]);
+  });
+
+  it('keeps a lapsed plan on file and still grants access when another row does', async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: 'client-lapsed',
+        email: 'lapsed@example.com',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+        profile: null,
+        workoutProgram: null,
+        subscriptions: [
+          {
+            status: 'ACTIVE',
+            currentPeriodEnd: new Date('2020-01-01T00:00:00.000Z'),
+          },
+        ],
+      },
+      {
+        id: 'client-both',
+        email: 'both@example.com',
+        createdAt: new Date('2026-02-02T00:00:00.000Z'),
+        profile: null,
+        workoutProgram: null,
+        subscriptions: [
+          {
+            status: 'EXPIRED',
+            currentPeriodEnd: new Date('2020-06-01T00:00:00.000Z'),
+          },
+          {
+            status: 'ACTIVE',
+            currentPeriodEnd: new Date('2099-06-01T00:00:00.000Z'),
+          },
+        ],
+      },
+    ]);
+    const service = createService({ user: { findMany } });
+
+    const result = await service.listClients();
+
+    expect(result.clients.map((client) => client.email)).toEqual([
+      'lapsed@example.com',
+      'both@example.com',
+    ]);
+    expect(result.clients[0]).toMatchObject({
+      subscriptionOnFile: true,
+      subscriptionActive: false,
+    });
+    expect(result.clients[1]).toMatchObject({
+      subscriptionOnFile: true,
+      subscriptionActive: true,
+    });
   });
 });
 
@@ -169,6 +226,82 @@ describe('CoachService.getClient', () => {
     await expect(service.getClient('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('shows a granting plan, including one behind a newer ended row', async () => {
+    const userId = '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10';
+    function row(
+      subscriptions: {
+        status: 'ACTIVE' | 'EXPIRED';
+        currentPeriodEnd: Date;
+        plan: { name: string };
+      }[],
+    ) {
+      return {
+        id: userId,
+        email: 'olena@example.com',
+        createdAt: new Date('2026-03-04T00:00:00.000Z'),
+        profile: null,
+        onboardingResponses: null,
+        workoutProgram: null,
+        subscriptions,
+      };
+    }
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(row([]))
+      .mockResolvedValueOnce(
+        row([
+          {
+            status: 'ACTIVE',
+            currentPeriodEnd: new Date('2099-01-01T00:00:00.000Z'),
+            plan: { name: 'Progress' },
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        row([
+          // Newest first, matching orderBy createdAt desc. One ACTIVE row is allowed.
+          {
+            status: 'EXPIRED',
+            currentPeriodEnd: new Date('2026-01-01T00:00:00.000Z'),
+            plan: { name: 'Ended' },
+          },
+          {
+            status: 'ACTIVE',
+            currentPeriodEnd: new Date('2099-06-01T00:00:00.000Z'),
+            plan: { name: 'Current' },
+          },
+        ]),
+      );
+    const service = createService({ user: { findFirst } });
+
+    await expect(service.getClient(userId)).resolves.toMatchObject({
+      subscription: null,
+    });
+    await expect(service.getClient(userId)).resolves.toMatchObject({
+      subscription: {
+        active: true,
+        status: 'ACTIVE',
+        planName: 'Progress',
+        currentPeriodEnd: '2099-01-01T00:00:00.000Z',
+      },
+    });
+    await expect(service.getClient(userId)).resolves.toMatchObject({
+      subscription: {
+        active: true,
+        status: 'ACTIVE',
+        planName: 'Current',
+      },
+    });
+    expect(findFirst.mock.calls[0]?.[0].select.subscriptions).toEqual({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        status: true,
+        currentPeriodEnd: true,
+        plan: { select: { name: true } },
+      },
+    });
   });
 });
 

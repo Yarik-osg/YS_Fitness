@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole, type Prisma } from '@prisma/client';
+import { SubscriptionStatus, UserRole, type Prisma } from '@prisma/client';
 import type {
   CoachClientDetail,
   CoachClientOnboarding,
@@ -22,10 +22,7 @@ import {
   PROGRAM_TRACK_FROM_PRISMA,
   toOnboardingResponsesRecord,
 } from '../users/onboarding-responses.mapper.js';
-import {
-  activeAccessWhere,
-  grantsActiveAccess,
-} from '../subscriptions/subscription-access.js';
+import { grantsActiveAccess } from '../subscriptions/subscription-access.js';
 
 const clientDetailSelect = {
   id: true,
@@ -79,7 +76,6 @@ const clientDetailSelect = {
   },
   subscriptions: {
     orderBy: { createdAt: 'desc' as const },
-    take: 1,
     select: {
       status: true,
       currentPeriodEnd: true,
@@ -138,14 +134,12 @@ export class CoachService {
         profile: { select: { name: true, onboardingCompletedAt: true } },
         workoutProgram: { select: { id: true } },
         subscriptions: {
-          where: activeAccessWhere(now),
-          select: { id: true },
-          take: 1,
+          select: { status: true, currentPeriodEnd: true },
         },
       },
     });
 
-    return { clients: users.map(toSummary) };
+    return { clients: users.map((user) => toSummary(user, now)) };
   }
 
   async getClient(userId: string): Promise<CoachClientDetail> {
@@ -216,14 +210,20 @@ export class CoachService {
   }
 }
 
-function toSummary(user: {
-  id: string;
-  email: string;
-  createdAt: Date;
-  profile: { name: string | null; onboardingCompletedAt: Date | null } | null;
-  workoutProgram: { id: string } | null;
-  subscriptions: { id: string }[];
-}): CoachClientSummary {
+function toSummary(
+  user: {
+    id: string;
+    email: string;
+    createdAt: Date;
+    profile: { name: string | null; onboardingCompletedAt: Date | null } | null;
+    workoutProgram: { id: string } | null;
+    subscriptions: {
+      status: SubscriptionStatus;
+      currentPeriodEnd: Date | null;
+    }[];
+  },
+  now: Date,
+): CoachClientSummary {
   return {
     id: user.id,
     email: user.email,
@@ -231,7 +231,10 @@ function toSummary(user: {
     createdAt: user.createdAt.toISOString(),
     onboardingCompleted: user.profile?.onboardingCompletedAt != null,
     programAssigned: user.workoutProgram != null,
-    subscriptionActive: user.subscriptions.length > 0,
+    subscriptionOnFile: user.subscriptions.length > 0,
+    subscriptionActive: user.subscriptions.some((subscription) =>
+      grantsActiveAccess(subscription, now),
+    ),
   };
 }
 
@@ -260,8 +263,15 @@ function toWorkoutHistory(log: WorkoutHistoryRow): CoachClientWorkoutLog {
   };
 }
 
+// Prefer a row that still grants access. Otherwise show the newest row.
+function shownSubscription<
+  T extends { status: SubscriptionStatus; currentPeriodEnd: Date | null },
+>(rows: T[], now: Date): T | null {
+  return rows.find((row) => grantsActiveAccess(row, now)) ?? rows[0] ?? null;
+}
+
 function toDetail(user: ClientDetailRow, now: Date): CoachClientDetail {
-  const subscription = user.subscriptions[0] ?? null;
+  const subscription = shownSubscription(user.subscriptions, now);
   const record = user.onboardingResponses
     ? toOnboardingResponsesRecord(user.onboardingResponses)
     : null;

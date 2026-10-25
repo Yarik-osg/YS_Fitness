@@ -149,7 +149,11 @@ function ClientRow({
           label={t('subscription')}
           on={client.subscriptionActive}
           yes={t('subscriptionActive')}
-          no={t('noSubscription')}
+          no={
+            client.subscriptionOnFile
+              ? t('subscriptionInactive')
+              : t('noSubscription')
+          }
         />
       </td>
     </tr>

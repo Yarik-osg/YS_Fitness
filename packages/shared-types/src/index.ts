@@ -98,6 +98,8 @@ export interface CoachClientSummary {
   createdAt: string;
   onboardingCompleted: boolean;
   programAssigned: boolean;
+  /** True when any subscription row exists, including one that no longer grants access. */
+  subscriptionOnFile: boolean;
   subscriptionActive: boolean;
 }
 

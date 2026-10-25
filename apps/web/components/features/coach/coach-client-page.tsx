@@ -211,7 +211,7 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
               {detail.subscription.planName}
             </p>
             <p className="mt-1 text-sm text-muted">
-              {t(`status.${detail.subscription.status}`)}
+              {subscriptionStatusLabel(detail.subscription, t)}
               {detail.subscription.currentPeriodEnd
                 ? ` · ${t('fields.periodEnd')} ${formatDate(locale, detail.subscription.currentPeriodEnd)}`
                 : ''}
@@ -368,6 +368,18 @@ function readMessage(source: unknown, path: string): string | null {
     current = (current as Record<string, unknown>)[part];
   }
   return typeof current === 'string' ? current : null;
+}
+
+function subscriptionStatusLabel(
+  subscription: NonNullable<CoachClientDetail['subscription']>,
+  t: ReturnType<typeof useTranslations<'coach'>>,
+) {
+  // A lapsed ACTIVE row has not been expired in the database. Say so
+  // without calling the period current.
+  if (!subscription.active && subscription.status === 'ACTIVE') {
+    return t('status.EXPIRED');
+  }
+  return t(`status.${subscription.status}`);
 }
 
 function StatusPill({
