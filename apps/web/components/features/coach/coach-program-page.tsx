@@ -53,7 +53,7 @@ export function CoachProgramPage({ templateId }: { templateId: string }) {
     <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
       <Link
         href="/coach/programs"
-        className="text-sm text-muted hover:text-ink"
+        className="text-sm text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-safe:transition-colors"
       >
         {t('catalog.back')}
       </Link>

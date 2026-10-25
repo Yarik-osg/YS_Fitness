@@ -1017,6 +1017,8 @@
       "all": "All",
       "system": "System",
       "custom": "Custom",
+      "matched": "Matched",
+      "pinned": "Pinned",
       "name": "Name",
       "origin": "Source",
       "focus": "Focus",

@@ -158,6 +158,7 @@ describe('CoachClientPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('olena@example.com')).toBeInTheDocument();
     expect(screen.getByText('Upper subtitle')).toBeInTheDocument();
+    expect(screen.getByText(/System · Matched/)).toBeInTheDocument();
     expect(screen.getByText('Maintain shape')).toBeInTheDocument();
     expect(screen.getByText('Apr 12, 1994')).toBeInTheDocument();
     expect(screen.getByText('Option 3')).toBeInTheDocument();
@@ -169,6 +170,18 @@ describe('CoachClientPage', () => {
     expect(
       screen.getByRole('link', { name: 'Back to clients' }),
     ).toHaveAttribute('href', '/coach');
+  });
+
+  it('shows a pinned program separately from a matched one', () => {
+    client.current.data = {
+      ...DETAIL,
+      program: DETAIL.program
+        ? { ...DETAIL.program, assignmentSource: 'ADMIN', origin: 'TRAINER' }
+        : null,
+    };
+    renderPage('en');
+    expect(screen.getByText(/Custom · Pinned/)).toBeInTheDocument();
+    expect(screen.queryByText(/Matched/)).toBeNull();
   });
 
   it('shows empty sections when the client has no saved file', () => {

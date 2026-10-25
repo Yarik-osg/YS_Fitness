@@ -168,6 +168,10 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
               {detail.program.origin === 'SYSTEM'
                 ? t('catalog.system')
                 : t('catalog.custom')}
+              {' · '}
+              {detail.program.assignmentSource === 'ADMIN'
+                ? t('catalog.pinned')
+                : t('catalog.matched')}
             </p>
             <h2 className="mt-2 font-heading text-xl text-ink">{title}</h2>
             <p className="mt-2 text-sm text-ink">
