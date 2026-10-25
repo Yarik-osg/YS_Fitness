@@ -7,6 +7,7 @@ import type {
   CoachClientWorkoutLog,
   CoachClientWorkoutsResponse,
   CoachClientsResponse,
+  CoachProgramClientsResponse,
   ProgressPhotosResponse,
   StrengthChangesResponse,
   WeightMeasurementsResponse,
@@ -154,6 +155,28 @@ export class CoachService {
     return { id: userId };
   }
 
+  async restoreClient(userId: string): Promise<{ id: string }> {
+    await this.prisma.$transaction(async (tx) => {
+      const client = await tx.user.findFirst({
+        where: { id: userId, role: UserRole.CLIENT },
+        select: { id: true, isActive: true },
+      });
+      if (!client) {
+        throw new NotFoundException({
+          code: 'CLIENT_NOT_FOUND',
+          message: 'Client not found.',
+        });
+      }
+      if (!client.isActive) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { isActive: true },
+        });
+      }
+    });
+    return { id: userId };
+  }
+
   async listClients(): Promise<CoachClientsResponse> {
     const now = new Date();
     const users = await this.prisma.user.findMany({
@@ -176,6 +199,49 @@ export class CoachService {
     );
 
     return {
+      clients: users.map((user) =>
+        toSummary(user, lastWorkoutAt.get(user.id) ?? null, now),
+      ),
+    };
+  }
+
+  async listProgramClients(
+    templateId: string,
+  ): Promise<CoachProgramClientsResponse> {
+    const template = await this.prisma.programTemplate.findUnique({
+      where: { id: templateId },
+      select: { name: true },
+    });
+    if (!template) {
+      throw new NotFoundException({
+        code: 'TEMPLATE_NOT_FOUND',
+        message: 'Program not found.',
+      });
+    }
+    const now = new Date();
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: UserRole.CLIENT,
+        workoutProgram: { templateId },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
+        profile: { select: { name: true, onboardingCompletedAt: true } },
+        workoutProgram: { select: { template: { select: { name: true } } } },
+        subscriptions: {
+          select: { status: true, currentPeriodEnd: true },
+        },
+      },
+    });
+    const lastWorkoutAt = await this.latestWorkouts(
+      users.map((user) => user.id),
+    );
+    return {
+      programName: template.name,
       clients: users.map((user) =>
         toSummary(user, lastWorkoutAt.get(user.id) ?? null, now),
       ),

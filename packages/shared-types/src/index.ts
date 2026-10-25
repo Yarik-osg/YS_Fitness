@@ -118,6 +118,11 @@ export interface CoachClientsResponse {
   clients: CoachClientSummary[];
 }
 
+export interface CoachProgramClientsResponse {
+  programName: string;
+  clients: CoachClientSummary[];
+}
+
 export interface CoachClientProfile {
   dateOfBirth: string;
   biologicalSexForCalculation: BiologicalSexForCalculation;

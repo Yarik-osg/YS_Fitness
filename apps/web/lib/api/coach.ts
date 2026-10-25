@@ -2,6 +2,7 @@ import type {
   CoachClientDetail,
   CoachClientWorkoutsResponse,
   CoachClientsResponse,
+  CoachProgramClientsResponse,
   ProgressPhotosResponse,
   StrengthChangesResponse,
   WeightMeasurementsResponse,
@@ -18,9 +19,22 @@ export function getCoachClient(userId: string) {
   );
 }
 
+export function listProgramClients(templateId: string) {
+  return apiRequest<CoachProgramClientsResponse>(
+    `/coach/programs/${encodeURIComponent(templateId)}/clients`,
+  );
+}
+
 export function archiveCoachClient(userId: string) {
   return apiRequest<{ id: string }>(
     `/coach/clients/${encodeURIComponent(userId)}/archive`,
+    { method: 'POST' },
+  );
+}
+
+export function restoreCoachClient(userId: string) {
+  return apiRequest<{ id: string }>(
+    `/coach/clients/${encodeURIComponent(userId)}/restore`,
     { method: 'POST' },
   );
 }

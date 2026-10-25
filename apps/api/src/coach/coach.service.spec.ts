@@ -324,6 +324,127 @@ describe('CoachService.archiveClient', () => {
   });
 });
 
+describe('CoachService.restoreClient', () => {
+  const userId = '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10';
+
+  function transaction(client: { id: string; isActive: boolean } | null) {
+    const tx = {
+      user: {
+        findFirst: vi.fn().mockResolvedValue(client),
+        update: vi.fn().mockResolvedValue({ id: userId }),
+      },
+      authSession: { updateMany: vi.fn(), create: vi.fn() },
+      authRefreshToken: { updateMany: vi.fn(), create: vi.fn() },
+      subscription: { updateMany: vi.fn(), create: vi.fn() },
+    };
+    const prisma = {
+      $transaction: vi.fn(
+        async (work: (client: typeof tx) => Promise<void>) => {
+          await work(tx);
+        },
+      ),
+    };
+    return { prisma, tx };
+  }
+
+  it('reactivates an archived client without sessions or subscriptions', async () => {
+    const { prisma, tx } = transaction({ id: userId, isActive: false });
+    const service = createService(prisma);
+
+    await expect(service.restoreClient(userId)).resolves.toEqual({
+      id: userId,
+    });
+
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { isActive: true },
+    });
+    expect(tx.authSession.create).not.toHaveBeenCalled();
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
+    expect(tx.subscription.create).not.toHaveBeenCalled();
+    expect(tx.subscription.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('leaves an already active client unchanged', async () => {
+    const { prisma, tx } = transaction({ id: userId, isActive: true });
+    const service = createService(prisma);
+
+    await expect(service.restoreClient(userId)).resolves.toEqual({
+      id: userId,
+    });
+    expect(tx.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing user and a non-client', async () => {
+    const { prisma, tx } = transaction(null);
+    const service = createService(prisma);
+
+    await expect(service.restoreClient(userId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(tx.user.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('CoachService.listProgramClients', () => {
+  it('returns current assignees, including archived clients, for one template', async () => {
+    const findUnique = vi.fn().mockResolvedValue({ name: 'Upper split' });
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: 'client-1',
+        email: 'olena@example.com',
+        isActive: false,
+        createdAt: new Date('2026-03-04T00:00:00.000Z'),
+        profile: { name: 'Olena', onboardingCompletedAt: null },
+        workoutProgram: { template: { name: 'Upper split' } },
+        subscriptions: [],
+      },
+    ]);
+    const groupBy = vi.fn().mockResolvedValue([]);
+    const service = createService({
+      programTemplate: { findUnique },
+      user: { findMany },
+      workoutLog: { groupBy },
+    });
+
+    const result = await service.listProgramClients(
+      '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10',
+    );
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          role: UserRole.CLIENT,
+          workoutProgram: {
+            templateId: '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10',
+          },
+        },
+      }),
+    );
+    expect(result.programName).toBe('Upper split');
+    expect(result.clients).toHaveLength(1);
+    expect(result.clients[0]).toMatchObject({
+      id: 'client-1',
+      archived: true,
+      programAssigned: true,
+    });
+  });
+
+  it('rejects a missing template before listing clients', async () => {
+    const findMany = vi.fn();
+    const service = createService({
+      programTemplate: { findUnique: vi.fn().mockResolvedValue(null) },
+      user: { findMany },
+      workoutLog: { groupBy: vi.fn() },
+    });
+
+    await expect(
+      service.listProgramClients('6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('CoachService.getClient', () => {
   it('returns the saved client detail and treats a missing client as not found', async () => {
     const findFirst = vi

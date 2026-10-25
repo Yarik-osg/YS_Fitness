@@ -9,6 +9,8 @@ import {
 import { ApiClientError } from '@/lib/api/client';
 import {
   archiveCoachClient,
+  listProgramClients,
+  restoreCoachClient,
   assignCoachProgram,
   getCoachClient,
   listCoachClients,
@@ -42,10 +44,39 @@ export function useArchiveClient() {
     mutationFn: (userId: string) => archiveCoachClient(userId),
     onSuccess: async (_result, userId) => {
       await queryClient.invalidateQueries({
-        predicate: (query) => isArchiveRefreshKey(query.queryKey, userId),
+        predicate: (query) => refreshesClientLists(query.queryKey, userId),
       });
     },
   });
+}
+
+export function useRestoreClient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => restoreCoachClient(userId),
+    onSuccess: async (_result, userId) => {
+      await queryClient.invalidateQueries({
+        predicate: (query) => refreshesClientLists(query.queryKey, userId),
+      });
+    },
+  });
+}
+
+export function useProgramClients(templateId: string) {
+  return useQuery({
+    queryKey: ['coach', 'program-clients', templateId],
+    queryFn: () => listProgramClients(templateId),
+    retry: (failureCount, error) =>
+      !(error instanceof ApiClientError && error.status === 404) &&
+      failureCount < 2,
+  });
+}
+
+function refreshesClientLists(key: readonly unknown[], userId: string) {
+  return (
+    isArchiveRefreshKey(key, userId) ||
+    (key[0] === 'coach' && key[1] === 'program-clients')
+  );
 }
 
 export function useAssignCoachProgram(userId: string) {
