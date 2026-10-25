@@ -59,6 +59,8 @@ export function toProgramSummary(
     level: program.level,
     frequencyPerWeek: program.frequencyPerWeek,
     accent: program.accent,
+    templateOrigin: program.templateOrigin,
+    assignmentSource: program.assignmentSource,
     assignedAt: program.assignedAt,
     nextDayNumber: program.nextDayNumber,
     programProgress: program.programProgress,

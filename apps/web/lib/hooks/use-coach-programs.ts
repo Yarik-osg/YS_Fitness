@@ -8,10 +8,11 @@ import {
   listCoachPrograms,
 } from '@/lib/api/coach-programs';
 
-export function useCoachPrograms() {
+export function useCoachPrograms(enabled = true) {
   return useQuery({
     queryKey: ['coach', 'program-templates'],
     queryFn: listCoachPrograms,
+    enabled,
   });
 }
 

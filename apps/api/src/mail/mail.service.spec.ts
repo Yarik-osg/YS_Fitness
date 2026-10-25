@@ -1,9 +1,11 @@
+import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MailService } from './mail.service.js';
 import {
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
 } from './password-emails.js';
+import { buildProgramAssignedEmail } from './program-assigned-email.js';
 import { buildWelcomeEmail } from './welcome-email.js';
 
 const mailer = vi.hoisted(() => ({
@@ -199,5 +201,101 @@ describe('password email builders', () => {
         `https://x.test/${locale}/forgot-password`,
       );
     }
+  });
+});
+
+describe('MailService.sendProgramAssigned', () => {
+  beforeEach(() => {
+    mailer.sendMail.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('sends the assigned and updated text in both languages', async () => {
+    const service = createService({ APP_URL: 'https://app.example.com/' });
+    await service.sendProgramAssigned({
+      to: 'olena@example.com',
+      kind: 'assigned',
+      name: 'Upper',
+      origin: 'SYSTEM',
+      frequencyPerWeek: 2,
+      days: [
+        { exercises: [{ name: 'Тяга', nameEn: 'Row' }] },
+        { exercises: [{ name: 'Тяга', nameEn: 'Row' }] },
+      ],
+    });
+    await service.sendProgramAssigned({
+      to: 'olena@example.com',
+      kind: 'updated',
+      name: 'Lower',
+      origin: 'TRAINER',
+      frequencyPerWeek: 4,
+      days: [{ exercises: [{ name: 'Жим', nameEn: 'Press' }] }],
+      locale: 'en',
+    });
+
+    const uk = buildProgramAssignedEmail({
+      locale: 'uk',
+      kind: 'assigned',
+      name: 'Upper',
+      origin: 'system',
+      frequencyPerWeek: 2,
+      days: [
+        { exercises: [{ name: 'Тяга', nameEn: 'Row' }] },
+        { exercises: [{ name: 'Тяга', nameEn: 'Row' }] },
+      ],
+      workoutUrl: 'https://app.example.com/uk/workout',
+    });
+    const en = buildProgramAssignedEmail({
+      locale: 'en',
+      kind: 'updated',
+      name: 'Lower',
+      origin: 'custom',
+      frequencyPerWeek: 4,
+      days: [{ exercises: [{ name: 'Жим', nameEn: 'Press' }] }],
+      workoutUrl: 'https://app.example.com/en/workout',
+    });
+    expect(mailer.sendMail).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ to: 'olena@example.com', text: uk.text }),
+    );
+    expect(mailer.sendMail).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        subject: en.subject,
+        text: en.text,
+      }),
+    );
+    expect(uk.text).toContain('Системна');
+    expect(uk.text).toContain('https://app.example.com/uk/workout');
+    expect(en.text).toContain('Custom');
+    expect(en.text).toContain('https://app.example.com/en/workout');
+    expect(en.text).not.toContain('TRAINER');
+    expect(en.text).not.toContain('admin');
+    expect(uk.text).toContain('- Тяга');
+    expect(uk.text).not.toContain('Дні:');
+    expect(uk.text.match(/- Тяга/g)).toHaveLength(1);
+    expect(en.text).toContain('- Press');
+    expect(en.text).not.toContain('Days:');
+  });
+
+  it('logs a delivery failure and still resolves', async () => {
+    const warn = vi
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    mailer.sendMail.mockRejectedValue(new Error('smtp down'));
+
+    await expect(
+      createService().sendProgramAssigned({
+        to: 'olena@example.com',
+        kind: 'assigned',
+        name: 'Upper',
+        origin: 'SYSTEM',
+        frequencyPerWeek: 2,
+        days: [{ exercises: [{ name: 'Тяга', nameEn: 'Row' }] }],
+      }),
+    ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      'Program assigned email failed: smtp down',
+    );
+    warn.mockRestore();
   });
 });

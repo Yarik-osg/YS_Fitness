@@ -4,6 +4,18 @@ export const coachClientParamsSchema = z.object({
   userId: z.string().uuid(),
 });
 
+export const assignClientProgramSchema = z
+  .object({
+    templateId: z.string().uuid(),
+  })
+  .strict();
+
+export class AssignClientProgramDto {
+  static readonly schema = assignClientProgramSchema;
+
+  templateId!: string;
+}
+
 export class CoachClientParamsDto {
   static readonly schema = coachClientParamsSchema;
 

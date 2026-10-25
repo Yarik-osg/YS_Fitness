@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
   Param,
+  Post,
   Query,
   StreamableFile,
   UseGuards,
@@ -20,6 +22,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { ListWorkoutLogsQueryDto } from '../workouts/dto/list-workout-logs-query.dto.js';
 import {
+  AssignClientProgramDto,
   CoachClientParamsDto,
   CoachClientPhotoParamsDto,
 } from './coach.dto.js';
@@ -39,6 +42,14 @@ export class CoachController {
   @Get('clients/:userId')
   getClient(@Param() params: CoachClientParamsDto): Promise<CoachClientDetail> {
     return this.coach.getClient(params.userId);
+  }
+
+  @Post('clients/:userId/program')
+  assignProgram(
+    @Param() params: CoachClientParamsDto,
+    @Body() body: AssignClientProgramDto,
+  ): Promise<CoachClientDetail> {
+    return this.coach.assignProgram(params.userId, body.templateId);
   }
 
   @Get('clients/:userId/workouts')

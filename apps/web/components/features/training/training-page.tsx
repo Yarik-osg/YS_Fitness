@@ -14,7 +14,7 @@ import { ClientNav } from '@/components/features/shell/client-nav';
 import { TrainingCalendar } from '@/components/features/training/training-calendar';
 import { Link } from '@/i18n/navigation';
 import { exerciseName } from '@/lib/exercise-name';
-import { useProgramTitle } from '@/lib/program-title';
+import { useClientProgramTitle } from '@/lib/program-title';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 
 export function TrainingPage() {
@@ -65,7 +65,7 @@ function TrainingLoading({ label }: { label: string }) {
 
 function ProgramDays({ program }: { program: AssignedProgramResponse }) {
   const home = useTranslations('dashboard.home');
-  const programTitle = useProgramTitle(program.accent);
+  const programTitle = useClientProgramTitle(program);
   const days = [...program.days].sort(
     (left, right) => left.dayNumber - right.dayNumber,
   );

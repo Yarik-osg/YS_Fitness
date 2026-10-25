@@ -12,7 +12,9 @@ import type {
   WeightMeasurementsResponse,
 } from '@repo/shared-types';
 import type { ListWorkoutLogsQuery } from '@repo/validation';
+import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ProgramsService } from '../programs/programs.service.js';
 import { UsersService } from '../users/users.service.js';
 import { WorkoutsService } from '../workouts/workouts.service.js';
 import {
@@ -61,6 +63,7 @@ const clientDetailSelect = {
   workoutProgram: {
     select: {
       assignedAt: true,
+      assignmentSource: true,
       template: {
         select: {
           code: true,
@@ -69,6 +72,7 @@ const clientDetailSelect = {
           level: true,
           frequencyPerWeek: true,
           accent: true,
+          origin: true,
         },
       },
     },
@@ -107,7 +111,20 @@ export class CoachService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly workouts: WorkoutsService,
+    private readonly programs: ProgramsService,
+    private readonly mail: MailService,
   ) {}
+
+  async assignProgram(
+    userId: string,
+    templateId: string,
+  ): Promise<CoachClientDetail> {
+    const result = await this.programs.assignTemplate(userId, templateId);
+    if (result.notice) {
+      void this.mail.sendProgramAssigned(result.notice);
+    }
+    return this.getClient(userId);
+  }
 
   async listClients(): Promise<CoachClientsResponse> {
     const now = new Date();
@@ -291,6 +308,8 @@ function toDetail(user: ClientDetailRow, now: Date): CoachClientDetail {
             level: EXPERIENCE_FROM_PRISMA[template.level],
             frequencyPerWeek: template.frequencyPerWeek,
             gender: PROGRAM_TRACK_FROM_PRISMA[template.gender],
+            origin: template.origin,
+            assignmentSource: user.workoutProgram.assignmentSource,
             assignedAt: user.workoutProgram.assignedAt.toISOString(),
           }
         : null,

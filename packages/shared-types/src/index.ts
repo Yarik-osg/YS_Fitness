@@ -135,6 +135,8 @@ export interface CoachClientProgram {
   level: TrainingExperience;
   frequencyPerWeek: number;
   gender: ProgramTrack;
+  origin: ProgramOrigin;
+  assignmentSource: AssignmentSource;
   assignedAt: string;
 }
 
@@ -284,6 +286,8 @@ export type ProgramAccent =
 
 export type ProgramOrigin = 'SYSTEM' | 'TRAINER';
 
+export type AssignmentSource = 'MATCHED' | 'ADMIN';
+
 export interface ExerciseResponse {
   id: string;
   code: string;
@@ -325,6 +329,8 @@ export interface AssignedProgramSummary {
   level: TrainingExperience;
   frequencyPerWeek: number;
   accent: ProgramAccent;
+  templateOrigin: ProgramOrigin;
+  assignmentSource: AssignmentSource;
   assignedAt: string;
   nextDayNumber: number;
   programProgress: ProgramProgress;

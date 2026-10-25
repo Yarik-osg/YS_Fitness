@@ -8,8 +8,16 @@ function createService(
   prisma: unknown,
   users: unknown = {},
   workouts: unknown = {},
+  programs: unknown = {},
+  mail: unknown = { sendProgramAssigned: vi.fn() },
 ) {
-  return new CoachService(prisma as never, users as never, workouts as never);
+  return new CoachService(
+    prisma as never,
+    users as never,
+    workouts as never,
+    programs as never,
+    mail as never,
+  );
 }
 
 describe('CoachService.listClients', () => {
@@ -104,6 +112,7 @@ describe('CoachService.getClient', () => {
         },
         workoutProgram: {
           assignedAt: new Date('2026-03-06T00:00:00.000Z'),
+          assignmentSource: 'MATCHED',
           template: {
             code: 'WB2U',
             name: 'Upper subtitle',
@@ -111,6 +120,7 @@ describe('CoachService.getClient', () => {
             level: 'BEGINNER',
             frequencyPerWeek: 2,
             accent: 'UPPER',
+            origin: 'SYSTEM',
           },
         },
         subscriptions: [
@@ -285,5 +295,130 @@ describe('CoachService client history', () => {
       firstMeasurement: null,
     });
     expect(measurements).toHaveBeenCalledWith('client-1');
+  });
+});
+
+describe('CoachService.assignProgram', () => {
+  const userId = '6f1c2a40-3e0b-4a1d-9c77-0b5e8a1d2f10';
+  const storedClient = {
+    id: userId,
+    email: 'olena@example.com',
+    createdAt: new Date('2026-03-04T00:00:00.000Z'),
+    profile: null,
+    onboardingResponses: null,
+    workoutProgram: null,
+    subscriptions: [],
+  };
+
+  it('sends mail only after a committed change', async () => {
+    const sendProgramAssigned = vi.fn().mockResolvedValue(undefined);
+    const assignTemplate = vi.fn().mockResolvedValue({
+      change: 'assigned',
+      notice: {
+        to: 'olena@example.com',
+        kind: 'assigned',
+        name: 'Upper',
+        origin: 'SYSTEM',
+        frequencyPerWeek: 2,
+        dayCount: 2,
+      },
+    });
+    const service = createService(
+      { user: { findFirst: vi.fn().mockResolvedValue(storedClient) } },
+      {},
+      {},
+      { assignTemplate },
+      { sendProgramAssigned },
+    );
+
+    const detail = await service.assignProgram(userId, 'template-1');
+
+    expect(assignTemplate).toHaveBeenCalledWith(userId, 'template-1');
+    expect(sendProgramAssigned).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'assigned', to: 'olena@example.com' }),
+    );
+    expect(detail.email).toBe('olena@example.com');
+  });
+
+  it('sends the updated notice when the template is replaced', async () => {
+    const sendProgramAssigned = vi.fn().mockResolvedValue(undefined);
+    const service = createService(
+      { user: { findFirst: vi.fn().mockResolvedValue(storedClient) } },
+      {},
+      {},
+      {
+        assignTemplate: vi.fn().mockResolvedValue({
+          change: 'replaced',
+          notice: {
+            to: 'olena@example.com',
+            kind: 'updated',
+            name: 'Lower',
+            origin: 'TRAINER',
+            frequencyPerWeek: 3,
+            dayCount: 3,
+          },
+        }),
+      },
+      { sendProgramAssigned },
+    );
+
+    await service.assignProgram(userId, 'template-2');
+
+    expect(sendProgramAssigned).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'updated', origin: 'TRAINER' }),
+    );
+  });
+
+  it('does not send mail when the assignment is unchanged or the transaction fails', async () => {
+    const sendProgramAssigned = vi.fn().mockResolvedValue(undefined);
+    const assignTemplate = vi
+      .fn()
+      .mockResolvedValueOnce({ change: 'unchanged', notice: null })
+      .mockRejectedValueOnce(new Error('rolled back'));
+    const service = createService(
+      { user: { findFirst: vi.fn().mockResolvedValue(storedClient) } },
+      {},
+      {},
+      { assignTemplate },
+      { sendProgramAssigned },
+    );
+
+    await service.assignProgram(userId, 'template-1');
+    await expect(service.assignProgram(userId, 'template-1')).rejects.toThrow(
+      'rolled back',
+    );
+    expect(sendProgramAssigned).not.toHaveBeenCalled();
+  });
+
+  it('returns the saved client when mail delivery is still pending', async () => {
+    const sendProgramAssigned = vi.fn(
+      () => new Promise(() => undefined) as Promise<void>,
+    );
+    const service = createService(
+      { user: { findFirst: vi.fn().mockResolvedValue(storedClient) } },
+      {},
+      {},
+      {
+        assignTemplate: vi.fn().mockResolvedValue({
+          change: 'assigned',
+          notice: {
+            to: 'olena@example.com',
+            kind: 'assigned',
+            name: 'Upper',
+            origin: 'SYSTEM',
+            frequencyPerWeek: 2,
+            dayCount: 2,
+          },
+        }),
+      },
+      { sendProgramAssigned },
+    );
+
+    await expect(
+      service.assignProgram(userId, 'template-1'),
+    ).resolves.toMatchObject({
+      email: 'olena@example.com',
+    });
+    expect(sendProgramAssigned).toHaveBeenCalledOnce();
   });
 });

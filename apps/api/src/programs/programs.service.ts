@@ -40,6 +40,26 @@ const TRAINER_PROGRAM_ASSIGNED = {
   message: 'A trainer program is already assigned',
 };
 
+const ADMIN_PROGRAM_ASSIGNED = {
+  code: 'ADMIN_PROGRAM_ASSIGNED',
+  message: 'An admin-assigned program cannot be replaced this way',
+};
+
+const CLIENT_NOT_FOUND = {
+  code: 'CLIENT_NOT_FOUND',
+  message: 'Client not found.',
+};
+
+const TEMPLATE_NOT_FOUND = {
+  code: 'TEMPLATE_NOT_FOUND',
+  message: 'Program template not found',
+};
+
+const TEMPLATE_INACTIVE = {
+  code: 'TEMPLATE_INACTIVE',
+  message: 'This program is not available to assign',
+};
+
 const STORED_EXPERIENCE = {
   beginner: 'BEGINNER',
   intermediate: 'INTERMEDIATE',
@@ -74,6 +94,7 @@ type ProgramStore = Pick<
   | 'programTemplate'
   | 'workoutProgram'
   | 'workoutLog'
+  | 'user'
 >;
 
 type AssignOptions = {
@@ -84,6 +105,24 @@ type AssignOptions = {
 type AssignmentLock = {
   origin: 'SYSTEM' | 'TRAINER';
   templateId: string;
+  assignmentSource: 'MATCHED' | 'ADMIN';
+};
+
+export type TemplateAssignmentChange = 'assigned' | 'replaced' | 'unchanged';
+
+export type TemplateAssignmentNotice = {
+  to: string;
+  kind: 'assigned' | 'updated';
+  name: string;
+  origin: 'SYSTEM' | 'TRAINER';
+  frequencyPerWeek: number;
+  days: { exercises: { name: string; nameEn: string }[] }[];
+};
+
+export type TemplateAssignmentResult = {
+  program: AssignedProgramResponse;
+  change: TemplateAssignmentChange;
+  notice: TemplateAssignmentNotice | null;
 };
 
 type AssignedProgramBase = Omit<
@@ -199,6 +238,15 @@ export class ProgramsService {
     await run(db);
   }
 
+  async assignTemplate(
+    userId: string,
+    templateId: string,
+  ): Promise<TemplateAssignmentResult> {
+    return this.prisma.$transaction((db) =>
+      this.assignTemplateLocked(userId, templateId, db),
+    );
+  }
+
   async listExercises(query: ListExercisesQuery): Promise<ExerciseResponse[]> {
     const exercises = await this.prisma.exercise.findMany({
       where: query.muscleGroup
@@ -282,6 +330,12 @@ export class ProgramsService {
     options: AssignOptions,
   ): Promise<AssignedProgramResponse> {
     const locked = await lockAssignment(db, userId);
+    if (locked?.assignmentSource === 'ADMIN') {
+      if (options.onTrainerProgram === 'reject') {
+        throw new ConflictException(ADMIN_PROGRAM_ASSIGNED);
+      }
+      return this.currentProgram(userId, db);
+    }
     if (locked?.origin === 'TRAINER') {
       if (options.onTrainerProgram === 'reject') {
         throw new ConflictException(TRAINER_PROGRAM_ASSIGNED);
@@ -329,6 +383,95 @@ export class ProgramsService {
     return this.withProgramCycle(userId, toAssignedProgram(program), db);
   }
 
+  private async assignTemplateLocked(
+    userId: string,
+    templateId: string,
+    db: ProgramStore,
+  ): Promise<TemplateAssignmentResult> {
+    const locked = await lockAssignment(db, userId);
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { role: true, email: true },
+    });
+    if (!user || user.role !== 'CLIENT') {
+      throw new NotFoundException(CLIENT_NOT_FOUND);
+    }
+
+    const template = await db.programTemplate.findUnique({
+      where: { id: templateId },
+      include: {
+        days: {
+          orderBy: { dayNumber: 'asc' },
+          include: {
+            exercises: {
+              orderBy: { order: 'asc' },
+              include: {
+                exercise: { select: { name: true, nameEn: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!template) throw new NotFoundException(TEMPLATE_NOT_FOUND);
+    if (!template.active) throw new ConflictException(TEMPLATE_INACTIVE);
+
+    if (locked?.templateId === template.id) {
+      const program =
+        locked.assignmentSource === 'MATCHED'
+          ? await this.withProgramCycle(
+              userId,
+              toAssignedProgram(
+                await db.workoutProgram.update({
+                  where: { userId },
+                  data: { assignmentSource: 'ADMIN' },
+                  include: programInclude,
+                }),
+              ),
+              db,
+            )
+          : await this.currentProgram(userId, db);
+      return { program, change: 'unchanged', notice: null };
+    }
+
+    const data = {
+      templateId: template.id,
+      assignmentSource: 'ADMIN' as const,
+      assignedAt: new Date(),
+    };
+    const record = locked
+      ? await db.workoutProgram.update({
+          where: { userId },
+          data,
+          include: programInclude,
+        })
+      : await db.workoutProgram.create({
+          data: { userId, ...data },
+          include: programInclude,
+        });
+    return {
+      program: await this.withProgramCycle(
+        userId,
+        toAssignedProgram(record),
+        db,
+      ),
+      change: locked ? 'replaced' : 'assigned',
+      notice: {
+        to: user.email,
+        kind: locked ? 'updated' : 'assigned',
+        name: template.name,
+        origin: template.origin,
+        frequencyPerWeek: template.frequencyPerWeek,
+        days: template.days.map((day) => ({
+          exercises: day.exercises.map((row) => ({
+            name: row.exercise.name,
+            nameEn: row.exercise.nameEn,
+          })),
+        })),
+      },
+    };
+  }
+
   private async recoverLostInsert(
     userId: string,
     onTrainerProgram: AssignOptions['onTrainerProgram'],
@@ -337,6 +480,12 @@ export class ProgramsService {
     return this.prisma.$transaction(async (tx) => {
       const locked = await lockAssignment(tx, userId);
       if (!locked) throw cause;
+      if (
+        locked.assignmentSource === 'ADMIN' &&
+        onTrainerProgram === 'reject'
+      ) {
+        throw new ConflictException(ADMIN_PROGRAM_ASSIGNED);
+      }
       if (locked.origin === 'TRAINER' && onTrainerProgram === 'reject') {
         throw new ConflictException(TRAINER_PROGRAM_ASSIGNED);
       }
@@ -351,7 +500,13 @@ export class ProgramsService {
     const locked = await lockAssignment(db, userId);
     // A miss deletes nothing. The user lock is still held, so a concurrent
     // insert cannot commit a row for this delete to remove.
-    if (!locked || locked.origin === 'TRAINER') return;
+    if (
+      !locked ||
+      locked.origin === 'TRAINER' ||
+      locked.assignmentSource === 'ADMIN'
+    ) {
+      return;
+    }
     await db.workoutProgram.deleteMany({
       where: { userId, templateId: locked.templateId },
     });
@@ -372,9 +527,17 @@ export class ProgramsService {
   ): Promise<ProgramPromotion | null> {
     const assigned = await db.workoutProgram.findUnique({
       where: { userId },
-      select: { template: { select: { origin: true } } },
+      select: {
+        assignmentSource: true,
+        template: { select: { origin: true } },
+      },
     });
-    if (assigned?.template?.origin === 'TRAINER') return null;
+    if (
+      assigned?.assignmentSource === 'ADMIN' ||
+      assigned?.template?.origin === 'TRAINER'
+    ) {
+      return null;
+    }
 
     const { program } = await this.getMine(userId, db);
     if (
@@ -523,6 +686,8 @@ export function toProgramSummary(
     level: program.level,
     frequencyPerWeek: program.frequencyPerWeek,
     accent: program.accent,
+    templateOrigin: program.templateOrigin,
+    assignmentSource: program.assignmentSource,
     assignedAt: program.assignedAt,
     nextDayNumber: program.nextDayNumber,
     programProgress: program.programProgress,
@@ -533,6 +698,7 @@ export function toProgramSummary(
 function toAssignedSummary(program: {
   id: string;
   assignedAt: Date;
+  assignmentSource: 'MATCHED' | 'ADMIN';
   template: {
     id: string;
     code: string;
@@ -541,6 +707,7 @@ function toAssignedSummary(program: {
     level: string;
     frequencyPerWeek: number;
     accent: string;
+    origin: 'SYSTEM' | 'TRAINER';
   };
 }): AssignedProgramBase {
   return {
@@ -552,6 +719,8 @@ function toAssignedSummary(program: {
     level: program.template.level.toLowerCase() as TrainingExperience,
     frequencyPerWeek: program.template.frequencyPerWeek,
     accent: program.template.accent as ProgramAccent,
+    templateOrigin: program.template.origin,
+    assignmentSource: program.assignmentSource,
     assignedAt: program.assignedAt.toISOString(),
   };
 }
@@ -580,7 +749,8 @@ export async function lockAssignment(
     SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0::bigint))
   `;
   const rows = await db.$queryRaw<AssignmentLock[]>`
-    SELECT pt.origin, wp.template_id AS "templateId"
+    SELECT pt.origin, wp.template_id AS "templateId",
+           wp.assignment_source AS "assignmentSource"
     FROM workout_programs wp
     JOIN program_templates pt ON pt.id = wp.template_id
     WHERE wp.user_id = CAST(${userId} AS uuid)

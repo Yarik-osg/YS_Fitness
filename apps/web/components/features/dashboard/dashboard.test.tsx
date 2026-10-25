@@ -59,6 +59,8 @@ const ASSIGNED_PROGRAM = {
   level: 'beginner',
   frequencyPerWeek: 2,
   accent: 'UPPER',
+  templateOrigin: 'SYSTEM',
+  assignmentSource: 'MATCHED',
   assignedAt: '2026-09-27T00:00:00.000Z',
   nextDayNumber: 2,
   programProgress: { completed: 9, expected: 16 },
@@ -754,6 +756,65 @@ describe('Dashboard program', () => {
 
     expect(await screen.findByText('31 / 32')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes('/programs/promotion'),
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps the promotion sheet closed for a trainer program past the target', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/programs/me')) {
+        return json({
+          program: {
+            ...ASSIGNED_PROGRAM,
+            templateName: 'Ярослав спліт',
+            templateOrigin: 'TRAINER',
+            assignmentSource: 'ADMIN',
+            programProgress: { completed: 40, expected: 32 },
+          },
+        });
+      }
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(await screen.findByText('40 / 32')).toBeInTheDocument();
+    expect(screen.getAllByText('Ярослав спліт').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Програма на верх тіла')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes('/programs/promotion'),
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps the promotion sheet closed for an admin-pinned system program', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/programs/me')) {
+        return json({
+          program: {
+            ...ASSIGNED_PROGRAM,
+            assignmentSource: 'ADMIN',
+            programProgress: { completed: 32, expected: 32 },
+          },
+        });
+      }
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    signInAsAlina();
+    renderDashboard();
+
+    expect(await screen.findByText('32 / 32')).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([input]) =>
         String(input).includes('/programs/promotion'),

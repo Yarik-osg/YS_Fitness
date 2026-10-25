@@ -27,6 +27,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { useCoachPrograms } from '@/lib/hooks/use-coach-programs';
+import { programCatalogName } from '@/lib/program-catalog-name';
 import { cn } from '@/lib/utils';
 
 const features = tableFeatures({
@@ -421,21 +422,4 @@ function FilterSelect({
       </select>
     </label>
   );
-}
-
-const CATALOG_CODE = /^[WM][BMP][234][A-Z]?$/;
-
-function programCatalogName(template: TrainerProgramTemplateSummary) {
-  const suffix = ' - copy';
-  let base = template.name;
-  let copies = '';
-  while (base.endsWith(suffix)) {
-    base = base.slice(0, -suffix.length);
-    copies += suffix;
-  }
-  const [head, ...rest] = base.split(' — ');
-  const tail = rest.join(' — ');
-  const code = head?.trim() ?? '';
-  const label = CATALOG_CODE.test(code) && tail.includes('·') ? code : base;
-  return `${label}${copies}`;
 }

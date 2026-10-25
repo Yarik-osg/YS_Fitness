@@ -1,18 +1,23 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type {
   CoachClientDetail,
   CoachClientOnboarding,
+  TrainerProgramTemplateSummary,
 } from '@repo/shared-types';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
 import { CoachClientHistory } from '@/components/features/coach/coach-client-history';
+import { programCatalogName } from '@/lib/program-catalog-name';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
-import { useCoachClient } from '@/lib/hooks/use-coach-clients';
-import { useProgramTitle } from '@/lib/program-title';
+import {
+  useAssignCoachProgram,
+  useCoachClient,
+} from '@/lib/hooks/use-coach-clients';
+import { useCoachPrograms } from '@/lib/hooks/use-coach-programs';
 
 export function CoachClientPage({ userId }: { userId: string }) {
   const t = useTranslations('coach');
@@ -66,7 +71,9 @@ export function CoachClientPage({ userId }: { userId: string }) {
 function ClientDetail({ detail }: { detail: CoachClientDetail }) {
   const t = useTranslations('coach');
   const locale = useLocale();
-  const title = useProgramTitle(detail.program?.accent ?? '');
+  const title = detail.program
+    ? programCatalogName({ name: detail.program.templateName })
+    : null;
   const joined = formatDate(locale, detail.createdAt);
 
   return (
@@ -157,7 +164,12 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
       <Section title={t('sections.program')}>
         {detail.program ? (
           <div>
-            <h2 className="font-heading text-xl text-ink">{title}</h2>
+            <p className="text-xs text-muted">
+              {detail.program.origin === 'SYSTEM'
+                ? t('catalog.system')
+                : t('catalog.custom')}
+            </p>
+            <h2 className="mt-2 font-heading text-xl text-ink">{title}</h2>
             <p className="mt-2 text-sm text-ink">
               <ChoiceText
                 path={
@@ -178,6 +190,7 @@ function ClientDetail({ detail }: { detail: CoachClientDetail }) {
         ) : (
           <p className="text-sm text-muted">{t('noProgram')}</p>
         )}
+        <ProgramAssign userId={detail.id} currentName={title} />
       </Section>
 
       <Section title={t('sections.subscription')}>
@@ -380,6 +393,180 @@ function StatusPill({
       </span>
     </span>
   );
+}
+
+function ProgramAssign({
+  userId,
+  currentName,
+}: {
+  userId: string;
+  currentName: string | null;
+}) {
+  const t = useTranslations('coach');
+  const [open, setOpen] = useState(false);
+  const programs = useCoachPrograms(open);
+  const assign = useAssignCoachProgram(userId);
+  const [query, setQuery] = useState('');
+  const [choice, setChoice] = useState<TrainerProgramTemplateSummary | null>(
+    null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const templates = (programs.data?.templates ?? []).filter(
+    (template) => template.active,
+  );
+  const needle = query.trim().toLocaleLowerCase();
+  const visible = templates.filter((template) =>
+    programCatalogName(template).toLocaleLowerCase().includes(needle),
+  );
+
+  function closePicker() {
+    setOpen(false);
+    setChoice(null);
+    setQuery('');
+    setError(null);
+  }
+
+  function submit(templateId: string) {
+    setError(null);
+    assign.mutate(templateId, {
+      onSuccess: () => {
+        setOpen(false);
+        setChoice(null);
+        setQuery('');
+      },
+      onError: (caught) => {
+        setError(assignErrorMessage(caught, t));
+      },
+    });
+  }
+
+  return (
+    <div className="mt-4">
+      <Button
+        size="sm"
+        className="rounded-lg whitespace-nowrap"
+        onClick={() => {
+          setOpen(true);
+          setError(null);
+        }}
+      >
+        {currentName ? t('catalog.replaceProgram') : t('catalog.assignProgram')}
+      </Button>
+      {open ? (
+        <div className="mt-4">
+          <input
+            type="search"
+            value={query}
+            aria-label={t('catalog.searchPrograms')}
+            placeholder={t('catalog.searchPrograms')}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-10 w-full rounded-lg border border-line bg-transparent px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          />
+          {programs.isError ? (
+            <p role="alert" className="mt-3 text-sm text-amber">
+              {t('catalog.loadError')}
+            </p>
+          ) : null}
+          <ul className="mt-3 max-h-60 overflow-auto">
+            {visible.map((template) => (
+              <li
+                key={template.id}
+                className="border-b border-line last:border-b-0"
+              >
+                <button
+                  type="button"
+                  disabled={assign.isPending}
+                  className="flex w-full min-w-0 items-baseline gap-3 py-2 text-left text-sm whitespace-nowrap text-ink hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
+                  onClick={() => {
+                    if (currentName) {
+                      setChoice(template);
+                      return;
+                    }
+                    submit(template.id);
+                  }}
+                >
+                  <span className="min-w-0 truncate font-medium">
+                    {programCatalogName(template)}
+                  </span>
+                  <span className="shrink-0 text-muted">
+                    {template.origin === 'SYSTEM'
+                      ? t('catalog.system')
+                      : t('catalog.custom')}
+                    {' · '}
+                    {t(`catalog.levels.${template.level}`)}
+                    {' · '}
+                    {t('catalog.days')} {template.dayCount}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {visible.length === 0 && programs.data ? (
+            <p className="mt-3 text-sm text-muted">
+              {t('catalog.filterEmpty')}
+            </p>
+          ) : null}
+          {choice ? (
+            <div className="mt-4 flex flex-col items-start gap-3">
+              <p className="text-sm text-ink">
+                {t('catalog.replaceConfirm', {
+                  name: programCatalogName(choice),
+                })}
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  size="sm"
+                  className="rounded-lg whitespace-nowrap"
+                  disabled={assign.isPending}
+                  onClick={() => submit(choice.id)}
+                >
+                  {assign.isPending
+                    ? t('catalog.assigningProgram')
+                    : t('catalog.replaceProgram')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg whitespace-nowrap"
+                  onClick={() => setChoice(null)}
+                >
+                  {t('catalog.cancel')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {error ? (
+            <p role="alert" className="mt-3 text-sm text-amber">
+              {error}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 rounded-lg whitespace-nowrap"
+            onClick={closePicker}
+          >
+            {t('catalog.close')}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function assignErrorMessage(
+  error: unknown,
+  t: ReturnType<typeof useTranslations<'coach'>>,
+) {
+  if (error instanceof ApiClientError) {
+    if (error.code === 'TEMPLATE_INACTIVE')
+      return t('catalog.templateInactive');
+    if (error.code === 'TEMPLATE_NOT_FOUND') return t('catalog.notFound');
+    if (error.code === 'CLIENT_NOT_FOUND') return t('notFound');
+    if (error.status < 500 && error.message) return error.message;
+  }
+  return t('catalog.assignError');
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
