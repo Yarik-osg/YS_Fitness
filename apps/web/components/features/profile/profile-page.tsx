@@ -11,8 +11,10 @@ import type {
 } from '@repo/shared-types';
 import {
   EXPERIENCE_LEVELS,
+  FEMALE_FOCUS_AREAS,
   HEIGHT_CM,
   MAIN_GOALS,
+  MALE_FOCUS_AREAS,
   profileUpdateSchema,
   TRAINING_FREQUENCIES,
   WEIGHT_KG,
@@ -164,6 +166,7 @@ export function ProfilePage() {
           experience={answers?.experience}
           mainGoal={answers?.mainGoal}
           trainingFrequency={answers?.trainingFrequency}
+          focusAreas={answers?.focusAreas}
           loadError={responses.isError}
         />
 
@@ -220,6 +223,7 @@ function ParametersCard({
   experience,
   mainGoal,
   trainingFrequency,
+  focusAreas,
   loadError,
 }: {
   track: ProgramTrack;
@@ -229,6 +233,7 @@ function ParametersCard({
   experience: TrainingExperience | undefined;
   mainGoal: OnboardingMainGoal | undefined;
   trainingFrequency: TrainingFrequency | undefined;
+  focusAreas: string[] | undefined;
   loadError: boolean;
 }) {
   const t = useTranslations('profile');
@@ -245,13 +250,16 @@ function ParametersCard({
     experience ?? EXPERIENCE_LEVELS[0],
   );
   const [goal, setGoal] = useState(mainGoal ?? MAIN_GOALS[0]);
+  const male = track === 'male';
+  const focusOptions = male ? MALE_FOCUS_AREAS : FEMALE_FOCUS_AREAS;
+  const storedFocus = focusOptions.find((area) => area === focusAreas?.[0]);
   const [frequency, setFrequency] = useState(
     trainingFrequency ?? TRAINING_FREQUENCIES[0],
   );
+  const [focus, setFocus] = useState(storedFocus ?? focusOptions[0]);
   const [error, setError] = useState<string | null>(null);
   // Set while the member is asked to confirm a change that can switch program.
   const [confirming, setConfirming] = useState<ProfileUpdateInput | null>(null);
-  const male = track === 'male';
   // Level, goal and frequency are stored with the onboarding answers, so they
   // can only be edited once those exist.
   const canEditAnswers = !loadError && experience !== undefined;
@@ -274,12 +282,15 @@ function ParametersCard({
     setLevel(experience ?? EXPERIENCE_LEVELS[0]);
     setGoal(mainGoal ?? MAIN_GOALS[0]);
     setFrequency(trainingFrequency ?? TRAINING_FREQUENCIES[0]);
+    setFocus(storedFocus ?? focusOptions[0]);
     setError(null);
     setConfirming(null);
     setEditing(true);
   }
 
   function save() {
+    // The first option is only the empty display. It is not a chosen focus.
+    const focusChanged = storedFocus !== undefined && focus !== storedFocus;
     const parsed = profileUpdateSchema.safeParse(
       !canEditAnswers
         ? {
@@ -292,6 +303,7 @@ function ParametersCard({
             experience: level,
             mainGoal: goal,
             trainingFrequency: frequency,
+            ...(focusChanged ? { focusAreas: [focus] } : {}),
           },
     );
     if (!parsed.success || parsed.data.weightKg === undefined) {
@@ -303,7 +315,7 @@ function ParametersCard({
     // needs an explicit yes before it is saved.
     if (
       canEditAnswers &&
-      (level !== experience || frequency !== trainingFrequency)
+      (level !== experience || frequency !== trainingFrequency || focusChanged)
     ) {
       setConfirming(parsed.data);
       return;
@@ -424,6 +436,18 @@ function ParametersCard({
                 }))}
                 onChange={(value) => setFrequency(value as TrainingFrequency)}
               />
+              <SelectField
+                id="profile-focus"
+                label={t('focus')}
+                value={focus}
+                options={focusOptions.map((value) => ({
+                  value,
+                  label: focusLabel(onboarding, value),
+                }))}
+                onChange={(value) =>
+                  setFocus(value as (typeof focusOptions)[number])
+                }
+              />
             </>
           ) : (
             <div>{levelRows}</div>
@@ -463,6 +487,10 @@ function ParametersCard({
           <Detail
             label={t('frequency')}
             value={frequencyLabel(onboarding, trainingFrequency ?? '')}
+          />
+          <Detail
+            label={t('focus')}
+            value={focusLabel(onboarding, storedFocus ?? '')}
           />
         </>
       )}
@@ -846,6 +874,30 @@ function trainingYearsLabel(
       return t('trainingYearsValue.intermediate');
     case 'advanced':
       return t('trainingYearsValue.advanced');
+    default:
+      return '—';
+  }
+}
+
+function focusLabel(
+  t: ReturnType<typeof useTranslations<'onboarding'>>,
+  focus: string,
+) {
+  switch (focus) {
+    case 'glutes':
+      return t('choices.focus.glutes');
+    case 'legs':
+      return t('choices.focus.legs');
+    case 'shoulders':
+      return t('choices.focus.shoulders');
+    case 'back':
+      return t('choices.focus.back');
+    case 'arms':
+      return t('choices.focus.arms');
+    case 'full_body':
+      return t('choices.focus.full_body');
+    case 'chest':
+      return t('choices.focus.chest');
     default:
       return '—';
   }

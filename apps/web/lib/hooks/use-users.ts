@@ -105,6 +105,7 @@ export function useUpdateProfile() {
             experience: response.experience,
             mainGoal: response.mainGoal,
             trainingFrequency: response.trainingFrequency,
+            focusAreas: response.focusAreas ?? current.responses.focusAreas,
           },
         });
         return;

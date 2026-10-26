@@ -21,6 +21,27 @@ import { Dashboard } from './dashboard';
 const routerReplace = vi.hoisted(() => vi.fn());
 const MONDAY = new Date(2026, 8, 28, 12, 0, 0);
 
+const OPEN_SUBSCRIPTION = {
+  id: 'sub-1',
+  userId: 'user-1',
+  planId: 'plan-1',
+  status: 'ACTIVE',
+  provider: 'MOCK',
+  providerReference: null,
+  currentPeriodEnd: '2027-01-25T00:00:00.000Z',
+  grantedByUserId: null,
+  createdAt: '2026-09-01T00:00:00.000Z',
+  plan: {
+    id: 'plan-1',
+    code: 'FULL_ACCESS',
+    name: 'FULL ACCESS',
+    priceAmount: 349_000,
+    currency: 'UAH',
+    intervalMonths: 3,
+    isActive: true,
+  },
+};
+
 function programExercise(
   order: number,
   sets: number,
@@ -288,7 +309,7 @@ describe('Dashboard program', () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.includes('/subscriptions/me')) {
-          return json({ subscription: null });
+          return json({ subscription: OPEN_SUBSCRIPTION });
         }
         if (url.includes('/programs/assign')) {
           expect(init?.method).toBe('POST');
@@ -557,7 +578,7 @@ describe('Dashboard program', () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes('/subscriptions/me')) {
-          return json({ subscription: null });
+          return json({ subscription: OPEN_SUBSCRIPTION });
         }
         if (url.includes('/programs/me')) {
           programRequests += 1;
@@ -628,7 +649,7 @@ describe('Dashboard program', () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.includes('/subscriptions/me')) {
-          return json({ subscription: null });
+          return json({ subscription: OPEN_SUBSCRIPTION });
         }
         if (url.includes('/programs/assign')) {
           expect(init?.method).toBe('POST');
@@ -659,6 +680,54 @@ describe('Dashboard program', () => {
       screen.getByRole('button', { name: 'Призначити мою програму' }),
     ).toBeInTheDocument();
   });
+
+  it.each([
+    ['PENDING', '2027-01-25T00:00:00.000Z'],
+    ['EXPIRED', '2027-01-25T00:00:00.000Z'],
+    ['CANCELED', '2027-01-25T00:00:00.000Z'],
+    ['ACTIVE', '2026-01-01T00:00:00.000Z'],
+  ] as const)(
+    'locks training for a %s subscription',
+    async (status, currentPeriodEnd) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes('/subscriptions/me')) {
+            return json({
+              subscription: { ...OPEN_SUBSCRIPTION, status, currentPeriodEnd },
+            });
+          }
+          if (url.includes('/programs/me')) return json({ program: null });
+          return json({}, 404);
+        }),
+      );
+
+      renderDashboard();
+
+      expect(
+        await screen.findByRole('heading', { name: 'Немає абонемента' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Програма і тренування відкриються, коли обереш план.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getAllByText('Закрито')).toHaveLength(2);
+      expect(
+        screen
+          .getAllByRole('link', { name: 'Профіль' })
+          .some((link) => link.getAttribute('href')?.endsWith('/profile')),
+      ).toBe(true);
+      expect(screen.getByRole('link', { name: 'Обрати план' })).toHaveAttribute(
+        'href',
+        '/checkout',
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Призначити мою програму' }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it('links to checkout when the program needs a subscription', async () => {
     vi.stubGlobal(
@@ -701,7 +770,7 @@ describe('Dashboard program', () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.includes('/subscriptions/me')) {
-          return json({ subscription: null });
+          return json({ subscription: OPEN_SUBSCRIPTION });
         }
         if (url.includes('/programs/assign')) {
           expect(init?.method).toBe('POST');

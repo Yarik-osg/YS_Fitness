@@ -524,7 +524,7 @@ describe('Profile page', () => {
         .closest('section')!,
     );
     // Level, goal and frequency are all choices now; years follow the level.
-    expect(screen.getAllByRole('combobox')).toHaveLength(3);
+    expect(screen.getAllByRole('combobox')).toHaveLength(4);
     expect(
       screen.getByRole('combobox', { name: 'Рівень підготовки' }),
     ).toBeInTheDocument();
@@ -617,6 +617,43 @@ describe('Profile page', () => {
       mainGoal: 'lose_weight',
       trainingFrequency: '3',
     });
+  });
+
+  it('asks before saving a new focus and keeps the current one without asking', async () => {
+    const user = userEvent.setup();
+    const patches = stubProfileApi();
+
+    renderProfile();
+    await screen.findByRole('heading', { name: 'Профіль' });
+    expect(screen.getByText('Сідниці')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Редагувати' }));
+    await selectLabeledOption(user, 'Фокус', 'Ноги');
+    await user.click(screen.getByRole('button', { name: 'Зберегти' }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Змінити програму?',
+    });
+    expect(patches).toEqual([]);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Скасувати' }));
+    await selectLabeledOption(user, 'Фокус', 'Сідниці');
+    await user.click(screen.getByRole('button', { name: 'Зберегти' }));
+
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(patches[0]).not.toHaveProperty('focusAreas');
+
+    await user.click(screen.getByRole('button', { name: 'Редагувати' }));
+    await selectLabeledOption(user, 'Фокус', 'Ноги');
+    await user.click(screen.getByRole('button', { name: 'Зберегти' }));
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Змінити програму?' }),
+      ).getByRole('button', { name: 'Підтвердити і зберегти' }),
+    );
+
+    await waitFor(() => expect(patches).toHaveLength(2));
+    expect(patches[1]).toMatchObject({ focusAreas: ['legs'] });
   });
 
   it('saves a goal-only or height-only change without asking', async () => {

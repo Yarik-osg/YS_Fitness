@@ -18,7 +18,9 @@ import type {
   WeightMeasurement,
 } from '@repo/shared-types';
 import {
+  FEMALE_FOCUS_AREAS,
   isPlausibleDateOfBirth,
+  MALE_FOCUS_AREAS,
   type OnboardingInput,
   type ProfileUpdateInput,
 } from '@repo/validation';
@@ -50,6 +52,11 @@ import {
 const PROFILE_INCOMPLETE = {
   code: 'PROFILE_INCOMPLETE',
   message: 'Complete onboarding before editing this profile',
+};
+
+const INVALID_FOCUS = {
+  code: 'INVALID_FOCUS_AREA',
+  message: 'Focus is not available for this program',
 };
 
 const CHART_MEASUREMENT_LIMIT = 1000;
@@ -495,6 +502,7 @@ export class UsersService {
           experience?: (typeof EXPERIENCE_TO_PRISMA)[keyof typeof EXPERIENCE_TO_PRISMA];
           mainGoal?: (typeof MAIN_GOAL_TO_PRISMA)[keyof typeof MAIN_GOAL_TO_PRISMA];
           trainingFrequency?: TrainingFrequency;
+          focusAreas?: string[];
         } = {};
         if (input.experience) {
           responseUpdate.experience = EXPERIENCE_TO_PRISMA[input.experience];
@@ -504,6 +512,15 @@ export class UsersService {
         }
         if (input.trainingFrequency) {
           responseUpdate.trainingFrequency = input.trainingFrequency;
+        }
+        if (input.focusAreas?.[0]) {
+          if (!responses) {
+            throw new NotFoundException(PROFILE_INCOMPLETE);
+          }
+          assertAllowedFocus(responses.programTrack, input.focusAreas[0]);
+          if (input.focusAreas[0] !== responses.focusAreas[0]) {
+            responseUpdate.focusAreas = [input.focusAreas[0]];
+          }
         }
 
         if (!storedResponses) {
@@ -540,12 +557,19 @@ export class UsersService {
         } else if (
           responseUpdate.experience ||
           responseUpdate.mainGoal ||
-          responseUpdate.trainingFrequency
+          responseUpdate.trainingFrequency ||
+          responseUpdate.focusAreas
         ) {
           await transaction.onboardingResponses.update({
             where: { userId },
             data: responseUpdate,
           });
+          if (responseUpdate.focusAreas) {
+            storedResponses = {
+              ...storedResponses,
+              focusAreas: responseUpdate.focusAreas,
+            };
+          }
         }
 
         const weightKg =
@@ -578,6 +602,7 @@ export class UsersService {
             (storedResponses
               ? (storedResponses.trainingFrequency as TrainingFrequency)
               : null),
+          focusAreas: storedResponses?.focusAreas ?? null,
           program,
         };
       },
@@ -669,11 +694,19 @@ function hasMatchableFocus(stored: { focusAreas: string[] } | null): boolean {
   return Boolean(stored?.focusAreas[0]);
 }
 
+function assertAllowedFocus(track: string, focus: string) {
+  const allowed = track === 'MALE' ? MALE_FOCUS_AREAS : FEMALE_FOCUS_AREAS;
+  if (!(allowed as readonly string[]).includes(focus)) {
+    throw new BadRequestException(INVALID_FOCUS);
+  }
+}
+
 function matchFieldsChanged(
   stored: {
     experience: string;
     mainGoal: string;
     trainingFrequency: string;
+    focusAreas: string[];
   } | null,
   input: ProfileUpdateInput,
 ): boolean {
@@ -690,6 +723,8 @@ function matchFieldsChanged(
           stored.mainGoal as keyof typeof MAIN_GOAL_FROM_PRISMA
         ]) ||
     (input.trainingFrequency !== undefined &&
-      input.trainingFrequency !== stored.trainingFrequency)
+      input.trainingFrequency !== stored.trainingFrequency) ||
+    (input.focusAreas !== undefined &&
+      input.focusAreas[0] !== stored.focusAreas[0])
   );
 }

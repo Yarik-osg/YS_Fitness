@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import type { PlanResponse, SubscriptionResponse } from '@repo/shared-types';
+import type { PlanResponse } from '@repo/shared-types';
 import { Check } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -9,15 +9,19 @@ import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link } from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { getUserFacingError } from '@/lib/api/errors';
 import { getMySubscription } from '@/lib/api/subscriptions';
+import { ApiClientError } from '@/lib/api/client';
+import { getMyProgram } from '@/lib/api/programs';
+import { useAssignProgram } from '@/lib/hooks/use-programs';
 import { useCheckout, usePlans } from '@/lib/hooks/use-subscriptions';
 import {
   formatHryvniaAmount,
   kopiykasToHryvnia,
   monthlyHryvnia,
 } from '@/lib/subscriptions/money';
+import { grantsActiveAccess } from '@/lib/subscriptions/access';
 import {
   clearSelectedPlanId,
   persistSelectedPlanId,
@@ -46,6 +50,7 @@ export function CheckoutPage() {
 }
 
 function CheckoutFlow() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const plansQuery = usePlans();
   const checkout = useCheckout();
@@ -58,9 +63,7 @@ function CheckoutFlow() {
   );
   const [agreed, setAgreed] = useState(false);
   const [cardAdded, setCardAdded] = useState(false);
-  const [subscription, setSubscription] = useState<SubscriptionResponse | null>(
-    null,
-  );
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const plans = useMemo(() => {
@@ -83,15 +86,13 @@ function CheckoutFlow() {
     void getMySubscription()
       .then((existing) => {
         if (!active) return;
-        if (existing?.status === 'ACTIVE') {
-          setSubscription(existing);
-        }
+        if (grantsActiveAccess(existing)) router.replace('/dashboard');
       })
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, []);
+  }, [router]);
 
   async function pay() {
     if (!selected || !agreed || !cardAdded) return;
@@ -104,15 +105,22 @@ function CheckoutFlow() {
         window.location.assign(result.checkoutUrl);
         return;
       }
-      setSubscription(result.subscription);
+      if (grantsActiveAccess(result.subscription)) {
+        setConfirmed(true);
+        return;
+      }
+      setError(t('error'));
     } catch (cause) {
       setError(getUserFacingError(cause, tAuth) || t('error'));
     }
   }
 
-  if (subscription) {
-    return <CheckoutSuccess />;
+  function skip() {
+    clearSelectedPlanId();
+    router.push('/dashboard');
   }
+
+  if (confirmed) return <CheckoutSuccess />;
 
   if (plansQuery.isPending || plansQuery.isLoading) {
     return (
@@ -177,6 +185,7 @@ function CheckoutFlow() {
           onToggleAgreed={() => setAgreed((current) => !current)}
           onAddCard={() => setCardAdded(true)}
           onPay={() => void pay()}
+          onSkip={skip}
         />
       </CheckoutFrame>
     );
@@ -199,6 +208,7 @@ function CheckoutFlow() {
           persistSelectedPlanId(selected.id);
           setStep('pay');
         }}
+        onSkip={skip}
       />
     </CheckoutFrame>
   );
@@ -209,11 +219,13 @@ function PlanSelectStep({
   selectedId,
   onSelect,
   onContinue,
+  onSkip,
 }: {
   plans: PlanResponse[];
   selectedId: string;
   onSelect: (planId: string) => void;
   onContinue: () => void;
+  onSkip: () => void;
 }) {
   const t = useTranslations('checkout');
   const tPricing = useTranslations('marketing');
@@ -363,6 +375,7 @@ function PlanSelectStep({
       <Button className="mt-6 w-full" onClick={onContinue}>
         {t('goToPayment')}
       </Button>
+      <SkipCheckout onSkip={onSkip} />
     </>
   );
 }
@@ -377,6 +390,7 @@ function PaymentStep({
   onToggleAgreed,
   onAddCard,
   onPay,
+  onSkip,
 }: {
   selected: PlanResponse;
   selectedCopy: PlanCopy;
@@ -387,6 +401,7 @@ function PaymentStep({
   onToggleAgreed: () => void;
   onAddCard: () => void;
   onPay: () => void;
+  onSkip: () => void;
 }) {
   const t = useTranslations('checkout');
   const programName = t('programFallback');
@@ -495,12 +510,36 @@ function PaymentStep({
               ),
             })}
       </Button>
+      <SkipCheckout onSkip={onSkip} />
     </>
   );
 }
 
 function CheckoutSuccess() {
   const t = useTranslations('checkout');
+  const tDashboard = useTranslations('dashboard');
+  const tAuth = useTranslations('auth');
+  const router = useRouter();
+  const assign = useAssignProgram();
+  const [error, setError] = useState<string | null>(null);
+
+  async function openProgram() {
+    setError(null);
+    try {
+      const current = await getMyProgram();
+      if (!current) await assign.mutateAsync(undefined);
+      router.push('/dashboard');
+    } catch (cause) {
+      const unavailable =
+        cause instanceof ApiClientError &&
+        cause.code === 'PROGRAM_NOT_AVAILABLE';
+      setError(
+        unavailable
+          ? tDashboard('workouts.unavailable')
+          : getUserFacingError(cause, tAuth) || t('error'),
+      );
+    }
+  }
 
   return (
     <CheckoutFrame hideIntro>
@@ -531,9 +570,20 @@ function CheckoutSuccess() {
             label={t('successStatReadyLabel')}
           />
         </div>
-        <Link href="/dashboard" className="mt-12 inline-block w-full">
-          <Button className="w-full">{t('dashboardCta')}</Button>
-        </Link>
+        <Button
+          className="mt-12 w-full"
+          disabled={assign.isPending}
+          onClick={() => void openProgram()}
+        >
+          {assign.isPending
+            ? tDashboard('workouts.assigning')
+            : t('dashboardCta')}
+        </Button>
+        {error ? (
+          <p role="alert" className="mt-4 text-sm text-amber">
+            {error}
+          </p>
+        ) : null}
         <p className="mt-8 font-label text-[8px] font-medium tracking-[0.12em] text-white/35">
           TRAIN.&nbsp;&nbsp;DISCIPLINE.&nbsp;&nbsp;
           <span className="text-lime">EVOLVE</span>
@@ -553,6 +603,20 @@ function SuccessStat({ value, label }: { value: string; label: string }) {
         {label}
       </p>
     </div>
+  );
+}
+
+function SkipCheckout({ onSkip }: { onSkip: () => void }) {
+  const t = useTranslations('checkout');
+
+  return (
+    <button
+      type="button"
+      onClick={onSkip}
+      className="mt-4 w-full py-2 text-center text-sm text-white/55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      {t('skip')}
+    </button>
   );
 }
 

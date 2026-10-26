@@ -10,19 +10,40 @@ import { buttonVariants } from '@/components/ui/button';
 import { Collapse } from '@/components/ui/collapse';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AssignProgramCard } from '@/components/features/dashboard/dashboard';
+import { LockedProgramScreen } from '@/components/features/subscription/locked-screen';
+import { TrainingGhost } from '@/components/features/training/training-ghost';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { TrainingCalendar } from '@/components/features/training/training-calendar';
 import { Link } from '@/i18n/navigation';
+import { ApiClientError } from '@/lib/api/client';
 import { exerciseName } from '@/lib/exercise-name';
 import { useClientProgramTitle } from '@/lib/program-title';
 import { useMyProgram } from '@/lib/hooks/use-programs';
+import { useMySubscription } from '@/lib/hooks/use-subscriptions';
+import { grantsActiveAccess } from '@/lib/subscriptions/access';
 
 export function TrainingPage() {
   const program = useMyProgram();
+  const subscription = useMySubscription();
   const t = useTranslations('training');
+  const programNeedsPlan =
+    program.error instanceof ApiClientError &&
+    program.error.code === 'SUBSCRIPTION_REQUIRED';
+  const locked =
+    (subscription.isSuccess &&
+      !grantsActiveAccess(subscription.data ?? null)) ||
+    (!subscription.isSuccess && programNeedsPlan);
 
   if (program.isPending && !program.data) {
     return <TrainingLoading label={t('loading')} />;
+  }
+
+  if (!program.data && locked) {
+    return (
+      <LockedProgramScreen nav="training">
+        <TrainingGhost />
+      </LockedProgramScreen>
+    );
   }
 
   if (!program.data) {

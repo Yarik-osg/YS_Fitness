@@ -558,6 +558,34 @@ describe('OnboardingWizard', () => {
     expect(screen.getByRole('spinbutton', { name: 'Вага' })).toHaveValue(60);
   });
 
+  it('leaves height and weight empty after they are cleared', async () => {
+    const user = userEvent.setup();
+    useOnboardingStore.setState({
+      programTrack: 'female',
+      step: 11,
+      heightCm: 168,
+      weightKg: 64,
+    });
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <OnboardingWizard />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    const height = screen.getByRole('spinbutton', { name: 'Зріст' });
+    const weight = screen.getByRole('spinbutton', { name: 'Вага' });
+    await user.clear(height);
+    await user.clear(weight);
+
+    expect(height).toHaveValue(null);
+    expect(weight).toHaveValue(null);
+    expect(useOnboardingStore.getState().heightCm).toBeUndefined();
+    expect(useOnboardingStore.getState().weightKg).toBeUndefined();
+  });
+
   it('uses height arrows to move an out-of-range value onto the allowed minimum', async () => {
     const user = userEvent.setup();
     useOnboardingStore.setState({
