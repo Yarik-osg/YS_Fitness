@@ -6,7 +6,7 @@ import type {
   TrainerProgramTemplateDetail,
 } from '@repo/shared-types';
 import type { TrainerTemplateBody } from '@repo/validation';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -358,23 +358,32 @@ export function CoachProgramForm({
                     )
                   }
                 />
-                <label className="flex items-center gap-2 text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    checked={exercise.allowsAbsAddon}
-                    onChange={(event) =>
-                      replaceExercise(
-                        draft,
-                        dayIndex,
-                        exerciseIndex,
-                        {
-                          ...exercise,
-                          allowsAbsAddon: event.target.checked,
-                        },
-                        update,
-                      )
-                    }
-                  />
+                <label className="flex min-h-11 items-center gap-3 text-sm text-ink">
+                  <span className="relative grid size-6 shrink-0 place-items-center">
+                    <input
+                      type="checkbox"
+                      checked={exercise.allowsAbsAddon}
+                      onChange={(event) =>
+                        replaceExercise(
+                          draft,
+                          dayIndex,
+                          exerciseIndex,
+                          {
+                            ...exercise,
+                            allowsAbsAddon: event.target.checked,
+                          },
+                          update,
+                        )
+                      }
+                      className="peer size-6 appearance-none rounded border border-line bg-transparent checked:border-accent"
+                    />
+                    <Check
+                      size={14}
+                      strokeWidth={2.4}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute text-accent opacity-0 peer-checked:opacity-100"
+                    />
+                  </span>
                   {t('catalog.abs')}
                 </label>
                 <div>
@@ -621,21 +630,50 @@ function NumberField({
   value: number;
   onChange: (value: number) => void;
 }) {
+  const t = useTranslations('coach');
+  const id = useId();
+
+  function set(next: number) {
+    onChange(Math.min(999, Math.max(1, next)));
+  }
+
   return (
-    <label className="block text-sm text-ink">
-      <span className="mb-1 block text-xs text-muted">{label}</span>
-      <input
-        required
-        type="number"
-        min={1}
-        max={999}
-        value={value}
-        onChange={(event) => {
-          const next = event.target.valueAsNumber;
-          onChange(Number.isFinite(next) ? next : 1);
-        }}
-        className={fieldClass}
-      />
-    </label>
+    <div className="text-sm text-ink">
+      <label htmlFor={id} className="mb-1 block text-xs text-muted">
+        {label}
+      </label>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={t('catalog.decrease', { field: label })}
+          onClick={() => set(value - 1)}
+          className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-ink"
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+        <input
+          id={id}
+          required
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={999}
+          value={value}
+          onChange={(event) => {
+            const next = event.target.valueAsNumber;
+            onChange(Number.isFinite(next) ? next : 1);
+          }}
+          className={`${fieldClass} appearance-none text-center`}
+        />
+        <button
+          type="button"
+          aria-label={t('catalog.increase', { field: label })}
+          onClick={() => set(value + 1)}
+          className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-ink"
+        >
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   );
 }

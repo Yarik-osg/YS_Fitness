@@ -396,6 +396,7 @@ export interface ProfileUpdateResponse {
   experience: TrainingExperience | null;
   mainGoal: OnboardingMainGoal | null;
   trainingFrequency: TrainingFrequency | null;
+  focusAreas: string[] | null;
   program: AssignedProgramSummary | null;
 }
 

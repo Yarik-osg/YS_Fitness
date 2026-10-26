@@ -1,6 +1,7 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProfileUpdateInput } from '@repo/validation';
 import { FEMALE_ONBOARDING } from '../../test/onboarding.fixture.js';
 import { UsersService } from './users.service.js';
 
@@ -510,6 +511,103 @@ describe('UsersService.updateProfile', () => {
     expect(programs.assign).not.toHaveBeenCalled();
     expect(programs.unassign).not.toHaveBeenCalled();
     expect(result.program).toEqual(assignedProgram);
+  });
+
+  it('reassigns through the same path when the focus changes', async () => {
+    const { service, programs } = serviceWithAssign();
+
+    const result = await service.updateProfile(userId, {
+      focusAreas: ['legs'],
+    });
+
+    expect(onboardingResponses.update).toHaveBeenCalledWith({
+      where: { userId },
+      data: { focusAreas: ['legs'] },
+    });
+    expect(programs.assign).toHaveBeenCalledWith(
+      userId,
+      { userProfile, bodyMeasurement, onboardingResponses },
+      { preserveAssignedAt: true, onTrainerProgram: 'keep' },
+    );
+    expect(programs.unassign).not.toHaveBeenCalled();
+    expect(result.focusAreas).toEqual(['legs']);
+    expect(result.program).toEqual(assignedProgram);
+  });
+
+  it('does not reassign when the submitted focus is already stored', async () => {
+    const { service, programs } = serviceWithAssign();
+
+    await service.updateProfile(userId, { focusAreas: ['glutes'] });
+
+    expect(onboardingResponses.update).not.toHaveBeenCalled();
+    expect(programs.assign).not.toHaveBeenCalled();
+  });
+
+  it.each(['chest', 'abs'])(
+    'rejects a %s focus the persisted track does not offer',
+    async (focus) => {
+      const { service, programs } = serviceWithAssign();
+
+      await expect(
+        service.updateProfile(userId, {
+          focusAreas: [focus] as ProfileUpdateInput['focusAreas'],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(onboardingResponses.update).not.toHaveBeenCalled();
+      expect(programs.assign).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts chest when the persisted track is male', async () => {
+    onboardingResponses.findUnique.mockResolvedValue({
+      ...existingResponses,
+      programTrack: 'MALE',
+      focusAreas: ['back'],
+    });
+    const { service, programs } = serviceWithAssign();
+
+    await service.updateProfile(userId, { focusAreas: ['chest'] });
+
+    expect(programs.assign).toHaveBeenCalled();
+  });
+
+  it('rejects a focus when the member has no persisted track', async () => {
+    onboardingResponses.findUnique.mockResolvedValue(null);
+    const { service, programs } = serviceWithAssign();
+
+    await expect(
+      service.updateProfile(userId, { focusAreas: ['glutes'] }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(onboardingResponses.create).not.toHaveBeenCalled();
+    expect(programs.assign).not.toHaveBeenCalled();
+  });
+
+  it('keeps workout assignment untouched when a focus change has no subscription', async () => {
+    const programs = {
+      assign: vi.fn(),
+      getAssigned: vi.fn().mockResolvedValue({ program: assignedProgram }),
+      unassign: vi.fn(),
+      holdAssignment: vi.fn(),
+    };
+    const subscriptions = {
+      hasActiveAccess: vi.fn().mockResolvedValue(false),
+    };
+    const { service } = createService(
+      { userProfile, bodyMeasurement, onboardingResponses },
+      programs,
+      subscriptions,
+    );
+
+    const result = await service.updateProfile(userId, {
+      focusAreas: ['legs'],
+    });
+
+    expect(onboardingResponses.update).toHaveBeenCalled();
+    expect(programs.assign).not.toHaveBeenCalled();
+    expect(programs.unassign).not.toHaveBeenCalled();
+    expect(programs.getAssigned).not.toHaveBeenCalled();
+    expect(result.program).toBeNull();
+    expect(result.focusAreas).toEqual(['legs']);
   });
 
   it('reads the latest profile weight with an id tie-break', async () => {

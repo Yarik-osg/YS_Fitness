@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ActivityLevel } from '@repo/shared-types';
 import {
   HEIGHT_CM,
@@ -203,6 +203,7 @@ export function OnboardingWizard() {
   const t = useTranslations('onboarding');
   const tAuth = useTranslations('auth');
   const [phase, setPhase] = useState<'wizard' | 'analysis' | 'plan'>('wizard');
+  const seededMetrics = useRef(false);
 
   const step = Math.min(Math.max(draft.step, 0), TOTAL_STEPS - 1);
   const male = draft.programTrack === 'male';
@@ -436,16 +437,19 @@ export function OnboardingWizard() {
     if (step === 6 && !draft.activityLevel) {
       useOnboardingStore.setState({ activityLevel: 'MODERATELY_ACTIVE' });
     }
-    if (
-      step === 11 &&
-      (draft.heightCm === undefined || draft.weightKg === undefined)
-    ) {
+  }, [currentBodyChoices, draft, step]);
+
+  useEffect(() => {
+    if (step !== 11 || seededMetrics.current) return;
+    seededMetrics.current = true;
+    const state = useOnboardingStore.getState();
+    if (state.heightCm === undefined || state.weightKg === undefined) {
       useOnboardingStore.setState({
-        heightCm: draft.heightCm ?? DEFAULT_HEIGHT_CM,
-        weightKg: draft.weightKg ?? DEFAULT_WEIGHT_KG,
+        heightCm: state.heightCm ?? DEFAULT_HEIGHT_CM,
+        weightKg: state.weightKg ?? DEFAULT_WEIGHT_KG,
       });
     }
-  }, [currentBodyChoices, draft, step]);
+  }, [step]);
 
   function previous() {
     if (step === 0) {

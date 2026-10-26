@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { useState } from 'react';
 
@@ -153,22 +154,41 @@ export function BirthDateField({
         {label}
       </span>
       <div role="group" aria-labelledby={id} className="flex gap-2">
-        {order.map((part) => (
-          <select
-            key={part}
-            aria-label={names[part]}
-            value={draft[part]}
-            onChange={(event) => choose(part, event.target.value)}
-            className={`border border-white/12 bg-white/4 px-2 py-3 font-heading text-[16px] scheme-dark accent-accent focus:border-accent focus:outline-none ${draft[part] ? 'text-white' : 'text-white/35'} ${part === 'month' ? 'min-w-0 flex-1' : 'w-[4.75rem]'}`}
-          >
-            <option value="">—</option>
-            {options[part].map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        ))}
+        {order.map((part) => {
+          const selected = options[part].find(
+            (option) => option.value === draft[part],
+          );
+          return (
+            <div
+              key={part}
+              className={`relative border border-white/12 bg-white/4 focus-within:border-accent ${part === 'month' ? 'min-w-0 flex-1' : 'w-[5.25rem]'}`}
+            >
+              <span
+                className={`pointer-events-none block truncate py-3 pr-7 pl-3 font-heading text-[18px] leading-none ${selected ? 'text-white' : 'text-white/35'}`}
+              >
+                {selected?.label ?? '—'}
+              </span>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-white/40"
+              />
+              <select
+                aria-label={names[part]}
+                value={draft[part]}
+                onChange={(event) => choose(part, event.target.value)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              >
+                <option value="">—</option>
+                {options[part].map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

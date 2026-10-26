@@ -388,13 +388,56 @@ describe('TrainingPage', () => {
     renderPage();
 
     expect(
-      await screen.findByRole('link', { name: 'Обрати план' }),
-    ).toHaveAttribute('href', '/checkout');
+      await screen.findByRole('heading', { name: 'Немає абонемента' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Обрати план' })).toHaveAttribute(
+      'href',
+      '/checkout',
+    );
     expect(
       screen.queryByRole('button', { name: 'Призначити мою програму' }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'Почати тренування →' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps assign available when the plan is active', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/subscriptions/me')) {
+          return json({
+            subscription: {
+              status: 'ACTIVE',
+              currentPeriodEnd: '2027-01-25T00:00:00.000Z',
+            },
+          });
+        }
+        if (url.includes('/programs/me')) {
+          return json(
+            {
+              code: 'SUBSCRIPTION_REQUIRED',
+              message: 'An active subscription is required',
+            },
+            403,
+          );
+        }
+        return json({}, 404);
+      }),
+    );
+    signIn();
+    renderPage();
+
+    expect(
+      await screen.findByRole('button', { name: 'Спробувати ще раз' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Немає абонемента' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Обрати план' }),
     ).not.toBeInTheDocument();
   });
 });

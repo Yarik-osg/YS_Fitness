@@ -60,4 +60,5 @@ export class ProfileUpdateDto implements ProfileUpdateInput {
   experience?: OnboardingInput['experience'];
   mainGoal?: OnboardingInput['mainGoal'];
   trainingFrequency?: OnboardingInput['trainingFrequency'];
+  focusAreas?: OnboardingInput['focusAreas'];
 }

@@ -7,6 +7,12 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import {
+  formatHomeDate,
+  HomeGhost,
+  Stat,
+} from '@/components/features/dashboard/home-ghost';
+import { BlurredProgram } from '@/components/features/subscription/locked-screen';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +23,7 @@ import { useLogout } from '@/lib/hooks/use-auth';
 import { ProgramPromotionSheet } from '@/components/features/programs/program-promotion-sheet';
 import { useAssignProgram, useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
+import { grantsActiveAccess } from '@/lib/subscriptions/access';
 import { useMeasurements } from '@/lib/hooks/use-users';
 import { useClientProgramTitle } from '@/lib/program-title';
 import {
@@ -224,6 +231,8 @@ function UnassignedDashboard({
   const subscription = useMySubscription();
   const t = useTranslations('dashboard');
   const locale = useLocale();
+  const access = grantsActiveAccess(subscription.data ?? null);
+  const locked = subscription.isSuccess && !access;
 
   async function signOut() {
     await logout.mutateAsync().catch(() => undefined);
@@ -231,7 +240,9 @@ function UnassignedDashboard({
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-6 pt-7 pb-24">
+    <main
+      className={`mx-auto min-h-screen w-full px-6 pt-7 pb-24 ${locked ? 'max-w-[430px]' : 'max-w-3xl'}`}
+    >
       <nav className="flex items-center justify-between border-b border-line pb-5">
         <Link href="/" className="inline-flex">
           <BrandMark />
@@ -249,30 +260,38 @@ function UnassignedDashboard({
         </div>
       </nav>
 
-      <header className="pt-14 pb-10">
-        <h1 className="max-w-lg font-heading text-5xl leading-none uppercase">
-          {t('title')} <span className="text-accent">{t('titleAccent')}</span>
-        </h1>
-        <p className="mt-5 text-sm text-muted">{user?.name ?? user?.email}</p>
-        {user?.name ? (
-          <p className="mt-1 text-xs text-muted">{user.email}</p>
-        ) : null}
-        {subscription.data ? (
-          <p className="mt-3 text-sm text-muted">
-            {t('subscription.active', {
-              plan: subscription.data.plan.name,
-              periodEnd: formatPeriodEnd(
-                subscription.data.currentPeriodEnd,
-                locale,
-              ),
-            })}
-          </p>
-        ) : (
-          <p className="mt-3 text-sm text-muted">{t('subscription.none')}</p>
-        )}
-      </header>
+      {locked ? null : (
+        <header className="pt-14 pb-10">
+          <h1 className="max-w-lg font-heading text-5xl leading-none uppercase">
+            {t('title')} <span className="text-accent">{t('titleAccent')}</span>
+          </h1>
+          <p className="mt-5 text-sm text-muted">{user?.name ?? user?.email}</p>
+          {user?.name ? (
+            <p className="mt-1 text-xs text-muted">{user.email}</p>
+          ) : null}
+          {access && subscription.data ? (
+            <p className="mt-3 text-sm text-muted">
+              {t('subscription.active', {
+                plan: subscription.data.plan.name,
+                periodEnd: formatPeriodEnd(
+                  subscription.data.currentPeriodEnd,
+                  locale,
+                ),
+              })}
+            </p>
+          ) : subscription.isPending ? null : (
+            <p className="mt-3 text-sm text-muted">{t('subscription.none')}</p>
+          )}
+        </header>
+      )}
 
-      <AssignProgramCard program={program} />
+      {locked ? (
+        <BlurredProgram>
+          <HomeGhost />
+        </BlurredProgram>
+      ) : (
+        <AssignProgramCard program={program} />
+      )}
       <ClientNav active="home" />
     </main>
   );
@@ -286,6 +305,7 @@ export function AssignProgramCard({
   const t = useTranslations('dashboard');
   const tCheckout = useTranslations('checkout');
   const assign = useAssignProgram();
+  const subscription = useMySubscription();
   const [heldError, setHeldError] = useState<unknown>(null);
   if (program.status === 'success') {
     if (heldError !== null) setHeldError(null);
@@ -298,7 +318,10 @@ export function AssignProgramCard({
   const subscriptionRequired = isSubscriptionRequired(
     displayedError ?? assign.error,
   );
-  const loadFailed = displayedError != null && !subscriptionRequired;
+  const locked =
+    subscription.isSuccess && !grantsActiveAccess(subscription.data ?? null);
+  const needsPlan = locked || (!subscription.isSuccess && subscriptionRequired);
+  const loadFailed = displayedError != null && !needsPlan;
 
   return (
     <article className="border border-line bg-panel p-5">
@@ -310,13 +333,13 @@ export function AssignProgramCard({
         <p className="text-xs leading-5 text-muted">
           {unavailable
             ? t('workouts.unavailable')
-            : subscriptionRequired
+            : needsPlan
               ? t('subscription.none')
               : loadFailed
                 ? t('workouts.loadError')
                 : t('workouts.prompt')}
         </p>
-        {unavailable ? null : subscriptionRequired ? (
+        {unavailable ? null : needsPlan ? (
           <Link href="/checkout" className={buttonVariants({ size: 'sm' })}>
             {tCheckout('choosePlanCta')}
           </Link>
@@ -414,17 +437,6 @@ function ProgressHomeCard({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-[10px] font-medium text-white/40">{label}</p>
-      <p className="font-label text-[10px] font-bold tracking-[0.08em] text-white uppercase">
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function Chevron({ className }: { className: string }) {
   return (
     <svg
@@ -463,14 +475,6 @@ function isSubscriptionRequired(error: unknown) {
   return (
     error instanceof ApiClientError && error.code === 'SUBSCRIPTION_REQUIRED'
   );
-}
-
-function formatHomeDate(locale: string, date: Date) {
-  return new Intl.DateTimeFormat(locale, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(date);
 }
 
 function formatPeriodEnd(value: string | null, locale: string) {

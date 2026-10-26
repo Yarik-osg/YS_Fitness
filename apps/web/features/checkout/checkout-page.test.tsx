@@ -48,6 +48,8 @@ const FULL_ACCESS_SUBSCRIPTION = {
   plan: FULL_ACCESS_PLAN,
 };
 
+const routerPush = vi.hoisted(() => vi.fn());
+
 vi.mock('@/i18n/navigation', () => ({
   Link: ({
     href,
@@ -63,7 +65,7 @@ vi.mock('@/i18n/navigation', () => ({
     </a>
   ),
   usePathname: () => '/checkout',
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: routerPush, push: routerPush }),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -72,6 +74,7 @@ vi.mock('next/navigation', () => ({
 
 describe('CheckoutPage', () => {
   beforeEach(() => {
+    routerPush.mockClear();
     window.sessionStorage.clear();
     vi.stubGlobal(
       'fetch',
@@ -89,6 +92,18 @@ describe('CheckoutPage', () => {
         if (url.includes('/subscriptions/me') && !init?.method) {
           return new Response(JSON.stringify({ subscription: null }), {
             status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (url.includes('/programs/me') && !init?.method) {
+          return new Response(JSON.stringify({ program: null }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (url.includes('/programs/assign') && init?.method === 'POST') {
+          return new Response(JSON.stringify({ id: 'program-1' }), {
+            status: 201,
             headers: { 'content-type': 'application/json' },
           });
         }
@@ -158,18 +173,114 @@ describe('CheckoutPage', () => {
     await user.click(screen.getByRole('button', { name: /додати картку/i }));
     await user.click(pay);
 
-    await waitFor(() => {
-      expect(screen.getByText(/ти в грі/i)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/ти в грі/i)).toBeInTheDocument();
     expect(
       screen.getByText(/вже доступна в особистому кабінеті/i),
     ).toBeInTheDocument();
-    expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('24/7')).toBeInTheDocument();
-    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole('button', { name: /перейти до програми/i }),
+    );
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith('/dashboard');
+    });
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      expect.stringContaining('/programs/assign'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('does not assign when the current program cannot be loaded', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/subscriptions/plans') && !init?.method) {
+          return new Response(JSON.stringify([FULL_ACCESS_PLAN]), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (url.includes('/subscriptions/me') && !init?.method) {
+          return new Response(JSON.stringify({ subscription: null }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (url.includes('/programs/me')) {
+          return new Response(null, { status: 500 });
+        }
+        if (url.includes('/subscriptions/checkout')) {
+          return new Response(
+            JSON.stringify({
+              subscription: FULL_ACCESS_SUBSCRIPTION,
+              checkoutUrl: null,
+            }),
+            {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            },
+          );
+        }
+        return new Response(null, { status: 404 });
+      }),
+    );
+
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <CheckoutPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: /перейти до оплати/i }),
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: /погоджуюсь з умовами надання послуг/i,
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: /додати картку/i }));
+    await user.click(screen.getByRole('button', { name: /оплатити/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /перейти до програми/i }),
+    );
+
     expect(
-      screen.getByRole('link', { name: /перейти до програми/i }),
-    ).toHaveAttribute('href', '/dashboard');
+      await screen.findByText(
+        'Щось пішло не так з нашого боку. Спробуй ще раз.',
+      ),
+    ).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch)).not.toHaveBeenCalledWith(
+      expect.stringContaining('/programs/assign'),
+      expect.anything(),
+    );
+  });
+
+  it('opens the cabinet without granting access when checkout is skipped', async () => {
+    const user = userEvent.setup();
+    render(
+      <I18nTestProvider>
+        <Providers>
+          <CheckoutPage />
+        </Providers>
+      </I18nTestProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: /продовжити без абонемента/i }),
+    );
+
+    expect(routerPush).toHaveBeenCalledWith('/dashboard');
+    expect(vi.mocked(fetch)).not.toHaveBeenCalledWith(
+      expect.stringContaining('/subscriptions/checkout'),
+      expect.anything(),
+    );
   });
 
   it('shows a retry when the plan catalog cannot be loaded', async () => {
@@ -312,5 +423,52 @@ describe('CheckoutPage', () => {
       await screen.findByRole('heading', { name: /обери абонемент/i }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/ти в грі/i)).not.toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
   });
+
+  it.each(['EXPIRED', 'CANCELED'] as const)(
+    'keeps a %s subscription on checkout',
+    async (status) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes('/subscriptions/plans')) {
+            return new Response(
+              JSON.stringify([MONTHLY_PLAN, PROGRESS_PLAN, FULL_ACCESS_PLAN]),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              },
+            );
+          }
+          if (url.includes('/subscriptions/me')) {
+            return new Response(
+              JSON.stringify({
+                subscription: { ...FULL_ACCESS_SUBSCRIPTION, status },
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              },
+            );
+          }
+          return new Response(null, { status: 404 });
+        }),
+      );
+
+      render(
+        <I18nTestProvider>
+          <Providers>
+            <CheckoutPage />
+          </Providers>
+        </I18nTestProvider>,
+      );
+
+      expect(
+        await screen.findByRole('heading', { name: /обери абонемент/i }),
+      ).toBeInTheDocument();
+      expect(routerPush).not.toHaveBeenCalled();
+    },
+  );
 });

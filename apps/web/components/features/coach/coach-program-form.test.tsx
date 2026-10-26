@@ -103,4 +103,30 @@ describe('CoachProgramForm exercise search', () => {
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it('gives the abs option a large checkbox and steps the rep count', async () => {
+    render(
+      <I18nTestProvider locale="uk">
+        <CoachProgramForm
+          exercises={exercises}
+          pending={false}
+          error={null}
+          onSubmit={vi.fn()}
+        />
+      </I18nTestProvider>,
+    );
+
+    const abs = screen.getAllByRole('checkbox', {
+      name: 'Додатковий прес',
+    })[0]!;
+    expect(abs).toHaveClass('size-6');
+    await userEvent.click(abs);
+    expect(abs).toBeChecked();
+
+    const reps = screen.getAllByLabelText('Повтори від')[0]!;
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Збільшити Повтори від' })[0]!,
+    );
+    expect(reps).toHaveValue(9);
+  });
 });

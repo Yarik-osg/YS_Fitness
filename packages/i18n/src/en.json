@@ -597,7 +597,10 @@
     },
     "subscription": {
       "active": "{plan} · until {periodEnd}",
-      "none": "No subscription is active yet."
+      "none": "Training stays locked until a subscription is active.",
+      "lockedTitle": "No active plan",
+      "lockedBody": "Your program and workouts open after you choose a plan.",
+      "closed": "Closed"
     },
     "home": {
       "screenTitle": "Home",
@@ -690,7 +693,7 @@
     "weight": "Current weight",
     "level": "Training level",
     "confirmProgramTitle": "Change your program?",
-    "confirmProgramBody": "Your training level and workouts per week decide which program fits you. If a different program matches your new answers, you will start it from workout 01 and the completed-workouts counter starts over. Your workout history is kept.",
+    "confirmProgramBody": "Your training level, workouts per week, and focus decide which program fits you. If a different program matches your new answers, you will start it from workout 01 and the completed-workouts counter starts over. Your workout history is kept.",
     "confirmProgramSave": "Confirm and save",
     "trainingYears": "Training experience",
     "trainingYearsValue": {
@@ -700,6 +703,7 @@
     },
     "goal": "Main goal",
     "frequency": "Workouts per week",
+    "focus": "Focus",
     "program": "My program",
     "programStatus": "Active",
     "started": "Started",
@@ -772,6 +776,7 @@
     "paying": "Processing…",
     "successTitle": "Welcome. <accent>You're in.</accent>",
     "successBody": "Your program is already available in the personal cabinet. Time to start.",
+    "skip": "Continue without a subscription",
     "successStatWeeks": "12",
     "successStatWeeksLabel": "weeks",
     "successStatAccess": "24/7",
@@ -1093,6 +1098,8 @@
       "female": "Women",
       "male": "Men",
       "sets": "Sets",
+      "decrease": "Decrease {field}",
+      "increase": "Increase {field}",
       "repsMin": "Reps from",
       "repsMax": "Reps to",
       "abs": "Abs add-on",

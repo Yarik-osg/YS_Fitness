@@ -324,6 +324,7 @@ export const profileUpdateSchema = z
     experience: z.enum(EXPERIENCE_LEVELS).optional(),
     mainGoal: z.enum(MAIN_GOALS).optional(),
     trainingFrequency: z.enum(TRAINING_FREQUENCIES).optional(),
+    focusAreas: z.array(z.enum(FOCUS_AREAS)).length(1).optional(),
   })
   .strict()
   .refine(
@@ -332,7 +333,8 @@ export const profileUpdateSchema = z
       value.weightKg !== undefined ||
       value.experience !== undefined ||
       value.mainGoal !== undefined ||
-      value.trainingFrequency !== undefined,
+      value.trainingFrequency !== undefined ||
+      value.focusAreas !== undefined,
     { message: 'At least one profile field is required' },
   );
 
