@@ -390,6 +390,56 @@ export function expectedProgramSessions(frequencyPerWeek: number): number {
   return frequencyPerWeek * 8;
 }
 
+function loggedCount(
+  dayLogCounts: readonly DayLogCount[],
+  dayNumber: number,
+): number {
+  return (
+    dayLogCounts.find((entry) => entry.dayNumber === dayNumber)?.count ?? 0
+  );
+}
+
+/** Fewest logs among days 1..frequency. That count is the open round. */
+function leastLoggedCount(
+  dayLogCounts: readonly DayLogCount[],
+  frequencyPerWeek: number,
+): number {
+  let least = Number.POSITIVE_INFINITY;
+  for (let day = 1; day <= frequencyPerWeek; day += 1) {
+    least = Math.min(least, loggedCount(dayLogCounts, day));
+  }
+  return least;
+}
+
+/**
+ * First day still on the current round.
+ * When every day has been logged the same number of times, the next round starts at day 1.
+ */
+export function nextProgramDay(
+  dayLogCounts: readonly DayLogCount[],
+  frequencyPerWeek: number,
+): number {
+  if (frequencyPerWeek < 1) return 1;
+  const least = leastLoggedCount(dayLogCounts, frequencyPerWeek);
+  for (let day = 1; day <= frequencyPerWeek; day += 1) {
+    if (loggedCount(dayLogCounts, day) === least) return day;
+  }
+  return 1;
+}
+
+/** A day already logged more than the others is closed until they catch up. */
+export function isDayOpenInCycle(
+  dayNumber: number,
+  dayLogCounts: readonly DayLogCount[],
+  frequencyPerWeek: number,
+): boolean {
+  if (dayNumber < 1 || dayNumber > frequencyPerWeek) return false;
+  return (
+    loggedCount(dayLogCounts, dayNumber) ===
+    leastLoggedCount(dayLogCounts, frequencyPerWeek)
+  );
+}
+
 export interface ProfileUpdateResponse {
   heightCm: number;
   weightKg: number;

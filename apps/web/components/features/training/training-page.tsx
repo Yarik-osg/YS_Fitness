@@ -1,12 +1,13 @@
 'use client';
 
-import type {
-  AssignedProgramResponse,
-  ProgramDayResponse,
+import {
+  isDayOpenInCycle,
+  type AssignedProgramResponse,
+  type ProgramDayResponse,
 } from '@repo/shared-types';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Collapse } from '@/components/ui/collapse';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AssignProgramCard } from '@/components/features/dashboard/dashboard';
@@ -119,6 +120,11 @@ function ProgramDays({ program }: { program: AssignedProgramResponse }) {
               )?.count ?? 0
             }
             isNext={day.dayNumber === program.nextDayNumber}
+            canStart={isDayOpenInCycle(
+              day.dayNumber,
+              program.dayLogCounts,
+              program.frequencyPerWeek,
+            )}
           />
         ))}
       </div>
@@ -143,10 +149,12 @@ function DayCard({
   day,
   count,
   isNext,
+  canStart,
 }: {
   day: ProgramDayResponse;
   count: number;
   isNext: boolean;
+  canStart: boolean;
 }) {
   const locale = useLocale();
   const t = useTranslations('training');
@@ -190,6 +198,11 @@ function DayCard({
           <span className="mt-1 block text-[11px] font-medium text-white/45">
             {t('completedTimes', { count })}
           </span>
+          {canStart ? null : (
+            <span className="mt-1 block text-[11px] font-medium text-white/55">
+              {t('closed')}
+            </span>
+          )}
         </span>
         <span className="text-right">
           <span className="block font-heading text-[22px] leading-none text-lime">
@@ -235,16 +248,22 @@ function DayCard({
               </li>
             ))}
           </ul>
-          {isNext ? (
-            <div className="px-4 pt-2 pb-4">
+          <div className="px-4 pt-2 pb-4">
+            {canStart ? (
               <Link
-                href="/workout"
-                className={buttonVariants({ className: 'w-full' })}
+                href={`/workout?day=${day.dayNumber}`}
+                className={buttonVariants({
+                  className: 'w-full whitespace-nowrap',
+                })}
               >
                 {t('start')}
               </Link>
-            </div>
-          ) : null}
+            ) : (
+              <Button disabled className="w-full whitespace-nowrap">
+                {t('start')}
+              </Button>
+            )}
+          </div>
         </div>
       </Collapse>
     </article>

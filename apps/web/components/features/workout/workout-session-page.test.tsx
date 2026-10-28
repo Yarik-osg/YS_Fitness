@@ -2,6 +2,7 @@ import type {
   AssignedProgramResponse,
   WorkoutLogListResponse,
 } from '@repo/shared-types';
+import { ApiClientError } from '@/lib/api/client';
 import {
   cleanup,
   render,
@@ -12,6 +13,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
+import { requestedProgramDay } from '@/app/[locale]/(client)/workout/page';
 import { WorkoutSessionPage } from './workout-session-page';
 
 const templateId = '11111111-1111-4111-8111-111111111111';
@@ -141,10 +143,10 @@ vi.mock('@/i18n/navigation', () => ({
   ),
 }));
 
-function renderSession() {
+function renderSession(requestedDay: number | null = null) {
   return render(
     <I18nTestProvider>
-      <WorkoutSessionPage />
+      <WorkoutSessionPage requestedDay={requestedDay} />
     </I18nTestProvider>,
   );
 }
@@ -290,6 +292,28 @@ describe('WorkoutSessionPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('says the workout is already done when the server rejects it', async () => {
+    const user = userEvent.setup();
+    logWorkout.mockRejectedValue(
+      new ApiClientError(409, 'PROGRAM_DAY_COMPLETED', 'closed'),
+    );
+    renderSession();
+
+    await user.type(screen.getByLabelText('Вага 1'), '35');
+    await user.type(screen.getByLabelText('Повтори 1'), '12');
+    await user.type(screen.getByLabelText('Повтори 2'), '10');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(toastError).toHaveBeenCalledWith(
+      'Це тренування вже виконано цього циклу.',
+      { duration: 6_000 },
+    );
+  });
+
   it('shows a fixed joint warm-up first and an abs card after the marked exercise', () => {
     renderSession();
 
@@ -340,6 +364,63 @@ describe('WorkoutSessionPage', () => {
     expect(
       screen.getAllByRole('button', { name: /Тяга|Скручування/ }),
     ).toHaveLength(2);
+  });
+
+  it('opens a chosen program day and logs that day number', async () => {
+    const user = userEvent.setup();
+    renderSession(2);
+
+    expect(
+      screen.getByRole('heading', { name: 'Тренування 02' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Не сьогодні')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    expect(logWorkout).toHaveBeenCalledWith(
+      expect.objectContaining({ templateId, dayNumber: 2 }),
+    );
+  });
+
+  it('opens the recommended day when the chosen day is already done this cycle', () => {
+    program.dayLogCounts = [{ dayNumber: 2, count: 1 }];
+    try {
+      renderSession(2);
+      expect(
+        screen.getByRole('heading', { name: 'Тренування 01' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Тренування 02 вже виконано цього циклу'),
+      ).toBeInTheDocument();
+    } finally {
+      program.dayLogCounts = [];
+    }
+  });
+
+  it('opens the recommended day when the query is missing or not on the program', () => {
+    const { unmount } = renderSession();
+    expect(
+      screen.getByRole('heading', { name: 'Тренування 01' }),
+    ).toBeInTheDocument();
+    unmount();
+
+    renderSession(9);
+    expect(
+      screen.getByRole('heading', { name: 'Тренування 01' }),
+    ).toBeInTheDocument();
+  });
+
+  it('rejects a missing, zero, fractional, or non-numeric day query', () => {
+    expect(requestedProgramDay(undefined)).toBeNull();
+    expect(requestedProgramDay('2')).toBe(2);
+    expect(requestedProgramDay(['3'])).toBe(3);
+    expect(requestedProgramDay('0')).toBeNull();
+    expect(requestedProgramDay('-1')).toBeNull();
+    expect(requestedProgramDay('2.5')).toBeNull();
+    expect(requestedProgramDay('nope')).toBeNull();
   });
 
   it('shows only the warm-up on a day that does not end with abs', () => {

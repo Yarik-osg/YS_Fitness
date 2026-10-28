@@ -152,7 +152,7 @@ describe('TrainingPage', () => {
     useAuthStore.getState().clearSession();
   });
 
-  it('lists every day, counts this cycle, and starts only the next day', async () => {
+  it('lists every day and starts only the ones still open this cycle', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       'fetch',
@@ -207,17 +207,22 @@ describe('TrainingPage', () => {
     expect(dayTwoToggle).toHaveTextContent('1');
     expect(dayOne.closest('a')).toBeNull();
     expect(dayTwo.closest('a')).toBeNull();
+    expect(dayTwo.closest('article')).toHaveTextContent('Наступне');
+    expect(dayOne.closest('article')).not.toHaveTextContent('Наступне');
+    expect(dayOne.closest('article')).toHaveTextContent(
+      'Вже виконано цього циклу',
+    );
 
-    const starts = screen.getAllByRole('link', {
-      name: 'Почати тренування →',
-    });
-    expect(starts).toHaveLength(1);
-    expect(starts[0]).toHaveAttribute('href', '/workout');
-    expect(starts[0]?.closest('article')).toContainElement(dayTwo);
-    expect(starts[0]?.closest('article')).not.toContainElement(dayOne);
+    expect(screen.getByRole('link', { name: 'Старт' })).toHaveAttribute(
+      'href',
+      '/workout?day=2',
+    );
 
     await user.click(dayOneToggle);
     expect(dayOneToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('link', { name: 'Старт' })).toHaveLength(1);
+    expect(screen.getByText('Вже виконано цього циклу')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Старт' })).toBeDisabled();
     expect(screen.getByText('Тяга вертикального блоку')).toBeInTheDocument();
     expect(screen.getByText('Спина · Біцепс')).toBeInTheDocument();
     expect(screen.getByText('Жим гантелей вгору сидячи')).toBeInTheDocument();
@@ -232,6 +237,42 @@ describe('TrainingPage', () => {
     expect(
       screen.queryByText('Жим гантелей вгору сидячи'),
     ).not.toBeInTheDocument();
+  });
+
+  it('starts a finished day again once every workout in the cycle is done', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/programs/me')) {
+          return json({
+            program: {
+              ...PROGRAM,
+              nextDayNumber: 1,
+              dayLogCounts: [
+                { dayNumber: 1, count: 1 },
+                { dayNumber: 2, count: 1 },
+              ],
+            },
+          });
+        }
+        return json({}, 404);
+      }),
+    );
+    signIn();
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Старт' })).toHaveAttribute(
+      'href',
+      '/workout?day=1',
+    );
+
+    await user.click(screen.getByRole('button', { name: /Тренування 02/ }));
+    expect(
+      screen
+        .getAllByRole('link', { name: 'Старт' })
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/workout?day=1', '/workout?day=2']);
   });
 
   it('lists the exercises with their English names in the English locale', async () => {
@@ -352,7 +393,7 @@ describe('TrainingPage', () => {
       await screen.findByRole('button', { name: 'Призначити мою програму' }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'Почати тренування →' }),
+      screen.queryByRole('link', { name: 'Старт' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Цього тижня')).not.toBeInTheDocument();
 
@@ -363,9 +404,10 @@ describe('TrainingPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Тренування 02' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Почати тренування →' }),
-    ).toHaveAttribute('href', '/workout');
+    expect(screen.getByRole('link', { name: 'Старт' })).toHaveAttribute(
+      'href',
+      '/workout?day=2',
+    );
   });
 
   it('links to checkout when the program needs a subscription', async () => {
@@ -398,7 +440,7 @@ describe('TrainingPage', () => {
       screen.queryByRole('button', { name: 'Призначити мою програму' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('link', { name: 'Почати тренування →' }),
+      screen.queryByRole('link', { name: 'Старт' }),
     ).not.toBeInTheDocument();
   });
 

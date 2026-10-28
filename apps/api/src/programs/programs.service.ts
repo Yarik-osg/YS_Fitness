@@ -169,8 +169,10 @@ export class ProgramsService {
   async getAssignedProgram(
     userId: string,
     db: ProgramStore = this.prisma,
-  ): Promise<{ program: AssignedProgramRecord | null }> {
-    return { program: await this.loadProgram(userId, db) };
+  ): Promise<{ program: AssignedProgramResponse | null }> {
+    const program = await this.loadProgram(userId, db);
+    if (!program) return { program: null };
+    return { program: await this.withProgramCycle(userId, program, db) };
   }
 
   async getMine(
@@ -622,18 +624,11 @@ export class ProgramsService {
       completedAt: { gte: assignedAt },
     };
     // Count on the caller's store so an open transaction uses its own snapshot.
-    const [latest, groups] = await Promise.all([
-      db.workoutLog.findFirst({
-        where: loggedSinceAssignment,
-        orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
-        select: { dayNumber: true },
-      }),
-      db.workoutLog.groupBy({
-        by: ['dayNumber'],
-        where: loggedSinceAssignment,
-        _count: { _all: true },
-      }),
-    ]);
+    const groups = await db.workoutLog.groupBy({
+      by: ['dayNumber'],
+      where: loggedSinceAssignment,
+      _count: { _all: true },
+    });
     const dayLogCounts = groups
       .map((group) => ({
         dayNumber: group.dayNumber,
@@ -643,10 +638,7 @@ export class ProgramsService {
 
     return {
       ...program,
-      nextDayNumber: nextProgramDay(
-        latest?.dayNumber ?? null,
-        program.frequencyPerWeek,
-      ),
+      nextDayNumber: nextProgramDay(dayLogCounts, program.frequencyPerWeek),
       programProgress: {
         completed: dayLogCounts.reduce((sum, day) => sum + day.count, 0),
         expected: expectedProgramSessions(program.frequencyPerWeek),

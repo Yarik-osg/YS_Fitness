@@ -254,35 +254,80 @@ describe('ProgramsService', () => {
       programProgress: { completed: 0, expected: 16 },
       dayLogCounts: [],
     });
-    expect(prisma.workoutLog.findFirst).toHaveBeenCalledWith({
+    expect(prisma.workoutLog.groupBy).toHaveBeenCalledWith({
+      by: ['dayNumber'],
       where: {
         userId,
         templateId: 'template-1',
         completedAt: { gte: new Date('2026-09-27T00:00:00.000Z') },
       },
-      orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
-      select: { dayNumber: true },
+      _count: { _all: true },
     });
   });
 
-  it('advances from the latest logged day', async () => {
-    const { prisma, service } = createService();
-    const record = assignedProgram();
-    record.template.frequencyPerWeek = 3;
-    prisma.workoutProgram.findUnique.mockResolvedValue(record);
-    prisma.workoutLog.findFirst.mockResolvedValue({ dayNumber: 2 });
-
-    const result = await service.getMine(userId);
-
-    expect(result.program?.nextDayNumber).toBe(3);
-  });
-
-  it('wraps the last day back to day 1', async () => {
+  it('recommends the first unfinished day from logged counts on a four-day program', async () => {
     const { prisma, service } = createService();
     const record = assignedProgram();
     record.template.frequencyPerWeek = 4;
     prisma.workoutProgram.findUnique.mockResolvedValue(record);
-    prisma.workoutLog.findFirst.mockResolvedValue({ dayNumber: 4 });
+
+    const nextAfter = async (
+      groups: { dayNumber: number; _count: { _all: number } }[],
+    ) => {
+      prisma.workoutLog.groupBy.mockResolvedValue(groups);
+      return (await service.getMine(userId)).program?.nextDayNumber;
+    };
+
+    expect(await nextAfter([])).toBe(1);
+    expect(await nextAfter([{ dayNumber: 3, _count: { _all: 1 } }])).toBe(1);
+    expect(
+      await nextAfter([
+        { dayNumber: 1, _count: { _all: 1 } },
+        { dayNumber: 3, _count: { _all: 1 } },
+      ]),
+    ).toBe(2);
+    expect(
+      await nextAfter([
+        { dayNumber: 1, _count: { _all: 1 } },
+        { dayNumber: 3, _count: { _all: 1 } },
+        { dayNumber: 4, _count: { _all: 1 } },
+      ]),
+    ).toBe(2);
+    expect(
+      await nextAfter([
+        { dayNumber: 1, _count: { _all: 1 } },
+        { dayNumber: 2, _count: { _all: 1 } },
+        { dayNumber: 3, _count: { _all: 1 } },
+        { dayNumber: 4, _count: { _all: 1 } },
+      ]),
+    ).toBe(1);
+  });
+
+  it('recommends the unfinished day when a later day was already logged', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.frequencyPerWeek = 3;
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+    prisma.workoutLog.groupBy.mockResolvedValue([
+      { dayNumber: 1, _count: { _all: 1 } },
+      { dayNumber: 3, _count: { _all: 1 } },
+    ]);
+
+    const result = await service.getMine(userId);
+
+    expect(result.program?.nextDayNumber).toBe(2);
+  });
+
+  it('starts the next cycle at day 1 when every day is complete', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.frequencyPerWeek = 3;
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+    prisma.workoutLog.groupBy.mockResolvedValue([
+      { dayNumber: 1, _count: { _all: 1 } },
+      { dayNumber: 2, _count: { _all: 1 } },
+      { dayNumber: 3, _count: { _all: 1 } },
+    ]);
 
     const result = await service.getMine(userId);
 
