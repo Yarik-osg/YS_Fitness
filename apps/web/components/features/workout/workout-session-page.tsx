@@ -9,10 +9,11 @@ import {
   type WorkoutLogSetResponse,
 } from '@repo/shared-types';
 import type { LogWorkoutInput } from '@repo/validation';
+import { SkipForward } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ApiClientError } from '@/lib/api/client';
 import { Collapse } from '@/components/ui/collapse';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,7 +31,7 @@ import { exerciseName } from '@/lib/exercise-name';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 import { useLogWorkout, useWorkoutLogs } from '@/lib/hooks/use-workouts';
 
-type SetDraft = { weight: string; reps: string };
+type SetDraft = { weight: string; reps: string; skipped: boolean };
 
 type ExerciseDraft = {
   exerciseId: string;
@@ -344,6 +345,26 @@ function SessionForm({
                   ),
                 )
               }
+              onSkip={(index) =>
+                setExercises((current) =>
+                  current.map((row) => {
+                    if (
+                      row.exerciseId !== exercise.exerciseId ||
+                      !canSkipSet(row.prescribedSets, index)
+                    ) {
+                      return row;
+                    }
+                    return {
+                      ...row,
+                      sets: row.sets.map((set, setIndex) =>
+                        setIndex === index
+                          ? { weight: '', reps: '', skipped: !set.skipped }
+                          : set,
+                      ),
+                    };
+                  }),
+                )
+              }
               onComplete={() => {
                 const index = exercises.findIndex(
                   (row) => row.exerciseId === exercise.exerciseId,
@@ -421,6 +442,7 @@ function ExerciseCard({
   previous,
   onToggle,
   onChangeSet,
+  onSkip,
   onComplete,
   cardRef,
 }: {
@@ -429,7 +451,8 @@ function ExerciseCard({
   instant: boolean;
   previous: PreviousSession | null;
   onToggle: () => void;
-  onChangeSet: (index: number, field: keyof SetDraft, value: string) => void;
+  onChangeSet: (index: number, field: 'weight' | 'reps', value: string) => void;
+  onSkip: (index: number) => void;
   onComplete: () => void;
   cardRef: (element: HTMLElement | null) => void;
 }) {
@@ -528,41 +551,61 @@ function ExerciseCard({
               <span className="grid h-[42px] place-items-center border border-white/10 font-heading text-base text-white/30">
                 {index + 1}
               </span>
-              <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-teal">
-                <input
-                  aria-label={t('weightInput', { set: index + 1 })}
-                  inputMode="decimal"
-                  value={set.weight}
-                  placeholder="—"
-                  className="w-full bg-transparent text-center text-[17px] font-semibold text-white outline-none"
-                  onChange={(event) =>
-                    onChangeSet(
-                      index,
-                      'weight',
-                      sanitizeWeight(event.target.value),
-                    )
-                  }
-                />
-                <span className="pr-2 text-[10px] text-white/30">
-                  {t('kg')}
-                </span>
-              </label>
-              <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-teal">
-                <input
-                  aria-label={t('repsInput', { set: index + 1 })}
-                  inputMode="numeric"
-                  value={set.reps}
-                  placeholder="—"
-                  className="w-full bg-transparent text-center text-[17px] font-semibold text-white outline-none"
-                  onChange={(event) =>
-                    onChangeSet(
-                      index,
-                      'reps',
-                      event.target.value.replace(/\D/g, '').slice(0, 3),
-                    )
-                  }
-                />
-              </label>
+              {set.skipped ? (
+                <p className="col-span-2 text-center font-label text-[11px] font-semibold tracking-[0.12em] text-white/40 uppercase">
+                  {t('skipped')}
+                </p>
+              ) : (
+                <>
+                  <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-teal">
+                    <input
+                      aria-label={t('weightInput', { set: index + 1 })}
+                      inputMode="decimal"
+                      value={set.weight}
+                      placeholder="—"
+                      className="w-full bg-transparent text-center text-[17px] font-semibold text-white outline-none"
+                      onChange={(event) =>
+                        onChangeSet(
+                          index,
+                          'weight',
+                          sanitizeWeight(event.target.value),
+                        )
+                      }
+                    />
+                    <span className="pr-2 text-[10px] text-white/30">
+                      {t('kg')}
+                    </span>
+                  </label>
+                  <label className="flex h-[42px] items-center border-[1.5px] border-white/10 bg-white/[0.03] focus-within:border-teal">
+                    <input
+                      aria-label={t('repsInput', { set: index + 1 })}
+                      inputMode="numeric"
+                      value={set.reps}
+                      placeholder="—"
+                      className="w-full bg-transparent text-center text-[17px] font-semibold text-white outline-none"
+                      onChange={(event) =>
+                        onChangeSet(
+                          index,
+                          'reps',
+                          event.target.value.replace(/\D/g, '').slice(0, 3),
+                        )
+                      }
+                    />
+                  </label>
+                </>
+              )}
+              {canSkipSet(exercise.prescribedSets, index) ? (
+                <Button
+                  variant="outline"
+                  className="col-span-3 mt-2 mb-1 w-full border-line bg-transparent text-sm font-medium tracking-normal text-muted normal-case hover:border-white/30 hover:bg-white/[0.04] hover:text-ink active:bg-white/[0.08]"
+                  onClick={() => onSkip(index)}
+                >
+                  <SkipForward aria-hidden className="size-4 shrink-0" />
+                  {set.skipped
+                    ? t('undoSkip', { set: index + 1 })
+                    : t('skipSet', { set: index + 1 })}
+                </Button>
+              ) : null}
             </div>
           ))}
           <button
@@ -739,7 +782,11 @@ function initialExercises(day: ProgramDayResponse): ExerciseDraft[] {
     prescribedSets: row.sets,
     repsLabel: `${row.exercise.repsMin}–${row.exercise.repsMax}`,
     allowsAbsAddon: row.allowsAbsAddon,
-    sets: Array.from({ length: row.sets }, () => ({ weight: '', reps: '' })),
+    sets: Array.from({ length: row.sets }, () => ({
+      weight: '',
+      reps: '',
+      skipped: false,
+    })),
   }));
 }
 
@@ -841,6 +888,11 @@ function formatSets(
     .join(' • ');
 }
 
+/** Only the last set of a four-set exercise can be skipped. */
+function canSkipSet(prescribedSets: number, index: number) {
+  return prescribedSets === 4 && index === 3;
+}
+
 function isFilledReps(value: string) {
   return /^[1-9]\d{0,2}$/.test(value);
 }
@@ -857,6 +909,7 @@ function setsToSubmit(
 
   for (const exercise of exercises) {
     exercise.sets.forEach((set, index) => {
+      if (set.skipped && canSkipSet(exercise.prescribedSets, index)) return;
       prescribed += 1;
       if (!isFilledReps(set.reps)) return;
       filled += 1;

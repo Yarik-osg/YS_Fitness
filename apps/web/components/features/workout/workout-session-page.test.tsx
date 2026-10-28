@@ -178,6 +178,108 @@ describe('WorkoutSessionPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('skips the fourth set, finishes the other three, and does not log the skip', async () => {
+    const user = userEvent.setup();
+    const day = program.days.find((entry) => entry.dayNumber === 1);
+    const row = day?.exercises.find((entry) => entry.exercise.id === rowId);
+    if (!day || !row) throw new Error('fixture is missing the row exercise');
+    const prescribed = row.sets;
+    row.sets = 4;
+    try {
+      renderSession();
+
+      expect(screen.getByText('0 / 2 виконано')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Пропустити підхід 1' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Пропустити підхід 2' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Пропустити підхід 3' }),
+      ).not.toBeInTheDocument();
+      const skip = screen.getByRole('button', {
+        name: 'Пропустити підхід 4',
+      });
+      expect(skip.querySelector('svg')).toBeInTheDocument();
+      expect(skip).toHaveClass('text-muted', 'border-line');
+      expect(skip.className).not.toMatch(
+        /text-teal|bg-teal|text-lime|bg-lime|hover:text-accent|hover:border-accent/,
+      );
+      await user.click(skip);
+      expect(screen.getByText('Пропущено')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Повтори 4')).not.toBeInTheDocument();
+      expect(screen.getByText('0 / 2 виконано')).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText('Повтори 1'), '10');
+      await user.type(screen.getByLabelText('Повтори 2'), '10');
+      await user.type(screen.getByLabelText('Повтори 3'), '10');
+      expect(screen.getByText('1 / 2 виконано')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Скручування/ }));
+      await user.type(screen.getByLabelText('Повтори 1'), '15');
+      await user.click(
+        screen.getByRole('button', { name: 'Завершити тренування' }),
+      );
+
+      expect(logWorkout).toHaveBeenCalledWith({
+        templateId,
+        dayNumber: 1,
+        sets: [
+          {
+            exerciseId: rowId,
+            order: 1,
+            setNumber: 1,
+            repsCompleted: 10,
+          },
+          {
+            exerciseId: rowId,
+            order: 1,
+            setNumber: 2,
+            repsCompleted: 10,
+          },
+          {
+            exerciseId: rowId,
+            order: 1,
+            setNumber: 3,
+            repsCompleted: 10,
+          },
+          {
+            exerciseId: pressId,
+            order: 2,
+            setNumber: 1,
+            repsCompleted: 15,
+          },
+        ],
+      });
+      const saved = logWorkout.mock.calls[0]?.[0] as {
+        sets: { setNumber: number; repsCompleted: number; weightKg?: number }[];
+      };
+      expect(saved.sets.some((set) => set.setNumber === 4)).toBe(false);
+      expect(saved.sets.some((set) => set.repsCompleted === 0)).toBe(false);
+      expect(screen.getByText('4')).toBeInTheDocument();
+      expect(screen.getByText('Підходів загалом')).toBeInTheDocument();
+    } finally {
+      row.sets = prescribed;
+    }
+  });
+
+  it('offers no skip unless the exercise has four sets', () => {
+    const day = program.days.find((entry) => entry.dayNumber === 1);
+    const row = day?.exercises.find((entry) => entry.exercise.id === rowId);
+    if (!row) throw new Error('fixture is missing the row exercise');
+    const prescribed = row.sets;
+    row.sets = 3;
+    try {
+      renderSession();
+      expect(
+        screen.queryByRole('button', { name: /Пропустити підхід/ }),
+      ).not.toBeInTheDocument();
+    } finally {
+      row.sets = prescribed;
+    }
+  });
+
   it('logs every prescribed set and leaves extra rows out', async () => {
     const user = userEvent.setup();
     renderSession();

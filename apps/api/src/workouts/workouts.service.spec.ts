@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AssignedProgramResponse } from '@repo/shared-types';
+import type { LogWorkoutInput } from '@repo/validation';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkoutsService } from './workouts.service.js';
 import type { WorkoutLogRecord } from './workouts.repository.js';
@@ -405,6 +406,47 @@ describe('WorkoutsService.log', () => {
       response: { code: 'DUPLICATE_SET' },
     });
     expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('records the workout without a row for a skipped set', async () => {
+    const completed = [1, 2, 3].map((setNumber) => ({
+      ...input.sets[0]!,
+      setNumber,
+      repsCompleted: 8 + setNumber,
+      weightKg: 40,
+    }));
+    const { service, workouts } = createService(
+      {
+        getAssignedProgram: vi.fn().mockResolvedValue({
+          program: {
+            ...program,
+            days: program.days.map((day) => ({
+              ...day,
+              exercises: day.exercises.map((row) => ({ ...row, sets: 4 })),
+            })),
+          },
+        }),
+      },
+      {
+        lockTemplateDays: vi.fn().mockResolvedValue([
+          {
+            dayNumber: 1,
+            exercises: [{ exerciseId, order: 1, sets: 4 }],
+          },
+        ]),
+      },
+    );
+
+    await service.log(userId, { ...input, dayNumber: 1, sets: completed });
+
+    expect(workouts.create).toHaveBeenCalledWith(
+      userId,
+      { ...input, dayNumber: 1, sets: completed },
+      {},
+    );
+    const saved = workouts.create.mock.calls[0]?.[1] as LogWorkoutInput;
+    expect(saved.sets.map((set) => set.setNumber)).toEqual([1, 2, 3]);
+    expect(saved.sets.every((set) => set.repsCompleted > 0)).toBe(true);
   });
 
   it('accepts fewer sets than prescribed', async () => {

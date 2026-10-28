@@ -32,8 +32,8 @@ describe('mergeProgramFiles', () => {
     expect(
       merged.exercises.find((exercise) => exercise.code === 'EX_010'),
     ).toMatchObject({
-      name: 'Жим у Сміті',
-      nameEn: 'Smith machine bench press',
+      name: 'Жим у Сміті 30°',
+      nameEn: '30° Smith machine bench press',
     });
     expect(merged.exercises).toHaveLength(64);
     expect(merged.templates).toHaveLength(81);
