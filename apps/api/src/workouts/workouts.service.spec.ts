@@ -149,15 +149,63 @@ describe('WorkoutsService.log', () => {
     expect(result.sets[0]?.exercise.nameEn).toBe('English row');
   });
 
-  it('allows another log for the same day', async () => {
+  it('rejects a day already finished in this cycle', async () => {
     const { service, workouts } = createService({
-      getAssignedProgram: vi.fn().mockResolvedValue({ program }),
+      getAssignedProgram: vi.fn().mockResolvedValue({
+        program: {
+          ...program,
+          frequencyPerWeek: 4,
+          dayLogCounts: [{ dayNumber: 3, count: 1 }],
+        },
+      }),
+    });
+
+    await expect(
+      service.log(userId, { ...input, dayNumber: 3 }),
+    ).rejects.toMatchObject({
+      response: { code: 'PROGRAM_DAY_COMPLETED' },
+    });
+    expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a day that closed before the log was written', async () => {
+    const getAssignedProgram = vi
+      .fn()
+      .mockResolvedValueOnce({ program })
+      .mockResolvedValueOnce({
+        program: {
+          ...program,
+          dayLogCounts: [{ dayNumber: 1, count: 1 }],
+        },
+      });
+    const { service, workouts } = createService({ getAssignedProgram });
+
+    await expect(service.log(userId, input)).rejects.toMatchObject({
+      response: { code: 'PROGRAM_DAY_COMPLETED' },
+    });
+    expect(workouts.lockTemplateDays.mock.invocationCallOrder[0]).toBeLessThan(
+      getAssignedProgram.mock.invocationCallOrder[1] ?? 0,
+    );
+    expect(getAssignedProgram).toHaveBeenNthCalledWith(2, userId, {});
+    expect(workouts.create).not.toHaveBeenCalled();
+  });
+
+  it('allows a day again once every day in the cycle has caught up', async () => {
+    const { service, workouts } = createService({
+      getAssignedProgram: vi.fn().mockResolvedValue({
+        program: {
+          ...program,
+          dayLogCounts: [
+            { dayNumber: 1, count: 1 },
+            { dayNumber: 2, count: 1 },
+          ],
+        },
+      }),
     });
 
     await service.log(userId, input);
-    await service.log(userId, input);
 
-    expect(workouts.create).toHaveBeenCalledTimes(2);
+    expect(workouts.create).toHaveBeenCalledWith(userId, input, {});
   });
 
   it('rejects logging when no program is assigned', async () => {

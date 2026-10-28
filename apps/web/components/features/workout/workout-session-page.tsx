@@ -1,17 +1,19 @@
 'use client';
 
-import type {
-  AssignedProgramResponse,
-  ProgramDayResponse,
-  WeightRecommendation,
-  WorkoutLogResponse,
-  WorkoutLogSetResponse,
+import {
+  isDayOpenInCycle,
+  type AssignedProgramResponse,
+  type ProgramDayResponse,
+  type WeightRecommendation,
+  type WorkoutLogResponse,
+  type WorkoutLogSetResponse,
 } from '@repo/shared-types';
 import type { LogWorkoutInput } from '@repo/validation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { buttonVariants } from '@/components/ui/button';
+import { ApiClientError } from '@/lib/api/client';
 import { Collapse } from '@/components/ui/collapse';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ERROR_DURATION_MS } from '@/components/ui/toaster';
@@ -63,6 +65,26 @@ type SavedSession = {
   exercises: CompletedExercise[];
 };
 
+function selectedProgramDay(
+  program: AssignedProgramResponse,
+  requestedDay: number | null,
+): ProgramDayResponse | undefined {
+  const requested =
+    requestedDay != null &&
+    isDayOpenInCycle(
+      requestedDay,
+      program.dayLogCounts,
+      program.frequencyPerWeek,
+    )
+      ? program.days.find((entry) => entry.dayNumber === requestedDay)
+      : undefined;
+  return (
+    requested ??
+    program.days.find((entry) => entry.dayNumber === program.nextDayNumber) ??
+    program.days[0]
+  );
+}
+
 function WorkoutLoading({ label }: { label: string }) {
   return (
     <main
@@ -83,7 +105,11 @@ function WorkoutLoading({ label }: { label: string }) {
   );
 }
 
-export function WorkoutSessionPage() {
+export function WorkoutSessionPage({
+  requestedDay = null,
+}: {
+  requestedDay?: number | null;
+}) {
   const programQuery = useMyProgram();
   const logsQuery = useWorkoutLogs();
   const t = useTranslations('workouts');
@@ -93,9 +119,18 @@ export function WorkoutSessionPage() {
   }
 
   const program = programQuery.data;
-  const day =
-    program?.days.find((entry) => entry.dayNumber === program.nextDayNumber) ??
-    program?.days[0];
+  const day = program ? selectedProgramDay(program, requestedDay) : undefined;
+  const closedDay =
+    program &&
+    requestedDay != null &&
+    program.days.some((entry) => entry.dayNumber === requestedDay) &&
+    !isDayOpenInCycle(
+      requestedDay,
+      program.dayLogCounts,
+      program.frequencyPerWeek,
+    )
+      ? String(requestedDay).padStart(2, '0')
+      : null;
   if (!program || !day) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-center gap-6 bg-background px-6 text-center">
@@ -115,6 +150,7 @@ export function WorkoutSessionPage() {
       program={program}
       day={day}
       logs={logsQuery.data?.logs ?? []}
+      closedDay={closedDay}
     />
   );
 }
@@ -123,10 +159,12 @@ function SessionForm({
   program,
   day,
   logs,
+  closedDay,
 }: {
   program: AssignedProgramResponse;
   day: ProgramDayResponse;
   logs: WorkoutLogResponse[];
+  closedDay: string | null;
 }) {
   const t = useTranslations('workouts');
   const muscles = useTranslations('dashboard.workouts');
@@ -209,8 +247,14 @@ function SessionForm({
           day.dayNumber,
         ),
       });
-    } catch {
-      toast.error(t('saveError'), { duration: ERROR_DURATION_MS });
+    } catch (error) {
+      toast.error(
+        error instanceof ApiClientError &&
+          error.code === 'PROGRAM_DAY_COMPLETED'
+          ? t('dayClosed')
+          : t('saveError'),
+        { duration: ERROR_DURATION_MS },
+      );
     }
   }
 
@@ -231,6 +275,11 @@ function SessionForm({
             <h1 className="font-heading text-[26px] leading-none text-white uppercase">
               {t('title', { number: dayNumber })}
             </h1>
+            {closedDay ? (
+              <p className="mt-2 text-[11px] font-medium text-white/55">
+                {t('closedDay', { number: closedDay })}
+              </p>
+            ) : null}
             {muscleLine ? (
               <p className="mt-1 text-[11px] font-medium text-white/40">
                 {muscleLine}

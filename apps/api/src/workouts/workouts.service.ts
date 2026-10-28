@@ -4,11 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type {
-  StrengthChangesResponse,
-  WorkoutCalendarResponse,
-  WorkoutLogListResponse,
-  WorkoutLogResponse,
+import {
+  isDayOpenInCycle,
+  type StrengthChangesResponse,
+  type WorkoutCalendarResponse,
+  type WorkoutLogListResponse,
+  type WorkoutLogResponse,
 } from '@repo/shared-types';
 import type {
   ListWorkoutLogsQuery,
@@ -47,6 +48,7 @@ export class WorkoutsService {
         message: 'This template is not the assigned program',
       });
     }
+    assertDayOpen(program, input.dayNumber);
 
     assertPrescribedSets(
       program.days.map((day) => ({
@@ -61,7 +63,8 @@ export class WorkoutsService {
     );
 
     const created = await this.workouts.transaction(async (transaction) => {
-      // Same row an edit or delete locks first. The assignment advisory
+      // The template row lock makes a second save wait until this one
+      // commits, so the cycle read below sees it. The assignment advisory
       // lock is a different key and is not taken on this path.
       const days = await this.workouts.lockTemplateDays(
         input.templateId,
@@ -73,6 +76,23 @@ export class WorkoutsService {
           message: 'That day is not on the assigned program',
         });
       }
+      const { program: current } = await this.programs.getAssignedProgram(
+        userId,
+        transaction,
+      );
+      if (!current) {
+        throw new ConflictException({
+          code: 'PROGRAM_NOT_ASSIGNED',
+          message: 'No program is assigned',
+        });
+      }
+      if (current.templateId !== input.templateId) {
+        throw new ConflictException({
+          code: 'TEMPLATE_NOT_ASSIGNED',
+          message: 'This template is not the assigned program',
+        });
+      }
+      assertDayOpen(current, input.dayNumber);
       assertPrescribedSets(days, input);
       return this.workouts.create(userId, input, transaction);
     });
@@ -198,6 +218,24 @@ function toWorkoutLog(log: WorkoutLogRecord): WorkoutLogResponse {
       };
     }),
   };
+}
+
+function assertDayOpen(
+  program: {
+    frequencyPerWeek: number;
+    dayLogCounts: readonly { dayNumber: number; count: number }[];
+  },
+  dayNumber: number,
+): void {
+  if (
+    dayNumber <= program.frequencyPerWeek &&
+    !isDayOpenInCycle(dayNumber, program.dayLogCounts, program.frequencyPerWeek)
+  ) {
+    throw new ConflictException({
+      code: 'PROGRAM_DAY_COMPLETED',
+      message: 'That workout is already done for this cycle',
+    });
+  }
 }
 
 function prescribedReps(
