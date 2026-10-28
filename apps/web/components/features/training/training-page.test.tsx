@@ -207,6 +207,11 @@ describe('TrainingPage', () => {
     expect(dayTwoToggle).toHaveTextContent('1');
     expect(dayOne.closest('a')).toBeNull();
     expect(dayTwo.closest('a')).toBeNull();
+    expect(dayTwo.closest('article')).toHaveTextContent('Наступне');
+    expect(dayOne.closest('article')).not.toHaveTextContent('Наступне');
+    expect(dayOne.closest('article')).toHaveTextContent(
+      'Вже виконано цього циклу',
+    );
 
     expect(screen.getByRole('link', { name: 'Старт' })).toHaveAttribute(
       'href',

@@ -168,6 +168,95 @@ describe('WorkoutsService.log', () => {
     expect(workouts.create).not.toHaveBeenCalled();
   });
 
+  it('logs a later open day as that day', async () => {
+    const firstDay = program.days[0];
+    if (!firstDay) throw new Error('fixture is missing day 1');
+    const { service, workouts } = createService(
+      {
+        getAssignedProgram: vi.fn().mockResolvedValue({
+          program: {
+            ...program,
+            frequencyPerWeek: 4,
+            nextDayNumber: 1,
+            dayLogCounts: [{ dayNumber: 3, count: 1 }],
+            days: [...program.days, { ...firstDay, dayNumber: 4 }],
+          },
+        }),
+      },
+      {
+        lockTemplateDays: vi.fn().mockResolvedValue([
+          {
+            dayNumber: 1,
+            exercises: [{ exerciseId, order: 1, sets: 3 }],
+          },
+          {
+            dayNumber: 4,
+            exercises: [{ exerciseId, order: 1, sets: 3 }],
+          },
+        ]),
+      },
+    );
+
+    await service.log(userId, { ...input, dayNumber: 4 });
+
+    expect(workouts.create).toHaveBeenCalledWith(
+      userId,
+      expect.objectContaining({ dayNumber: 4 }),
+      {},
+    );
+  });
+
+  it('rejects a second save once the first save has closed the day', async () => {
+    let completed = 0;
+    let busy = false;
+    const waiters: Array<() => void> = [];
+    const { service, workouts } = createService(
+      {
+        getAssignedProgram: vi.fn(async () => ({
+          program: {
+            ...program,
+            dayLogCounts:
+              completed === 0 ? [] : [{ dayNumber: 1, count: completed }],
+          },
+        })),
+      },
+      {
+        transaction: vi.fn(
+          async (work: (client: unknown) => Promise<unknown>) => {
+            if (busy) {
+              await new Promise<void>((resolve) => {
+                waiters.push(resolve);
+              });
+            }
+            busy = true;
+            try {
+              return await work({});
+            } finally {
+              busy = false;
+              waiters.shift()?.();
+            }
+          },
+        ),
+        create: vi.fn(async () => {
+          completed += 1;
+          return logRecord();
+        }),
+      },
+    );
+
+    const [first, second] = await Promise.allSettled([
+      service.log(userId, input),
+      service.log(userId, input),
+    ]);
+
+    expect(first.status).toBe('fulfilled');
+    expect(second.status).toBe('rejected');
+    expect(second.status === 'rejected' ? second.reason : null).toMatchObject({
+      response: { code: 'PROGRAM_DAY_COMPLETED' },
+    });
+    expect(workouts.create).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a day that closed before the log was written', async () => {
     const getAssignedProgram = vi
       .fn()

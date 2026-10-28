@@ -265,6 +265,44 @@ describe('ProgramsService', () => {
     });
   });
 
+  it('recommends the first unfinished day from logged counts on a four-day program', async () => {
+    const { prisma, service } = createService();
+    const record = assignedProgram();
+    record.template.frequencyPerWeek = 4;
+    prisma.workoutProgram.findUnique.mockResolvedValue(record);
+
+    const nextAfter = async (
+      groups: { dayNumber: number; _count: { _all: number } }[],
+    ) => {
+      prisma.workoutLog.groupBy.mockResolvedValue(groups);
+      return (await service.getMine(userId)).program?.nextDayNumber;
+    };
+
+    expect(await nextAfter([])).toBe(1);
+    expect(await nextAfter([{ dayNumber: 3, _count: { _all: 1 } }])).toBe(1);
+    expect(
+      await nextAfter([
+        { dayNumber: 1, _count: { _all: 1 } },
+        { dayNumber: 3, _count: { _all: 1 } },
+      ]),
+    ).toBe(2);
+    expect(
+      await nextAfter([
+        { dayNumber: 1, _count: { _all: 1 } },
+        { dayNumber: 3, _count: { _all: 1 } },
+        { dayNumber: 4, _count: { _all: 1 } },
+      ]),
+    ).toBe(2);
+    expect(
+      await nextAfter([
+        { dayNumber: 1, _count: { _all: 1 } },
+        { dayNumber: 2, _count: { _all: 1 } },
+        { dayNumber: 3, _count: { _all: 1 } },
+        { dayNumber: 4, _count: { _all: 1 } },
+      ]),
+    ).toBe(1);
+  });
+
   it('recommends the unfinished day when a later day was already logged', async () => {
     const { prisma, service } = createService();
     const record = assignedProgram();
