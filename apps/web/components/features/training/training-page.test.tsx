@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { I18nTestProvider } from '@/test/i18n';
+import { workoutDraftKey, writeWorkoutDraft } from '@/lib/workout-draft';
 import { TrainingPage } from './training-page';
 
 const routerReplace = vi.hoisted(() => vi.fn());
@@ -237,6 +238,46 @@ describe('TrainingPage', () => {
     expect(
       screen.queryByText('Жим гантелей вгору сидячи'),
     ).not.toBeInTheDocument();
+  });
+
+  it('labels a day with a saved draft as continue', async () => {
+    const user = userEvent.setup();
+    const storage = new Map<string, string>();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+        clear: () => storage.clear(),
+      },
+    });
+    writeWorkoutDraft(workoutDraftKey('user-1', PROGRAM.templateId, 2), [
+      {
+        exerciseId: '55555555-5555-4555-8555-555555555555',
+        sets: [{ weight: '', reps: '12', skipped: false }],
+      },
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/programs/me')) {
+          return json({ program: PROGRAM });
+        }
+        return json({}, 404);
+      }),
+    );
+    signIn();
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Продовжити' }),
+    ).toHaveAttribute('href', '/workout?day=2');
+
+    await user.click(screen.getByRole('button', { name: /Тренування 01/ }));
+    expect(screen.getByRole('button', { name: 'Старт' })).toBeDisabled();
+    expect(screen.getAllByRole('link', { name: 'Продовжити' })).toHaveLength(1);
+    storage.clear();
   });
 
   it('starts a finished day again once every workout in the cycle is done', async () => {

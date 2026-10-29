@@ -613,6 +613,7 @@
       "timesShort": "{count} times/week",
       "programFallback": "Program",
       "start": "Start workout →",
+      "continue": "Continue workout →",
       "training": "Training",
       "summary": "{exercises, plural, one {# exercise} other {# exercises}} · {sets, plural, one {# set} other {# sets}}",
       "profile": "Profile",
@@ -833,6 +834,11 @@
     "emptyBody": "Record weight and reps so you can compare results later.",
     "continue": "Keep filling in",
     "finishWithoutSave": "Finish without saving",
+    "clearDraft": "Clear",
+    "clearDraftTitle": "Clear this draft?",
+    "clearDraftBody": "The weight and reps entered for this workout will be removed.",
+    "clearDraftConfirm": "Clear",
+    "clearDraftCancel": "Keep",
     "noProgram": "No program is assigned.",
     "loading": "Loading workout",
     "completion": {
@@ -858,6 +864,7 @@
     "exercises": "exercises",
     "loading": "Loading program",
     "start": "Start",
+    "continue": "Continue",
     "closed": "Already done this cycle",
     "calendar": {
       "title": "This week",

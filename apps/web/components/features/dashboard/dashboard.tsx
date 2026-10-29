@@ -31,6 +31,7 @@ import {
   formatWeight,
   latestMeasurement,
 } from '@/lib/weight-chart';
+import { useHasWorkoutDraft } from '@/lib/workout-draft';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 export function Dashboard() {
@@ -84,6 +85,11 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
   const exerciseCount = day?.exercises.length ?? 0;
   const setCount =
     day?.exercises.reduce((total, row) => total + row.sets, 0) ?? 0;
+  const hasDraft = useHasWorkoutDraft(
+    user?.id,
+    program.templateId,
+    day?.dayNumber ?? 0,
+  );
   const dayNumber = String(day?.dayNumber ?? 1).padStart(2, '0');
   const dayLabel = t('home.firstDay', { number: dayNumber });
   const programTitle = useClientProgramTitle(program);
@@ -145,7 +151,7 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
               href="/workout"
               className={buttonVariants({ className: 'w-full' })}
             >
-              {t('home.start')}
+              {hasDraft ? t('home.continue') : t('home.start')}
             </Link>
           ) : (
             <Button className="w-full" disabled>

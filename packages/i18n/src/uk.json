@@ -610,6 +610,7 @@
       "timesShort": "{count} рази/тиж.",
       "programFallback": "Програма",
       "start": "Почати тренування →",
+      "continue": "Продовжити тренування →",
       "training": "Тренування",
       "summary": "{exercises, plural, one {# вправа} few {# вправи} many {# вправ} other {# вправ}} · {sets, plural, one {# підхід} few {# підходи} many {# підходів} other {# підходів}}",
       "profile": "Профіль",
@@ -830,6 +831,11 @@
     "emptyBody": "Записуй вагу та повторення, щоб бачити свою силову прогресію та порівнювати результати.",
     "continue": "Продовжити заповнення",
     "finishWithoutSave": "Завершити без запису",
+    "clearDraft": "Скинути",
+    "clearDraftTitle": "Скинути чернетку?",
+    "clearDraftBody": "Введені вага та повторення зникнуть з цього тренування.",
+    "clearDraftConfirm": "Скинути",
+    "clearDraftCancel": "Залишити",
     "noProgram": "Немає призначеної програми.",
     "loading": "Завантажуємо тренування",
     "completion": {
@@ -855,6 +861,7 @@
     "exercises": "вправ",
     "loading": "Завантажуємо програму",
     "start": "Старт",
+    "continue": "Продовжити",
     "closed": "Вже виконано цього циклу",
     "calendar": {
       "title": "Цього тижня",

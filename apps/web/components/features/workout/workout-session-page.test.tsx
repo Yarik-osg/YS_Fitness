@@ -2,8 +2,10 @@ import type {
   AssignedProgramResponse,
   WorkoutLogListResponse,
 } from '@repo/shared-types';
+import { StrictMode } from 'react';
 import { ApiClientError } from '@/lib/api/client';
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -14,6 +16,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nTestProvider } from '@/test/i18n';
 import { requestedProgramDay } from '@/app/[locale]/(client)/workout/page';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { workoutDraftKey } from '@/lib/workout-draft';
 import { WorkoutSessionPage } from './workout-session-page';
 
 const templateId = '11111111-1111-4111-8111-111111111111';
@@ -143,6 +147,41 @@ vi.mock('@/i18n/navigation', () => ({
   ),
 }));
 
+class MemoryStorage implements Storage {
+  private items = new Map<string, string>();
+
+  get length() {
+    return this.items.size;
+  }
+
+  clear() {
+    this.items.clear();
+  }
+
+  getItem(key: string) {
+    return this.items.get(key) ?? null;
+  }
+
+  key(index: number) {
+    return [...this.items.keys()][index] ?? null;
+  }
+
+  removeItem(key: string) {
+    this.items.delete(key);
+  }
+
+  setItem(key: string, value: string) {
+    this.items.set(key, value);
+  }
+}
+
+function installStorage() {
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: new MemoryStorage(),
+  });
+}
+
 function renderSession(requestedDay: number | null = null) {
   return render(
     <I18nTestProvider>
@@ -153,12 +192,15 @@ function renderSession(requestedDay: number | null = null) {
 
 describe('WorkoutSessionPage', () => {
   beforeEach(() => {
+    installStorage();
     // jsdom has no layout; completing an exercise scrolls the page.
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
+    useAuthStore.getState().clearSession();
     logs.current = { logs: [], total: 0 };
     logWorkout.mockReset();
     logWorkout.mockResolvedValue({ id: 'log-1' });
@@ -498,6 +540,80 @@ describe('WorkoutSessionPage', () => {
         screen.getByText('Тренування 02 вже виконано цього циклу'),
       ).toBeInTheDocument();
     } finally {
+      program.dayLogCounts = [];
+    }
+  });
+
+  it('keeps the completion screen in strict mode when the program advances', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <StrictMode>
+        <I18nTestProvider>
+          <WorkoutSessionPage requestedDay={1} />
+        </I18nTestProvider>
+      </StrictMode>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Тренування 01' }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    await user.type(screen.getByLabelText('Повтори 2'), '9');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    program.nextDayNumber = 2;
+    program.dayLogCounts = [{ dayNumber: 1, count: 1 }];
+    try {
+      view.rerender(
+        <StrictMode>
+          <I18nTestProvider>
+            <WorkoutSessionPage requestedDay={1} />
+          </I18nTestProvider>
+        </StrictMode>,
+      );
+      expect(
+        screen.getByRole('heading', { name: 'Тренування завершено' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Не сьогодні')).not.toBeInTheDocument();
+    } finally {
+      program.nextDayNumber = 1;
+      program.dayLogCounts = [];
+    }
+  });
+
+  it('keeps the completion screen when the program advances to the next day', async () => {
+    const user = userEvent.setup();
+    const view = renderSession(1);
+
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    await user.type(screen.getByLabelText('Повтори 2'), '9');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Тренування завершено' }),
+    ).toBeInTheDocument();
+
+    program.nextDayNumber = 2;
+    program.dayLogCounts = [{ dayNumber: 1, count: 1 }];
+    try {
+      view.rerender(
+        <I18nTestProvider>
+          <WorkoutSessionPage requestedDay={1} />
+        </I18nTestProvider>,
+      );
+      expect(
+        screen.getByRole('heading', { name: 'Тренування завершено' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Не сьогодні')).not.toBeInTheDocument();
+    } finally {
+      program.nextDayNumber = 1;
       program.dayLogCounts = [];
     }
   });
@@ -1031,5 +1147,295 @@ describe('WorkoutSessionPage', () => {
       expect(scrollTo).not.toHaveBeenCalled();
       expect(screen.queryByLabelText(/^Вага/)).not.toBeInTheDocument();
     });
+  });
+});
+
+const draftUser = {
+  id: 'user-a',
+  email: 'user-a@example.com',
+  role: 'CLIENT' as const,
+  name: null,
+  onboardingCompletedAt: '2026-01-01T00:00:00.000Z',
+};
+
+function signIn(id = draftUser.id) {
+  useAuthStore.getState().setSession('token', { ...draftUser, id });
+}
+
+function hidePage() {
+  window.dispatchEvent(new Event('pagehide'));
+}
+
+describe('workout draft persistence', () => {
+  beforeEach(() => {
+    installStorage();
+    logWorkout.mockReset();
+    logWorkout.mockResolvedValue({ id: 'log-1' });
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    signIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.localStorage.clear();
+    useAuthStore.getState().clearSession();
+  });
+
+  const draftKey = () => workoutDraftKey(draftUser.id, templateId, 1);
+
+  async function fillBothExercises(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    await user.type(screen.getByLabelText('Вага 1'), '20');
+    await user.type(screen.getByLabelText('Повтори 2'), '9');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+  }
+
+  it('does not keep the previous account once another user signs in', async () => {
+    const user = userEvent.setup();
+    renderSession();
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+
+    act(() => {
+      useAuthStore.getState().clearSession();
+      useAuthStore
+        .getState()
+        .setSession('token', { ...draftUser, id: 'user-b' });
+    });
+
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+    expect(
+      window.localStorage.getItem(workoutDraftKey('user-b', templateId, 1)),
+    ).toBeNull();
+
+    await user.type(screen.getByLabelText('Повтори 1'), '5');
+    hidePage();
+    expect(
+      window.localStorage.getItem(workoutDraftKey('user-b', templateId, 1)),
+    ).toContain('"reps":"5"');
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+    expect(window.localStorage.getItem(draftKey())).not.toContain('"reps":"5"');
+  });
+
+  it('does not store a draft when the workout is still blank', () => {
+    renderSession();
+    hidePage();
+    expect(window.localStorage.getItem(draftKey())).toBeNull();
+  });
+
+  it('opens the next exercise when the earlier one is already filled', async () => {
+    const user = userEvent.setup();
+    const view = renderSession();
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    await user.type(screen.getByLabelText('Повтори 2'), '9');
+    hidePage();
+    view.unmount();
+
+    renderSession();
+
+    expect(screen.queryByLabelText('Повтори 2')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+    await user.click(
+      screen.getByRole('button', { name: /Тяга вертикального блоку/ }),
+    );
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('8');
+    expect(screen.getByLabelText('Повтори 2')).toHaveValue('9');
+  });
+
+  it('clears the draft from the top and still saves what is typed next', async () => {
+    const user = userEvent.setup();
+    renderSession();
+    expect(
+      screen.queryByRole('button', { name: 'Скинути' }),
+    ).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    hidePage();
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+
+    await user.click(screen.getByRole('button', { name: 'Скинути' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Скинути' }));
+
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+    expect(
+      screen.queryByRole('button', { name: 'Скинути' }),
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(draftKey())).toBeNull();
+
+    await user.type(screen.getByLabelText('Повтори 1'), '5');
+    hidePage();
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"5"');
+  });
+
+  it('flushes the latest edits on pagehide and restores both exercises', async () => {
+    const user = userEvent.setup();
+    const view = renderSession();
+    await fillBothExercises(user);
+    hidePage();
+    view.unmount();
+
+    renderSession();
+
+    await user.click(
+      screen.getByRole('button', { name: /Тяга вертикального блоку/ }),
+    );
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('8');
+    expect(screen.getByLabelText('Вага 1')).toHaveValue('20');
+    expect(screen.getByLabelText('Повтори 2')).toHaveValue('9');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('15');
+    expect(logWorkout).not.toHaveBeenCalled();
+  });
+
+  it('restores a skipped fourth set', async () => {
+    const user = userEvent.setup();
+    const day = program.days.find((entry) => entry.dayNumber === 1);
+    const row = day?.exercises.find((entry) => entry.exercise.id === rowId);
+    if (!row) throw new Error('fixture is missing the row exercise');
+    const prescribed = row.sets;
+    row.sets = 4;
+    try {
+      const view = renderSession();
+      await user.click(
+        screen.getByRole('button', { name: 'Пропустити підхід 4' }),
+      );
+      await user.type(screen.getByLabelText('Повтори 1'), '8');
+      hidePage();
+      view.unmount();
+
+      renderSession();
+      expect(screen.getByText('Пропущено')).toBeInTheDocument();
+      expect(screen.getByLabelText('Повтори 1')).toHaveValue('8');
+      expect(screen.queryByLabelText('Повтори 4')).not.toBeInTheDocument();
+    } finally {
+      row.sets = prescribed;
+    }
+  });
+
+  it('does not restore another day, template, or user', () => {
+    const saved = {
+      v: 1,
+      exercises: [
+        {
+          exerciseId: rowId,
+          sets: [
+            { weight: '40', reps: '7', skipped: false },
+            { weight: '', reps: '6', skipped: false },
+          ],
+        },
+      ],
+    };
+    window.localStorage.setItem(
+      workoutDraftKey(draftUser.id, templateId, 2),
+      JSON.stringify(saved),
+    );
+    window.localStorage.setItem(
+      workoutDraftKey(draftUser.id, 'other-template', 1),
+      JSON.stringify(saved),
+    );
+    window.localStorage.setItem(
+      workoutDraftKey('user-b', templateId, 1),
+      JSON.stringify(saved),
+    );
+
+    renderSession();
+
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+    expect(screen.getByLabelText('Повтори 2')).toHaveValue('');
+  });
+
+  it('ignores malformed and outdated drafts', () => {
+    window.localStorage.setItem(draftKey(), '{');
+    const broken = renderSession();
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+    broken.unmount();
+
+    window.localStorage.setItem(
+      draftKey(),
+      JSON.stringify({
+        v: 2,
+        exercises: [
+          {
+            exerciseId: rowId,
+            sets: [{ weight: 40, reps: 7, skipped: 'yes' }],
+          },
+        ],
+      }),
+    );
+    renderSession();
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+  });
+
+  it('keeps the draft when saving fails and drops it after success', async () => {
+    const user = userEvent.setup();
+    logWorkout.mockRejectedValueOnce(new Error('fail'));
+    const view = renderSession();
+    await fillBothExercises(user);
+    hidePage();
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+    view.unmount();
+
+    logWorkout.mockResolvedValue({ id: 'log-1' });
+    renderSession();
+    await user.click(
+      screen.getByRole('button', { name: /Тяга вертикального блоку/ }),
+    );
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('8');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+    expect(window.localStorage.getItem(draftKey())).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(window.localStorage.getItem(draftKey())).toBeNull();
+    expect(logWorkout).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let a late success erase edits made while saving', async () => {
+    const user = userEvent.setup();
+    let finishSave: (value: { id: string }) => void = () => {};
+    logWorkout.mockReturnValue(
+      new Promise((resolve) => {
+        finishSave = resolve;
+      }),
+    );
+    renderSession();
+    await fillBothExercises(user);
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+    await user.clear(screen.getByLabelText('Повтори 1'));
+    await user.type(screen.getByLabelText('Повтори 1'), '11');
+    finishSave({ id: 'log-1' });
+
+    await waitFor(() => {
+      expect(screen.getByText('Підходів загалом')).toBeInTheDocument();
+    });
+    hidePage();
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"11"');
+    expect(logWorkout).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the draft when the workout is discarded', async () => {
+    const user = userEvent.setup();
+    renderSession();
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    hidePage();
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+    await user.clear(screen.getByLabelText('Повтори 1'));
+
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+    await user.click(
+      await screen.findByRole('link', { name: 'Завершити без запису' }),
+    );
+    expect(window.localStorage.getItem(draftKey())).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(window.localStorage.getItem(draftKey())).toBeNull();
   });
 });

@@ -22,6 +22,8 @@ import { useClientProgramTitle } from '@/lib/program-title';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
 import { grantsActiveAccess } from '@/lib/subscriptions/access';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { useHasWorkoutDraft } from '@/lib/workout-draft';
 
 export function TrainingPage() {
   const program = useMyProgram();
@@ -87,6 +89,7 @@ function TrainingLoading({ label }: { label: string }) {
 
 function ProgramDays({ program }: { program: AssignedProgramResponse }) {
   const home = useTranslations('dashboard.home');
+  const userId = useAuthStore((state) => state.user?.id);
   const programTitle = useClientProgramTitle(program);
   const days = [...program.days].sort(
     (left, right) => left.dayNumber - right.dayNumber,
@@ -113,6 +116,8 @@ function ProgramDays({ program }: { program: AssignedProgramResponse }) {
         {days.map((day) => (
           <DayCard
             key={day.dayNumber}
+            userId={userId}
+            templateId={program.templateId}
             day={day}
             count={
               program.dayLogCounts.find(
@@ -146,11 +151,15 @@ function PageHeader() {
 }
 
 function DayCard({
+  userId,
+  templateId,
   day,
   count,
   isNext,
   canStart,
 }: {
+  userId: string | undefined;
+  templateId: string;
   day: ProgramDayResponse;
   count: number;
   isNext: boolean;
@@ -158,6 +167,7 @@ function DayCard({
 }) {
   const locale = useLocale();
   const t = useTranslations('training');
+  const hasDraft = useHasWorkoutDraft(userId, templateId, day.dayNumber);
   const muscles = useTranslations('dashboard.workouts');
   const [expanded, setExpanded] = useState(isNext);
   const number = String(day.dayNumber).padStart(2, '0');
@@ -256,7 +266,7 @@ function DayCard({
                   className: 'w-full whitespace-nowrap',
                 })}
               >
-                {t('start')}
+                {hasDraft ? t('continue') : t('start')}
               </Link>
             ) : (
               <Button disabled className="w-full whitespace-nowrap">

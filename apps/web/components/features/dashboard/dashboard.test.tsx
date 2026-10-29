@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { I18nTestProvider } from '@/test/i18n';
+import { workoutDraftKey, writeWorkoutDraft } from '@/lib/workout-draft';
 import { Dashboard } from './dashboard';
 
 const routerReplace = vi.hoisted(() => vi.fn());
@@ -402,6 +403,44 @@ describe('Dashboard program', () => {
     expect(
       screen.queryByRole('button', { name: 'Призначити мою програму' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('offers to continue the next workout when that day has a draft', async () => {
+    const storage = new Map<string, string>();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+        clear: () => storage.clear(),
+      },
+    });
+    writeWorkoutDraft(
+      workoutDraftKey('user-1', ASSIGNED_PROGRAM.templateId, 2),
+      [
+        {
+          exerciseId: 'EX_039',
+          sets: [{ weight: '20', reps: '8', skipped: false }],
+        },
+      ],
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/programs/me')) {
+          return json({ program: ASSIGNED_PROGRAM });
+        }
+        return json({}, 404);
+      }),
+    );
+    signInAsAlina();
+    renderDashboard();
+
+    expect(
+      await screen.findByRole('link', { name: 'Продовжити тренування →' }),
+    ).toHaveAttribute('href', '/workout');
+    storage.clear();
   });
 
   it('shows the later equal-timestamp weight and the change from the first', async () => {
