@@ -11,7 +11,7 @@ import {
 import type { LogWorkoutInput } from '@repo/validation';
 import { SkipForward } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ApiClientError } from '@/lib/api/client';
@@ -30,6 +30,8 @@ import { Link } from '@/i18n/navigation';
 import { exerciseName } from '@/lib/exercise-name';
 import { useMyProgram } from '@/lib/hooks/use-programs';
 import { useLogWorkout, useWorkoutLogs } from '@/lib/hooks/use-workouts';
+import { useWorkoutDraft } from '@/lib/workout-draft';
+import { useAuthStore } from '@/lib/stores/auth-store';
 
 type SetDraft = { weight: string; reps: string; skipped: boolean };
 
@@ -114,13 +116,31 @@ export function WorkoutSessionPage({
   const programQuery = useMyProgram();
   const logsQuery = useWorkoutLogs();
   const t = useTranslations('workouts');
+  // The program's next day changes as soon as this workout is saved. Keep the
+  // day this visit opened, or the completion screen is replaced by the next one.
+  const [sessionDay, setSessionDay] = useState<{
+    requestedDay: number | null;
+    dayNumber: number;
+  } | null>(null);
 
   if (programQuery.isPending && !programQuery.data) {
     return <WorkoutLoading label={t('loading')} />;
   }
 
   const program = programQuery.data;
-  const day = program ? selectedProgramDay(program, requestedDay) : undefined;
+  const selected = program
+    ? selectedProgramDay(program, requestedDay)
+    : undefined;
+  const openedDay =
+    sessionDay != null && sessionDay.requestedDay === requestedDay
+      ? sessionDay.dayNumber
+      : null;
+  if (openedDay == null && selected) {
+    setSessionDay({ requestedDay, dayNumber: selected.dayNumber });
+  }
+  const day = program?.days.find(
+    (entry) => entry.dayNumber === (openedDay ?? selected?.dayNumber),
+  );
   const closedDay =
     program &&
     requestedDay != null &&
@@ -148,6 +168,7 @@ export function WorkoutSessionPage({
 
   return (
     <SessionForm
+      key={`${program.templateId}:${day.dayNumber}`}
       program={program}
       day={day}
       logs={logsQuery.data?.logs ?? []}
@@ -170,15 +191,28 @@ function SessionForm({
   const t = useTranslations('workouts');
   const muscles = useTranslations('dashboard.workouts');
   const logWorkout = useLogWorkout();
+  const userId = useAuthStore((state) => state.user?.id);
   const [exercises, setExercises] = useState(() => initialExercises(day));
   const [expandedId, setExpandedId] = useState(
     exercises[0]?.exerciseId ?? null,
+  );
+  const openRestoredExercise = useCallback((restored: ExerciseDraft[]) => {
+    setExpandedId(firstIncompleteExerciseId(restored));
+  }, []);
+  const draft = useWorkoutDraft(
+    userId,
+    program.templateId,
+    day.dayNumber,
+    exercises,
+    setExercises,
+    openRestoredExercise,
   );
   // True only for the change made by "Complete exercise": the page then
   // scrolls to the next card, so both cards switch without animating and the
   // scroll measures the final layout. Opening a card by hand animates.
   const [advancing, setAdvancing] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedSession | null>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -227,12 +261,14 @@ function SessionForm({
       return;
     }
     setError(null);
+    const submittedRevision = draft.currentRevision();
     try {
       await logWorkout.mutateAsync({
         templateId: program.templateId,
         dayNumber: day.dayNumber,
         sets: submission.sets,
       });
+      draft.commitSubmitted(submittedRevision);
       setSaved({
         exerciseCount: new Set(submission.sets.map((set) => set.exerciseId))
           .size,
@@ -265,12 +301,23 @@ function SessionForm({
         ref={headerRef}
         className="sticky top-0 z-10 border-b border-white/5 bg-background px-5 pt-8 pb-4"
       >
-        <Link
-          href="/dashboard"
-          className="mb-4 inline-flex items-center gap-2 font-label text-[9px] font-semibold tracking-[0.14em] text-white/30 uppercase"
-        >
-          {t('back')}
-        </Link>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 font-label text-[9px] font-semibold tracking-[0.14em] text-white/30 uppercase"
+          >
+            {t('back')}
+          </Link>
+          {exercisesHaveDraft(exercises) ? (
+            <button
+              type="button"
+              className="font-label text-[9px] font-semibold tracking-[0.14em] text-white/55 uppercase"
+              onClick={() => setConfirmClear(true)}
+            >
+              {t('clearDraft')}
+            </button>
+          ) : null}
+        </div>
         <div className="mb-3.5 flex items-start justify-between gap-3">
           <div>
             <h1 className="font-heading text-[26px] leading-none text-white uppercase">
@@ -407,6 +454,39 @@ function SessionForm({
         </button>
       </div>
 
+      <Sheet open={confirmClear} onOpenChange={setConfirmClear}>
+        <SheetContent>
+          <SheetTitle>{t('clearDraftTitle')}</SheetTitle>
+          <SheetDescription>{t('clearDraftBody')}</SheetDescription>
+          <SheetFooter>
+            <button
+              type="button"
+              className={buttonVariants({ className: 'w-full' })}
+              onClick={() => {
+                const blank = initialExercises(day);
+                draft.release(blank);
+                setExercises(blank);
+                setExpandedId(blank[0]?.exerciseId ?? null);
+                setError(null);
+                setConfirmClear(false);
+              }}
+            >
+              {t('clearDraftConfirm')}
+            </button>
+            <button
+              type="button"
+              className={buttonVariants({
+                variant: 'outline',
+                className: 'w-full',
+              })}
+              onClick={() => setConfirmClear(false)}
+            >
+              {t('clearDraftCancel')}
+            </button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
       <Sheet open={confirmEmpty} onOpenChange={setConfirmEmpty}>
         <SheetContent>
           <SheetTitle>{t('emptyTitle')}</SheetTitle>
@@ -425,6 +505,7 @@ function SessionForm({
                 variant: 'outline',
                 className: 'w-full',
               })}
+              onClick={() => draft.discard()}
             >
               {t('finishWithoutSave')}
             </Link>
@@ -546,7 +627,11 @@ function ExerciseCard({
           {exercise.sets.map((set, index) => (
             <div
               key={`${exercise.exerciseId}-${index}`}
-              className="mb-2 grid grid-cols-[36px_1fr_1fr] items-center gap-2"
+              className={`mb-2 grid items-center gap-2 ${
+                canSkipSet(exercise.prescribedSets, index)
+                  ? 'grid-cols-[36px_minmax(0,1fr)_minmax(0,1fr)_auto]'
+                  : 'grid-cols-[36px_1fr_1fr]'
+              }`}
             >
               <span className="grid h-[42px] place-items-center border border-white/10 font-heading text-base text-white/30">
                 {index + 1}
@@ -597,13 +682,15 @@ function ExerciseCard({
               {canSkipSet(exercise.prescribedSets, index) ? (
                 <Button
                   variant="outline"
-                  className="col-span-3 mt-2 mb-1 w-full border-line bg-transparent text-sm font-medium tracking-normal text-muted normal-case hover:border-white/30 hover:bg-white/[0.04] hover:text-ink active:bg-white/[0.08]"
+                  aria-label={
+                    set.skipped
+                      ? t('undoSkip', { set: index + 1 })
+                      : t('skipSet', { set: index + 1 })
+                  }
+                  className="size-[42px] min-h-[42px] shrink-0 border-line bg-transparent p-0 text-muted hover:border-white/30 hover:bg-white/[0.04] hover:text-ink active:bg-white/[0.08]"
                   onClick={() => onSkip(index)}
                 >
-                  <SkipForward aria-hidden className="size-4 shrink-0" />
-                  {set.skipped
-                    ? t('undoSkip', { set: index + 1 })
-                    : t('skipSet', { set: index + 1 })}
+                  <SkipForward aria-hidden className="size-4" />
                 </Button>
               ) : null}
             </div>
@@ -893,8 +980,33 @@ function canSkipSet(prescribedSets: number, index: number) {
   return prescribedSets === 4 && index === 3;
 }
 
+function exercisesHaveDraft(exercises: ExerciseDraft[]) {
+  return exercises.some((exercise) =>
+    exercise.sets.some(
+      (set, index) =>
+        set.weight !== '' ||
+        set.reps !== '' ||
+        (set.skipped && canSkipSet(exercise.prescribedSets, index)),
+    ),
+  );
+}
+
 function isFilledReps(value: string) {
   return /^[1-9]\d{0,2}$/.test(value);
+}
+
+/** The first exercise that still needs a set. A filled or skipped set is done. */
+function firstIncompleteExerciseId(exercises: ExerciseDraft[]) {
+  return (
+    exercises.find((exercise) =>
+      exercise.sets.some((set, index) => {
+        if (set.skipped && canSkipSet(exercise.prescribedSets, index)) {
+          return false;
+        }
+        return !isFilledReps(set.reps);
+      }),
+    )?.exerciseId ?? null
+  );
 }
 
 function setsToSubmit(
