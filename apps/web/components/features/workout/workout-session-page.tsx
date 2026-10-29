@@ -116,8 +116,11 @@ export function WorkoutSessionPage({
   const programQuery = useMyProgram();
   const logsQuery = useWorkoutLogs();
   const t = useTranslations('workouts');
-  // The program's next day changes as soon as this workout is saved. Keep the
-  // day this visit opened, or the completion screen is replaced by the next one.
+  const userId = useAuthStore((state) => state.user?.id);
+  // The program's next day changes as soon as this workout is saved. Remember
+  // the day this visit opened during render, before paint, so the completion
+  // screen is not replaced by the next day. The update runs once per visit:
+  // after it lands, the condition below is false, including in Strict Mode.
   const [sessionDay, setSessionDay] = useState<{
     requestedDay: number | null;
     dayNumber: number;
@@ -168,7 +171,7 @@ export function WorkoutSessionPage({
 
   return (
     <SessionForm
-      key={`${program.templateId}:${day.dayNumber}`}
+      key={`${userId ?? 'signed-out'}:${program.templateId}:${day.dayNumber}`}
       program={program}
       day={day}
       logs={logsQuery.data?.logs ?? []}

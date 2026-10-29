@@ -2,8 +2,10 @@ import type {
   AssignedProgramResponse,
   WorkoutLogListResponse,
 } from '@repo/shared-types';
+import { StrictMode } from 'react';
 import { ApiClientError } from '@/lib/api/client';
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -538,6 +540,47 @@ describe('WorkoutSessionPage', () => {
         screen.getByText('Тренування 02 вже виконано цього циклу'),
       ).toBeInTheDocument();
     } finally {
+      program.dayLogCounts = [];
+    }
+  });
+
+  it('keeps the completion screen in strict mode when the program advances', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <StrictMode>
+        <I18nTestProvider>
+          <WorkoutSessionPage requestedDay={1} />
+        </I18nTestProvider>
+      </StrictMode>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Тренування 01' }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+    await user.type(screen.getByLabelText('Повтори 2'), '9');
+    await user.click(screen.getByRole('button', { name: /Скручування/ }));
+    await user.type(screen.getByLabelText('Повтори 1'), '15');
+    await user.click(
+      screen.getByRole('button', { name: 'Завершити тренування' }),
+    );
+
+    program.nextDayNumber = 2;
+    program.dayLogCounts = [{ dayNumber: 1, count: 1 }];
+    try {
+      view.rerender(
+        <StrictMode>
+          <I18nTestProvider>
+            <WorkoutSessionPage requestedDay={1} />
+          </I18nTestProvider>
+        </StrictMode>,
+      );
+      expect(
+        screen.getByRole('heading', { name: 'Тренування завершено' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Не сьогодні')).not.toBeInTheDocument();
+    } finally {
+      program.nextDayNumber = 1;
       program.dayLogCounts = [];
     }
   });
@@ -1147,6 +1190,33 @@ describe('workout draft persistence', () => {
     await user.click(screen.getByRole('button', { name: /Скручування/ }));
     await user.type(screen.getByLabelText('Повтори 1'), '15');
   }
+
+  it('does not keep the previous account once another user signs in', async () => {
+    const user = userEvent.setup();
+    renderSession();
+    await user.type(screen.getByLabelText('Повтори 1'), '8');
+
+    act(() => {
+      useAuthStore.getState().clearSession();
+      useAuthStore
+        .getState()
+        .setSession('token', { ...draftUser, id: 'user-b' });
+    });
+
+    expect(screen.getByLabelText('Повтори 1')).toHaveValue('');
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+    expect(
+      window.localStorage.getItem(workoutDraftKey('user-b', templateId, 1)),
+    ).toBeNull();
+
+    await user.type(screen.getByLabelText('Повтори 1'), '5');
+    hidePage();
+    expect(
+      window.localStorage.getItem(workoutDraftKey('user-b', templateId, 1)),
+    ).toContain('"reps":"5"');
+    expect(window.localStorage.getItem(draftKey())).toContain('"reps":"8"');
+    expect(window.localStorage.getItem(draftKey())).not.toContain('"reps":"5"');
+  });
 
   it('does not store a draft when the workout is still blank', () => {
     renderSession();

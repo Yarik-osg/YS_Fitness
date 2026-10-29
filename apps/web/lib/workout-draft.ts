@@ -305,6 +305,18 @@ export function useWorkoutDraft<T extends WorkoutDraftExercise>(
     return () => window.removeEventListener('pagehide', flush);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      const currentKey = keyRef.current;
+      if (!currentKey || !readyRef.current || retiredRef.current) return;
+      if (timerRef.current != null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      persistWorkoutDraft(currentKey, exercisesRef.current);
+    };
+  }, []);
+
   return {
     currentRevision: () => revisionRef.current,
     /** Drop this key only when no newer edit landed after submit started. */
