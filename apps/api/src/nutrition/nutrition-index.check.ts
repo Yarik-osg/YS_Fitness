@@ -6,6 +6,8 @@ export const NUTRITION_ONE_ACTIVE_TARGET_INDEX = 'nutrition_one_active_target';
 export interface NutritionActiveTargetIndex {
   tableName: string;
   unique: boolean;
+  /** pg_index.indnkeyatts: key attributes only, including expression keys. */
+  keyAttributeCount: number;
   keyColumns: string[];
   predicate: string | null;
 }
@@ -25,6 +27,7 @@ export class NutritionIndexCheck implements OnApplicationBootstrap {
       SELECT
         t.relname AS "tableName",
         i.indisunique AS "unique",
+        i.indnkeyatts::int AS "keyAttributeCount",
         COALESCE(
           (
             SELECT array_agg(a.attname ORDER BY cols.ordinality)
@@ -32,7 +35,8 @@ export class NutritionIndexCheck implements OnApplicationBootstrap {
             JOIN pg_attribute a
               ON a.attrelid = i.indrelid
              AND a.attnum = cols.attnum
-             AND cols.attnum > 0
+            WHERE cols.ordinality <= i.indnkeyatts
+              AND cols.attnum > 0
           ),
           ARRAY[]::text[]
         ) AS "keyColumns",
@@ -67,6 +71,7 @@ export function isOneActiveTargetIndex(
   return (
     index.tableName === 'nutrition_targets' &&
     index.unique === true &&
+    index.keyAttributeCount === 1 &&
     Array.isArray(index.keyColumns) &&
     index.keyColumns.length === 1 &&
     index.keyColumns[0] === 'user_id' &&

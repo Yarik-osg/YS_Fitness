@@ -9,6 +9,7 @@ import {
 const correct: NutritionActiveTargetIndex = {
   tableName: 'nutrition_targets',
   unique: true,
+  keyAttributeCount: 1,
   keyColumns: ['user_id'],
   predicate: 'active',
 };
@@ -45,10 +46,38 @@ describe('isOneActiveTargetIndex', () => {
     );
   });
 
-  it('rejects extra key columns', () => {
+  it('rejects an ordinary second key column', () => {
     expect(
       isOneActiveTargetIndex({
         ...correct,
+        keyAttributeCount: 2,
+        keyColumns: ['user_id', 'source'],
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects an expression key even when the visible column list is only user_id', () => {
+    expect(
+      isOneActiveTargetIndex({
+        ...correct,
+        keyAttributeCount: 2,
+        keyColumns: ['user_id'],
+      }),
+    ).toBe(false);
+  });
+
+  it('does not count an included column as a key', () => {
+    expect(
+      isOneActiveTargetIndex({
+        ...correct,
+        keyAttributeCount: 1,
+        keyColumns: ['user_id'],
+      }),
+    ).toBe(true);
+    expect(
+      isOneActiveTargetIndex({
+        ...correct,
+        keyAttributeCount: 1,
         keyColumns: ['user_id', 'source'],
       }),
     ).toBe(false);
@@ -78,6 +107,16 @@ describe('NutritionIndexCheck', () => {
   it('refuses to boot when the index is missing', async () => {
     await expect(checkWith([]).onApplicationBootstrap()).rejects.toThrow(
       `Missing partial unique index ${NUTRITION_ONE_ACTIVE_TARGET_INDEX}`,
+    );
+  });
+
+  it('refuses to boot when an expression key was dropped from the column list', async () => {
+    await expect(
+      checkWith([
+        { ...correct, keyAttributeCount: 2, keyColumns: ['user_id'] },
+      ]).onApplicationBootstrap(),
+    ).rejects.toThrow(
+      `Index ${NUTRITION_ONE_ACTIVE_TARGET_INDEX} must be a unique index`,
     );
   });
 
