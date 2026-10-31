@@ -129,4 +129,24 @@ describe('CoachProgramForm exercise search', () => {
     );
     expect(reps).toHaveValue(9);
   });
+
+  it('leaves the editor without saving', async () => {
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <I18nTestProvider locale="en">
+        <CoachProgramForm
+          exercises={exercises}
+          pending={false}
+          error={null}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+        />
+      </I18nTestProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

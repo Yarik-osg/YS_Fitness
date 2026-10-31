@@ -193,8 +193,13 @@ function toWorkoutLog(log: WorkoutLogRecord): WorkoutLogResponse {
     completedAt: log.completedAt.toISOString(),
     sets: log.sets.map((set) => {
       const prescribed = prescribedReps(log, set.order, set.exerciseId);
-      const repsMin = prescribed?.repsMin ?? set.exercise.repsMin;
-      const repsMax = prescribed?.repsMax ?? set.exercise.repsMax;
+      const stored =
+        set.prescribedRepsMin != null && set.prescribedRepsMax != null
+          ? { repsMin: set.prescribedRepsMin, repsMax: set.prescribedRepsMax }
+          : undefined;
+      const range = prescribed ?? stored;
+      const repsMin = range?.repsMin ?? set.exercise.repsMin;
+      const repsMax = range?.repsMax ?? set.exercise.repsMax;
       return {
         id: set.id,
         exerciseId: set.exerciseId,
@@ -243,7 +248,7 @@ function prescribedReps(
   order: number,
   exerciseId: string,
 ) {
-  const day = log.template.days.find(
+  const day = log.template?.days.find(
     (entry) => entry.dayNumber === log.dayNumber,
   );
   if (!day) return undefined;

@@ -527,4 +527,12 @@ export const trainerTemplateParamsSchema = z
   .strict();
 
 export type TrainerTemplateBody = z.infer<typeof trainerTemplateBodySchema>;
+
+export const trainerTemplateRenameSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+export type TrainerTemplateRename = z.infer<typeof trainerTemplateRenameSchema>;
 export type TrainerTemplateParams = z.infer<typeof trainerTemplateParamsSchema>;

@@ -98,6 +98,8 @@ const workoutHistorySelect = {
   id: true,
   completedAt: true,
   dayNumber: true,
+  templateCode: true,
+  templateName: true,
   template: { select: { code: true, name: true } },
   sets: {
     orderBy: [{ order: 'asc' as const }, { setNumber: 'asc' as const }],
@@ -425,8 +427,8 @@ function toWorkoutHistory(log: WorkoutHistoryRow): CoachClientWorkoutLog {
     id: log.id,
     completedAt: log.completedAt.toISOString(),
     dayNumber: log.dayNumber,
-    templateCode: log.template.code,
-    templateName: log.template.name,
+    templateCode: log.template?.code ?? log.templateCode ?? '',
+    templateName: log.template?.name ?? log.templateName ?? '',
     sets: log.sets.map((set) => ({
       order: set.order,
       setNumber: set.setNumber,

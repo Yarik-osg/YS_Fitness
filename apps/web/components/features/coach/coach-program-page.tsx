@@ -10,6 +10,7 @@ import { ApiClientError } from '@/lib/api/client';
 import {
   deleteCoachProgram,
   duplicateCoachProgram,
+  renameCoachProgram,
 } from '@/lib/api/coach-programs';
 import { exerciseName } from '@/lib/exercise-name';
 import { useCoachProgram } from '@/lib/hooks/use-coach-programs';
@@ -18,12 +19,15 @@ import { coachProgramMessage } from './coach-program-form';
 
 export function CoachProgramPage({ templateId }: { templateId: string }) {
   const t = useTranslations('coach');
+  const home = useTranslations('dashboard.home');
   const locale = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
   const program = useCoachProgram(templateId);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState('');
   const duplicate = useMutation({
     mutationFn: () => duplicateCoachProgram(templateId),
     onSuccess: async (created) => {
@@ -31,6 +35,16 @@ export function CoachProgramPage({ templateId }: { templateId: string }) {
         queryKey: ['coach', 'program-templates'],
       });
       router.push(`/coach/programs/${created.id}`);
+    },
+    onError: (caught) => setError(coachProgramMessage(caught, t)),
+  });
+  const rename = useMutation({
+    mutationFn: () => renameCoachProgram(templateId, { name: name.trim() }),
+    onSuccess: async () => {
+      setRenaming(false);
+      await queryClient.invalidateQueries({
+        queryKey: ['coach', 'program-templates'],
+      });
     },
     onError: (caught) => setError(coachProgramMessage(caught, t)),
   });
@@ -42,7 +56,12 @@ export function CoachProgramPage({ templateId }: { templateId: string }) {
       });
       router.push('/coach/programs');
     },
-    onError: (caught) => setError(coachProgramMessage(caught, t)),
+    onError: (caught) =>
+      setError(
+        caught instanceof ApiClientError && caught.code === 'TEMPLATE_IN_USE'
+          ? t('catalog.deleteInUse')
+          : coachProgramMessage(caught, t),
+      ),
   });
   const missing =
     program.isError &&
@@ -103,7 +122,9 @@ export function CoachProgramPage({ templateId }: { templateId: string }) {
                 {' · '}
                 {t(`catalog.accents.${program.data.accent}`)}
                 {' · '}
-                {program.data.frequencyPerWeek}
+                {home('timesShort', {
+                  count: program.data.frequencyPerWeek,
+                })}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -122,6 +143,19 @@ export function CoachProgramPage({ templateId }: { templateId: string }) {
               </Button>
               {program.data.origin === 'TRAINER' ? (
                 <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg"
+                    onClick={() => {
+                      setError(null);
+                      setConfirmDelete(false);
+                      setName(program.data?.name ?? '');
+                      setRenaming(true);
+                    }}
+                  >
+                    {t('catalog.rename')}
+                  </Button>
                   <Link
                     href={`/coach/programs/${program.data.id}/edit`}
                     className={cn(
@@ -131,41 +165,100 @@ export function CoachProgramPage({ templateId }: { templateId: string }) {
                   >
                     {t('catalog.edit')}
                   </Link>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg"
-                    onClick={() => setConfirmDelete(true)}
-                  >
-                    {t('catalog.delete')}
-                  </Button>
+                  {program.data.assignedCount === 0 ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => {
+                        setRenaming(false);
+                        setConfirmDelete(true);
+                      }}
+                    >
+                      {t('catalog.delete')}
+                    </Button>
+                  ) : null}
                 </>
               ) : null}
             </div>
           </div>
 
+          {renaming ? (
+            <form
+              className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!name.trim() || rename.isPending) return;
+                setError(null);
+                rename.mutate();
+              }}
+            >
+              <label
+                className="shrink-0 text-sm text-ink"
+                htmlFor="program-name"
+              >
+                {t('catalog.name')}
+              </label>
+              <input
+                id="program-name"
+                value={name}
+                maxLength={200}
+                onChange={(event) => setName(event.target.value)}
+                className="h-10 min-w-48 flex-1 rounded-lg border border-line bg-background px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              />
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-lg"
+                  type="submit"
+                  disabled={rename.isPending || name.trim().length === 0}
+                >
+                  {rename.isPending ? t('catalog.renaming') : t('catalog.save')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  type="button"
+                  onClick={() => setRenaming(false)}
+                >
+                  {t('catalog.cancel')}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+
           {confirmDelete ? (
-            <div className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-panel px-4 py-3">
-              <p className="text-sm text-ink">{t('catalog.deleteConfirm')}</p>
-              <Button
-                size="sm"
-                className="rounded-lg"
-                disabled={remove.isPending}
-                onClick={() => {
-                  setError(null);
-                  remove.mutate();
-                }}
-              >
-                {remove.isPending ? t('catalog.deleting') : t('catalog.delete')}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-lg"
-                onClick={() => setConfirmDelete(false)}
-              >
-                {t('catalog.cancel')}
-              </Button>
+            <div className="mt-6 flex flex-col items-start gap-3 border border-amber px-4 py-3">
+              <p className="text-sm text-ink">
+                {program.data.logCount > 0
+                  ? t('catalog.deleteConfirmLogs')
+                  : t('catalog.deleteConfirm')}
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg border-amber text-amber hover:border-amber hover:bg-transparent hover:text-amber"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    setError(null);
+                    remove.mutate();
+                  }}
+                >
+                  {remove.isPending
+                    ? t('catalog.deleting')
+                    : t('catalog.delete')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  {t('catalog.cancel')}
+                </Button>
+              </div>
             </div>
           ) : null}
 

@@ -388,12 +388,15 @@ model WorkoutProgram {
 model WorkoutLog {
   id          String   @id @default(uuid()) @db.Uuid
   userId      String   @map("user_id") @db.Uuid
-  templateId  String   @map("template_id") @db.Uuid
-  dayNumber   Int      @map("day_number")
-  completedAt DateTime @default(now()) @map("completed_at")
+  /// Null after the program is deleted. The name and code below keep history readable.
+  templateId   String?  @map("template_id") @db.Uuid
+  templateCode String?  @map("template_code") @db.VarChar(16)
+  templateName String?  @map("template_name") @db.VarChar(200)
+  dayNumber    Int      @map("day_number")
+  completedAt  DateTime @default(now()) @map("completed_at")
 
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  template ProgramTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template ProgramTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   sets     WorkoutLogSet[]
 
   @@index([userId, completedAt])
@@ -408,6 +411,10 @@ model WorkoutLogSet {
   setNumber     Int      @map("set_number")
   repsCompleted Int      @map("reps_completed")
   weightKg      Decimal? @map("weight_kg") @db.Decimal(6, 2)
+  /// The program's rep range at the time the program was deleted.
+  /// Null while the program still exists; the template day is used instead.
+  prescribedRepsMin Int? @map("prescribed_reps_min")
+  prescribedRepsMax Int? @map("prescribed_reps_max")
 
   workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
   exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Restrict)

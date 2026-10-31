@@ -61,6 +61,8 @@ function logRecord(
     id: '66666666-6666-4666-8666-666666666666',
     userId,
     templateId,
+    templateCode: null,
+    templateName: null,
     dayNumber: 1,
     completedAt: new Date('2026-10-01T12:00:00.000Z'),
     template: {
@@ -94,7 +96,7 @@ function logRecord(
       },
     ],
     ...overrides,
-  };
+  } as WorkoutLogRecord;
 }
 
 const input = {
@@ -616,8 +618,8 @@ describe('WorkoutsService.list', () => {
 
   it('uses the male template range for an exact EX_008 match', async () => {
     const record = logRecord();
-    record.template.days[0]!.exercises[0]!.repsMin = 8;
-    record.template.days[0]!.exercises[0]!.repsMax = 12;
+    record.template!.days[0]!.exercises[0]!.repsMin = 8;
+    record.template!.days[0]!.exercises[0]!.repsMax = 12;
     record.sets[0]!.repsCompleted = 9;
     record.sets[0]!.exercise.code = 'EX_008';
     record.sets[0]!.exercise.repsMin = 10;
@@ -639,7 +641,7 @@ describe('WorkoutsService.list', () => {
 
   it('uses the same-day template range after EX_008 moves to another order', async () => {
     const record = logRecord();
-    record.template.days[0]!.exercises = [
+    record.template!.days[0]!.exercises = [
       { order: 1, exerciseId: otherExerciseId, repsMin: 15, repsMax: 20 },
       { order: 3, exerciseId, repsMin: 8, repsMax: 12 },
     ];
@@ -664,7 +666,7 @@ describe('WorkoutsService.list', () => {
 
   it('does not use EX_008 reps from a different day', async () => {
     const record = logRecord();
-    record.template.days = [
+    record.template!.days = [
       {
         dayNumber: 1,
         exercises: [
@@ -697,8 +699,8 @@ describe('WorkoutsService.list', () => {
 
   it('uses the catalog range when the exercise is gone from the template', async () => {
     const record = logRecord();
-    record.template.days[0]!.exercises[0]!.exerciseId = otherExerciseId;
-    record.template.days[0]!.exercises[0]!.repsMin = 8;
+    record.template!.days[0]!.exercises[0]!.exerciseId = otherExerciseId;
+    record.template!.days[0]!.exercises[0]!.repsMin = 8;
     record.sets[0]!.repsCompleted = 9;
     record.sets[0]!.exercise.code = 'EX_008';
     record.sets[0]!.exercise.repsMin = 10;
@@ -716,7 +718,7 @@ describe('WorkoutsService.list', () => {
 
   it('uses the lowest order when EX_008 remains twice on the same day', async () => {
     const record = logRecord();
-    record.template.days[0]!.exercises = [
+    record.template!.days[0]!.exercises = [
       { order: 4, exerciseId, repsMin: 6, repsMax: 10 },
       { order: 1, exerciseId: otherExerciseId, repsMin: 15, repsMax: 20 },
       { order: 2, exerciseId, repsMin: 8, repsMax: 12 },
@@ -737,6 +739,31 @@ describe('WorkoutsService.list', () => {
     expect(result.logs[0]?.sets[0]?.exercise).toMatchObject({
       repsMin: 8,
       repsMax: 12,
+    });
+  });
+
+  it('keeps a log readable after its program is deleted', async () => {
+    const record = logRecord({ templateId: null, template: null });
+    record.sets[0]!.repsCompleted = 8;
+    record.sets[0]!.prescribedRepsMin = 6;
+    record.sets[0]!.prescribedRepsMax = 8;
+    record.sets[0]!.exercise.repsMin = 10;
+    record.sets[0]!.exercise.repsMax = 12;
+    const { service } = createService(
+      { getAssignedProgram: vi.fn() },
+      { list: vi.fn().mockResolvedValue([record]) },
+    );
+
+    const result = await service.list(userId, { limit: 20, offset: 0 });
+    const log = result.logs[0];
+
+    expect(log?.templateId).toBeNull();
+    expect(log?.completedAt).toBe('2026-10-01T12:00:00.000Z');
+    expect(log?.sets[0]).toMatchObject({
+      repsCompleted: 8,
+      weightKg: 35.5,
+      recommendation: 'increase',
+      exercise: { name: 'Row', repsMin: 6, repsMax: 8 },
     });
   });
 });
