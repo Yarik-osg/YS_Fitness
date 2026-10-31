@@ -84,6 +84,7 @@ function createService() {
       .mockResolvedValue([
         { id: templateId, origin: 'TRAINER', ownerId: coachId },
       ]),
+    $executeRaw: vi.fn().mockResolvedValue(0),
     exercise: {
       findMany: vi.fn().mockResolvedValue([{ id: exerciseId }]),
     },
@@ -96,7 +97,10 @@ function createService() {
     programTemplateDay: {
       deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
     },
-    workoutLog: { count: vi.fn().mockResolvedValue(0) },
+    workoutLog: {
+      count: vi.fn().mockResolvedValue(0),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     workoutProgram: { count: vi.fn().mockResolvedValue(0) },
   };
   const prisma = {
@@ -111,6 +115,7 @@ function createService() {
       groupBy: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
+    workoutLog: { count: vi.fn().mockResolvedValue(0) },
   };
   return {
     tx,
@@ -297,14 +302,112 @@ describe('TrainerTemplatesService conflicts', () => {
     expect(tx.programTemplateDay.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('rejects delete when the template is assigned or logged', async () => {
+  it('rejects delete when the template is assigned and changes nothing', async () => {
     const { service, tx } = createService();
     tx.workoutProgram.count.mockResolvedValue(1);
+    tx.workoutLog.count.mockResolvedValue(3);
 
     await expect(service.remove(coach, templateId)).rejects.toMatchObject({
       response: { code: 'TEMPLATE_IN_USE' },
     });
+    expect(tx.workoutLog.updateMany).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
     expect(tx.programTemplate.delete).not.toHaveBeenCalled();
+    expect(tx.programTemplateDay.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('renames a template that has logs without touching its structure', async () => {
+    const { service, tx } = createService();
+    tx.workoutLog.count.mockResolvedValue(2);
+    tx.workoutProgram.count.mockResolvedValue(1);
+    tx.programTemplate.update.mockResolvedValue({
+      ...stored(),
+      name: 'Renamed',
+    });
+
+    const detail = await service.rename(coach, templateId, 'Renamed');
+
+    expect(detail.name).toBe('Renamed');
+    expect(detail.logCount).toBe(2);
+    expect(detail.assignedCount).toBe(1);
+    expect(tx.programTemplate.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: templateId },
+        data: { name: 'Renamed' },
+      }),
+    );
+    expect(tx.programTemplateDay.deleteMany).not.toHaveBeenCalled();
+    expect(tx.workoutLog.updateMany).not.toHaveBeenCalled();
+    expect(tx.programTemplate.delete).not.toHaveBeenCalled();
+  });
+
+  it('renames a template that has no logs', async () => {
+    const { service, tx } = createService();
+    tx.programTemplate.update.mockResolvedValue({
+      ...stored(),
+      name: 'Fresh name',
+    });
+
+    await service.rename(coach, templateId, 'Fresh name');
+
+    expect(tx.programTemplate.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: 'Fresh name' } }),
+    );
+    expect(tx.programTemplateDay.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('deletes an unassigned template that has no logs', async () => {
+    const { service, tx } = createService();
+    tx.workoutLog.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.remove(coach, templateId);
+
+    expect(tx.workoutLog.updateMany).toHaveBeenCalledWith({
+      where: { templateId },
+      data: {
+        templateId: null,
+        templateCode: 'Tabcdef01234567',
+        templateName: 'Upper',
+      },
+    });
+    expect(tx.programTemplate.delete).toHaveBeenCalledWith({
+      where: { id: templateId },
+    });
+  });
+
+  it('deletes an unassigned template and keeps every log', async () => {
+    const { service, tx, prisma } = createService();
+    tx.workoutProgram.count.mockResolvedValue(0);
+    tx.workoutLog.updateMany.mockResolvedValue({ count: 2 });
+
+    await service.remove(coach, templateId);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.workoutLog.updateMany).toHaveBeenCalledWith({
+      where: { templateId },
+      data: {
+        templateId: null,
+        templateCode: 'Tabcdef01234567',
+        templateName: 'Upper',
+      },
+    });
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.workoutLog.updateMany.mock.invocationCallOrder[0]!,
+    );
+    expect(tx.programTemplate.delete).toHaveBeenCalledWith({
+      where: { id: templateId },
+    });
+  });
+
+  it('rolls the log detach back when delete fails', async () => {
+    const { service, tx, prisma } = createService();
+    tx.programTemplate.delete.mockRejectedValue(new Error('disk'));
+
+    await expect(service.remove(coach, templateId)).rejects.toThrow('disk');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.workoutLog.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.programTemplateDay.deleteMany).not.toHaveBeenCalled();
   });
 
   it('retries only a code collision', async () => {

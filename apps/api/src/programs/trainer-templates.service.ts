@@ -95,10 +95,11 @@ export class TrainerTemplatesService {
       include: detailInclude,
     });
     this.assertReadable(template);
-    const assignedCount = await this.prisma.workoutProgram.count({
-      where: { templateId },
-    });
-    return toDetail(template, assignedCount);
+    const [assignedCount, logCount] = await Promise.all([
+      this.prisma.workoutProgram.count({ where: { templateId } }),
+      this.prisma.workoutLog.count({ where: { templateId } }),
+    ]);
+    return toDetail(template, assignedCount, logCount);
   }
 
   async listExercises(
@@ -164,7 +165,29 @@ export class TrainerTemplatesService {
         },
         include: detailInclude,
       });
-      return toDetail(template, 0);
+      return toDetail(template, 0, 0);
+    });
+  }
+
+  async rename(
+    actor: TrainerTemplateActor,
+    templateId: string,
+    name: string,
+  ): Promise<TrainerProgramTemplateDetail> {
+    this.assertCoach(actor);
+    return this.prisma.$transaction(async (db) => {
+      const locked = await lockTemplate(db, templateId);
+      this.assertVisible(locked);
+      const template = await db.programTemplate.update({
+        where: { id: templateId },
+        data: { name },
+        include: detailInclude,
+      });
+      const [assignedCount, logCount] = await Promise.all([
+        db.workoutProgram.count({ where: { templateId } }),
+        db.workoutLog.count({ where: { templateId } }),
+      ]);
+      return toDetail(template, assignedCount, logCount);
     });
   }
 
@@ -210,16 +233,35 @@ export class TrainerTemplatesService {
     await this.prisma.$transaction(async (db) => {
       const locked = await lockTemplate(db, templateId);
       this.assertVisible(locked);
-      const [programs, logs] = await Promise.all([
-        db.workoutProgram.count({ where: { templateId } }),
-        db.workoutLog.count({ where: { templateId } }),
-      ]);
-      if (programs > 0 || logs > 0) {
+      const programs = await db.workoutProgram.count({
+        where: { templateId },
+      });
+      if (programs > 0) {
         throw new ConflictException({
           code: 'TEMPLATE_IN_USE',
-          message: 'An assigned or logged template cannot be deleted',
+          message: 'An assigned template cannot be deleted',
         });
       }
+      const template = await db.programTemplate.findUnique({
+        where: { id: templateId },
+        select: { code: true, name: true },
+      });
+      if (!template) {
+        throw new NotFoundException({
+          code: 'TEMPLATE_NOT_FOUND',
+          message: 'Program template not found',
+        });
+      }
+      // Copy the name and the rep range before the program row goes away.
+      await keepPrescribedReps(db, templateId);
+      await db.workoutLog.updateMany({
+        where: { templateId },
+        data: {
+          templateId: null,
+          templateCode: template.code,
+          templateName: template.name,
+        },
+      });
       await db.programTemplate.delete({ where: { id: templateId } });
     });
   }
@@ -254,7 +296,7 @@ export class TrainerTemplatesService {
       },
       include: detailInclude,
     });
-    return toDetail(template, 0);
+    return toDetail(template, 0, 0);
   }
 
   private async assertExercises(
@@ -343,6 +385,46 @@ function isCodeCollision(error: unknown): boolean {
     fields.length > 0 &&
     fields.every((field) => field === 'code' || field.endsWith('_code_key'))
   );
+}
+
+async function keepPrescribedReps(
+  db: Writer,
+  templateId: string,
+): Promise<void> {
+  // Exact order wins. Otherwise use the lowest order of that exercise on the day,
+  // matching the suggestion lookup used while the program still exists.
+  await db.$executeRaw`
+    UPDATE workout_log_sets AS logged
+    SET prescribed_reps_min = match.reps_min,
+        prescribed_reps_max = match.reps_max
+    FROM (
+      SELECT
+        logged_set.id,
+        COALESCE(exact.reps_min, fallback.reps_min) AS reps_min,
+        COALESCE(exact.reps_max, fallback.reps_max) AS reps_max
+      FROM workout_log_sets AS logged_set
+      JOIN workout_logs AS workout_log
+        ON workout_log.id = logged_set.workout_log_id
+      JOIN program_template_days AS day
+        ON day.template_id = workout_log.template_id
+       AND day.day_number = workout_log.day_number
+      LEFT JOIN program_template_exercises AS exact
+        ON exact.template_day_id = day.id
+       AND exact.exercise_id = logged_set.exercise_id
+       AND exact."order" = logged_set."order"
+      LEFT JOIN LATERAL (
+        SELECT reps_min, reps_max
+        FROM program_template_exercises AS exercise_row
+        WHERE exercise_row.template_day_id = day.id
+          AND exercise_row.exercise_id = logged_set.exercise_id
+        ORDER BY exercise_row."order"
+        LIMIT 1
+      ) AS fallback ON exact.id IS NULL
+      WHERE workout_log.template_id = CAST(${templateId} AS uuid)
+        AND COALESCE(exact.reps_min, fallback.reps_min) IS NOT NULL
+    ) AS match
+    WHERE logged.id = match.id
+  `;
 }
 
 async function lockTemplate(
@@ -487,9 +569,11 @@ function toSummary(
 function toDetail(
   template: TemplateDetail,
   assignedCount: number,
+  logCount: number,
 ): TrainerProgramTemplateDetail {
   return {
     ...toSummary(template, assignedCount),
+    logCount,
     days: template.days.map((day): ProgramDayResponse => ({
       dayNumber: day.dayNumber,
       exercises: day.exercises.map((row) => ({

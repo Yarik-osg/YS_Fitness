@@ -113,12 +113,14 @@ export function CoachProgramForm({
   pending,
   error,
   onSubmit,
+  onCancel,
 }: {
   exercises: ExerciseResponse[];
   template?: TrainerProgramTemplateDetail;
   pending: boolean;
   error: string | null;
   onSubmit: (body: TrainerTemplateBody) => void;
+  onCancel?: () => void;
 }) {
   const t = useTranslations('coach');
   const fallback = exercises[0];
@@ -443,14 +445,28 @@ export function CoachProgramForm({
           {error}
         </p>
       ) : null}
-      <Button
-        type="submit"
-        size="sm"
-        className="w-fit rounded-lg"
-        disabled={pending}
-      >
-        {pending ? t('catalog.saving') : t('catalog.save')}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="submit"
+          size="sm"
+          className="w-fit rounded-lg"
+          disabled={pending}
+        >
+          {pending ? t('catalog.saving') : t('catalog.save')}
+        </Button>
+        {onCancel ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            {t('catalog.cancel')}
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

@@ -466,7 +466,7 @@ export interface WorkoutLogSetResponse {
 export interface WorkoutLogResponse {
   id: string;
   userId: string;
-  templateId: string;
+  templateId: string | null;
   dayNumber: number;
   completedAt: string;
   sets: WorkoutLogSetResponse[];
@@ -500,6 +500,7 @@ export interface TrainerProgramTemplateSummary {
 
 export interface TrainerProgramTemplateDetail extends TrainerProgramTemplateSummary {
   days: ProgramDayResponse[];
+  logCount: number;
 }
 
 export interface TrainerProgramTemplateListResponse {

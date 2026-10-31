@@ -23,6 +23,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import {
   TrainerTemplateBodyDto,
   TrainerTemplateParamsDto,
+  TrainerTemplateRenameDto,
 } from './dto/trainer-template.dto.js';
 import {
   TrainerTemplatesService,
@@ -68,6 +69,15 @@ export class TrainerTemplatesController {
     @Body() input: TrainerTemplateBodyDto,
   ): Promise<TrainerProgramTemplateDetail> {
     return this.templates.create(actor(user), input);
+  }
+
+  @Put(':templateId/name')
+  rename(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param() params: TrainerTemplateParamsDto,
+    @Body() input: TrainerTemplateRenameDto,
+  ): Promise<TrainerProgramTemplateDetail> {
+    return this.templates.rename(actor(user), params.templateId, input.name);
   }
 
   @Put(':templateId')

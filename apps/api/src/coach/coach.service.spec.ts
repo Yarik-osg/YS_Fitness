@@ -723,6 +723,43 @@ describe('CoachService client history', () => {
     expect(readPhoto).not.toHaveBeenCalled();
   });
 
+  it('reads a deleted program from the name stored on the log', async () => {
+    const log = {
+      id: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+      completedAt: new Date('2026-02-01T10:00:00.000Z'),
+      dayNumber: 1,
+      template: null,
+      templateCode: 'OLD',
+      templateName: 'Previous block',
+      sets: [
+        {
+          order: 1,
+          setNumber: 2,
+          repsCompleted: 6,
+          weightKg: { toNumber: () => 22.5 },
+          exercise: { name: 'Тяга', nameEn: 'Row' },
+        },
+      ],
+    };
+    const service = createService(historyPrisma({ id: 'client-1' }, [log]));
+
+    const history = await service.listWorkouts('client-1', query);
+
+    expect(history.logs[0]).toMatchObject({
+      completedAt: '2026-02-01T10:00:00.000Z',
+      templateCode: 'OLD',
+      templateName: 'Previous block',
+      sets: [
+        {
+          setNumber: 2,
+          repsCompleted: 6,
+          weightKg: 22.5,
+          exercise: { name: 'Тяга', nameEn: 'Row' },
+        },
+      ],
+    });
+  });
+
   it('returns an empty history and the existing measurement payload', async () => {
     const prisma = historyPrisma({ id: 'client-1' }, []);
     const measurements = vi.fn().mockResolvedValue({

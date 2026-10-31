@@ -253,20 +253,47 @@ describeWithDatabase('trainer program templates (e2e)', () => {
     expect(visible.body.days).toHaveLength(system.frequencyPerWeek);
   });
 
-  it('blocks edit and delete once the template has history', async () => {
+  it('renames a logged template and keeps history after it is deleted', async () => {
     const created = await createTemplate(trainer.authorization);
     const templateId = created.body.id as string;
+    const originalName = created.body.name as string;
     await prisma.workoutLog.create({
       data: {
         userId: client.id,
         templateId,
         dayNumber: 1,
         sets: {
+          create: [
+            {
+              exerciseId,
+              order: 1,
+              setNumber: 1,
+              repsCompleted: 10,
+              weightKg: 40,
+            },
+            {
+              exerciseId,
+              order: 1,
+              setNumber: 2,
+              repsCompleted: 8,
+              weightKg: 42.5,
+            },
+          ],
+        },
+      },
+    });
+    await prisma.workoutLog.create({
+      data: {
+        userId: client.id,
+        templateId,
+        dayNumber: 2,
+        completedAt: new Date('2026-10-02T12:00:00.000Z'),
+        sets: {
           create: {
             exerciseId,
             order: 1,
             setNumber: 1,
-            repsCompleted: 10,
+            repsCompleted: 12,
           },
         },
       },
@@ -279,13 +306,61 @@ describeWithDatabase('trainer program templates (e2e)', () => {
     expect(edited.status).toBe(409);
     expect(edited.body.code).toBe('TEMPLATE_HAS_LOGS');
 
+    const renamed = await request(app.getHttpServer())
+      .put(`/api/v1/coach/program-templates/${templateId}/name`)
+      .set('authorization', trainer.authorization)
+      .send({ name: 'Renamed block' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('Renamed block');
+    expect(renamed.body.days).toEqual(created.body.days);
+    expect(renamed.body.logCount).toBe(2);
+
     const removed = await request(app.getHttpServer())
       .delete(`/api/v1/coach/program-templates/${templateId}`)
       .set('authorization', trainer.authorization);
-    expect(removed.status).toBe(409);
-    expect(removed.body.code).toBe('TEMPLATE_IN_USE');
+    expect(removed.status).toBe(204);
 
-    await prisma.workoutLog.deleteMany({ where: { templateId } });
+    const logs = await prisma.workoutLog.findMany({
+      where: { userId: client.id, templateName: 'Renamed block' },
+      include: { sets: { orderBy: { setNumber: 'asc' } } },
+      orderBy: { dayNumber: 'asc' },
+    });
+    expect(logs).toHaveLength(2);
+    expect(logs[0]).toMatchObject({
+      templateId: null,
+      templateCode: created.body.code,
+      templateName: 'Renamed block',
+      dayNumber: 1,
+    });
+    expect(logs[0]?.sets).toMatchObject([
+      {
+        setNumber: 1,
+        repsCompleted: 10,
+        weightKg: expect.anything(),
+        prescribedRepsMin: 8,
+        prescribedRepsMax: 12,
+      },
+      {
+        setNumber: 2,
+        repsCompleted: 8,
+        prescribedRepsMin: 8,
+        prescribedRepsMax: 12,
+      },
+    ]);
+    expect(logs[1]).toMatchObject({
+      dayNumber: 2,
+      templateId: null,
+      templateName: 'Renamed block',
+    });
+    expect(
+      await prisma.programTemplate.findUnique({ where: { id: templateId } }),
+    ).toBeNull();
+    expect(originalName).not.toBe('Renamed block');
+  });
+
+  it('blocks edit and delete while a client is assigned', async () => {
+    const created = await createTemplate(trainer.authorization);
+    const templateId = created.body.id as string;
     await prisma.workoutProgram.create({
       data: { userId: client.id, templateId },
     });
@@ -316,6 +391,17 @@ describeWithDatabase('trainer program templates (e2e)', () => {
     expect(after.updatedAt).toEqual(before.updatedAt);
     expect(after.name).toBe(before.name);
     expect(after.days).toEqual(before.days);
+
+    const renamed = await request(app.getHttpServer())
+      .put(`/api/v1/coach/program-templates/${templateId}/name`)
+      .set('authorization', trainer.authorization)
+      .send({ name: 'Assigned rename' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('Assigned rename');
+    expect(renamed.body.days).toHaveLength(before.days.length);
+    expect(
+      await prisma.workoutProgram.findUnique({ where: { userId: client.id } }),
+    ).toMatchObject({ templateId });
 
     const assigned = await request(app.getHttpServer())
       .delete(`/api/v1/coach/program-templates/${templateId}`)

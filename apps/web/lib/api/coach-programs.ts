@@ -3,7 +3,10 @@ import type {
   TrainerProgramTemplateDetail,
   TrainerProgramTemplateListResponse,
 } from '@repo/shared-types';
-import type { TrainerTemplateBody } from '@repo/validation';
+import type {
+  TrainerTemplateBody,
+  TrainerTemplateRename,
+} from '@repo/validation';
 import { apiRequest } from '@/lib/api/client';
 
 export function listCoachPrograms() {
@@ -35,6 +38,16 @@ export function updateCoachProgram(
 ) {
   return apiRequest<TrainerProgramTemplateDetail>(
     `/coach/program-templates/${encodeURIComponent(templateId)}`,
+    { method: 'PUT', body },
+  );
+}
+
+export function renameCoachProgram(
+  templateId: string,
+  body: TrainerTemplateRename,
+) {
+  return apiRequest<TrainerProgramTemplateDetail>(
+    `/coach/program-templates/${encodeURIComponent(templateId)}/name`,
     { method: 'PUT', body },
   );
 }

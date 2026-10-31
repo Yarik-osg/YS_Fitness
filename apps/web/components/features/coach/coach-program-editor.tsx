@@ -115,6 +115,11 @@ export function CoachProgramEditor({ templateId }: { templateId?: string }) {
             setError(null);
             save.mutate(body);
           }}
+          onCancel={() =>
+            router.push(
+              templateId ? `/coach/programs/${templateId}` : '/coach/programs',
+            )
+          }
         />
       ) : null}
     </main>
