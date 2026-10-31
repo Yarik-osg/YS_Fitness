@@ -506,3 +506,49 @@ export interface TrainerProgramTemplateDetail extends TrainerProgramTemplateSumm
 export interface TrainerProgramTemplateListResponse {
   templates: TrainerProgramTemplateSummary[];
 }
+
+export type NutritionActivity = 'SEDENTARY' | 'MODERATE' | 'HIGH' | 'VERY_HIGH';
+export type NutritionGoal =
+  'LOSE_WEIGHT' | 'MAINTAIN' | 'GAIN_MUSCLE' | 'RECOMPOSITION';
+
+export interface NutritionProfileResponse {
+  activity: NutritionActivity;
+  goal: NutritionGoal;
+  preferences: string | null;
+  allergies: string | null;
+  dislikes: string | null;
+  mealCount: number;
+}
+
+export interface NutritionProfileGetResponse {
+  profile: NutritionProfileResponse | null;
+}
+
+export interface NutritionCalculationResponse {
+  id: string;
+  weightKg: string;
+  heightCm: string;
+  ageYears: number;
+  sex: BiologicalSexForCalculation;
+  activity: NutritionActivity;
+  frequency: 2 | 3 | 4;
+  goal: NutritionGoal;
+  activityMultiplier: string;
+  goalAdjustment: string;
+  bmr: string;
+  tdee: string;
+  targetCalories: string;
+  proteinGrams: string;
+  fatGrams: string;
+  carbsGrams: string;
+  carbsNonPositive: boolean;
+  createdAt: string;
+}
+
+export interface NutritionCalculationCreatedResponse extends NutritionCalculationResponse {
+  activatedTarget: boolean;
+}
+
+export interface NutritionCalculationListResponse {
+  calculations: NutritionCalculationResponse[];
+}

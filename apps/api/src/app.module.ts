@@ -6,6 +6,7 @@ import { CoachModule } from './coach/coach.module.js';
 import { UsersModule } from './users/users.module.js';
 import { ProgramsModule } from './programs/programs.module.js';
 import { WorkoutsModule } from './workouts/workouts.module.js';
+import { NutritionModule } from './nutrition/nutrition.module.js';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -24,6 +25,7 @@ import { ApiExceptionFilter } from './common/api-exception.filter.js';
     SubscriptionsModule,
     ProgramsModule,
     WorkoutsModule,
+    NutritionModule,
     HealthModule,
   ],
   providers: [
