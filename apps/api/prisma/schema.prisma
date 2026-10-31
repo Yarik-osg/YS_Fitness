@@ -77,9 +77,12 @@ model User {
   subscriptions        Subscription[]
   grantedSubscriptions Subscription[]       @relation("GrantedSubscriptions")
   workoutProgram       WorkoutProgram?
-  workoutLogs          WorkoutLog[]
-  progressPhotos       ProgressPhoto[]
+  workoutLogs           WorkoutLog[]
+  progressPhotos        ProgressPhoto[]
   ownedProgramTemplates ProgramTemplate[]
+  nutritionProfile      NutritionProfile?
+  nutritionCalculations NutritionCalculation[]
+  nutritionTargets      NutritionTarget[]
 
   @@map("users")
 }
@@ -421,4 +424,93 @@ model WorkoutLogSet {
 
   @@unique([workoutLogId, order, setNumber])
   @@map("workout_log_sets")
+}
+
+/// Formula inputs chosen on the nutrition screen. Not the training activity slider or training goal.
+enum NutritionActivity {
+  SEDENTARY
+  MODERATE
+  HIGH
+  VERY_HIGH
+}
+
+enum NutritionGoal {
+  LOSE_WEIGHT
+  MAINTAIN
+  GAIN_MUSCLE
+  RECOMPOSITION
+}
+
+enum NutritionTargetSource {
+  CALCULATED
+  MANUAL
+}
+
+model NutritionProfile {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @unique @map("user_id") @db.Uuid
+  activity    NutritionActivity
+  goal        NutritionGoal
+  preferences String?           @db.VarChar(500)
+  allergies   String?           @db.VarChar(500)
+  dislikes    String?           @db.VarChar(500)
+  mealCount   Int               @map("meal_count")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("nutrition_profiles")
+}
+
+model NutritionCalculation {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  userId             String                      @map("user_id") @db.Uuid
+  weightKg           Decimal                     @map("weight_kg") @db.Decimal(6, 2)
+  heightCm           Decimal                     @map("height_cm") @db.Decimal(5, 2)
+  ageYears           Int                         @map("age_years")
+  sex                BiologicalSexForCalculation
+  activity           NutritionActivity
+  frequency          Int
+  goal               NutritionGoal
+  activityMultiplier Decimal                     @map("activity_multiplier") @db.Decimal(4, 2)
+  goalAdjustment     Decimal                     @map("goal_adjustment") @db.Decimal(6, 3)
+  bmr                Decimal                     @db.Decimal(24, 12)
+  tdee               Decimal                     @db.Decimal(24, 12)
+  targetCalories     Decimal                     @map("target_calories") @db.Decimal(24, 12)
+  proteinGrams       Decimal                     @map("protein_grams") @db.Decimal(24, 12)
+  fatGrams           Decimal                     @map("fat_grams") @db.Decimal(24, 12)
+  carbsGrams         Decimal                     @map("carbs_grams") @db.Decimal(24, 12)
+  carbsNonPositive   Boolean                     @map("carbs_non_positive")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targets NutritionTarget[]
+
+  @@index([userId, createdAt])
+  @@map("nutrition_calculations")
+}
+
+model NutritionTarget {
+  id             String                @id @default(uuid()) @db.Uuid
+  userId         String                @map("user_id") @db.Uuid
+  /// Only the active flag changes. The four copied numbers are never updated.
+  /// One active row per user is the partial unique index
+  /// nutrition_one_active_target (user_id WHERE active), hand-written in the
+  /// nutrition migration because Prisma cannot model that predicate.
+  /// NutritionIndexCheck refuses to boot unless that exact index is present.
+  active         Boolean               @default(false)
+  source         NutritionTargetSource
+  calculationId  String?               @map("calculation_id") @db.Uuid
+  targetCalories Decimal               @map("target_calories") @db.Decimal(24, 12)
+  proteinGrams   Decimal               @map("protein_grams") @db.Decimal(24, 12)
+  fatGrams       Decimal               @map("fat_grams") @db.Decimal(24, 12)
+  carbsGrams     Decimal               @map("carbs_grams") @db.Decimal(24, 12)
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calculation NutritionCalculation? @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("nutrition_targets")
 }

@@ -536,3 +536,37 @@ export const trainerTemplateRenameSchema = z
 
 export type TrainerTemplateRename = z.infer<typeof trainerTemplateRenameSchema>;
 export type TrainerTemplateParams = z.infer<typeof trainerTemplateParamsSchema>;
+
+export const NUTRITION_ACTIVITIES = [
+  'SEDENTARY',
+  'MODERATE',
+  'HIGH',
+  'VERY_HIGH',
+] as const;
+export const NUTRITION_GOALS = [
+  'LOSE_WEIGHT',
+  'MAINTAIN',
+  'GAIN_MUSCLE',
+  'RECOMPOSITION',
+] as const;
+
+const nutritionNote = z
+  .string()
+  .trim()
+  .max(500)
+  .nullable()
+  .optional()
+  .transform((value) => value || null);
+
+export const nutritionProfileSchema = z
+  .object({
+    activity: z.enum(NUTRITION_ACTIVITIES),
+    goal: z.enum(NUTRITION_GOALS),
+    preferences: nutritionNote,
+    allergies: nutritionNote,
+    dislikes: nutritionNote,
+    mealCount: z.number().int().min(1).max(8),
+  })
+  .strict();
+
+export type NutritionProfileInput = z.infer<typeof nutritionProfileSchema>;
