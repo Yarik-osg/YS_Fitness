@@ -10,6 +10,7 @@ const PROTECTED_ROUTES = [
   '/training',
   '/workout',
   '/progress',
+  '/nutrition',
   '/coach',
 ];
 
@@ -19,6 +20,7 @@ const CLIENT_APP_ROUTES = [
   '/training',
   '/workout',
   '/progress',
+  '/nutrition',
 ];
 
 export function splitLocalePath(pathname: string): {
@@ -113,7 +115,8 @@ export function applyAuthRedirect({
       pathnameWithoutLocale.startsWith('/profile') ||
       pathnameWithoutLocale.startsWith('/training') ||
       pathnameWithoutLocale.startsWith('/workout') ||
-      pathnameWithoutLocale.startsWith('/progress')) &&
+      pathnameWithoutLocale.startsWith('/progress') ||
+      pathnameWithoutLocale.startsWith('/nutrition')) &&
     hint === 'onboarding'
   ) {
     return prefixed('/onboarding');
