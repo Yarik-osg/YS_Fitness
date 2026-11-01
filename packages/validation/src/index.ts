@@ -570,3 +570,17 @@ export const nutritionProfileSchema = z
   .strict();
 
 export type NutritionProfileInput = z.infer<typeof nutritionProfileSchema>;
+
+const nutritionGrams = z.string().regex(/^\d{1,6}(\.\d{1,4})?$/);
+export const nutritionManualTargetSchema = z
+  .object({
+    targetCalories: nutritionGrams.refine((value) => Number(value) > 0),
+    proteinGrams: nutritionGrams,
+    fatGrams: nutritionGrams,
+    carbsGrams: z.string().regex(/^-?\d{1,6}(\.\d{1,4})?$/),
+  })
+  .strict();
+
+export type NutritionManualTargetInput = z.infer<
+  typeof nutritionManualTargetSchema
+>;

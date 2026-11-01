@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { MailModule } from '../mail/mail.module.js';
+import { NutritionModule } from '../nutrition/nutrition.module.js';
 import { ProgramsModule } from '../programs/programs.module.js';
 import { TrainerTemplatesController } from '../programs/trainer-templates.controller.js';
 import { UsersModule } from '../users/users.module.js';
@@ -15,6 +16,7 @@ import { CoachService } from './coach.service.js';
     WorkoutsModule,
     ProgramsModule,
     MailModule,
+    NutritionModule,
   ],
   controllers: [CoachController, TrainerTemplatesController],
   providers: [CoachService],

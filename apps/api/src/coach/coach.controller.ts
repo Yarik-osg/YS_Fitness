@@ -8,26 +8,33 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import type {
+  CoachNutritionResponse,
+  CoachNutritionRosterResponse,
   CoachClientDetail,
   CoachClientWorkoutsResponse,
   CoachClientsResponse,
   CoachProgramClientsResponse,
   ProgressPhotosResponse,
+  NutritionTargetResponse,
   StrengthChangesResponse,
   WeightMeasurementsResponse,
 } from '@repo/shared-types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
+import { NutritionManualTargetDto } from '../nutrition/dto/nutrition-manual-target.dto.js';
+import { NutritionService } from '../nutrition/nutrition.service.js';
 import { ListWorkoutLogsQueryDto } from '../workouts/dto/list-workout-logs-query.dto.js';
 import {
   AssignClientProgramDto,
   CoachClientParamsDto,
+  CoachNutritionCalculationParamsDto,
   UpdateCoachNoteDto,
   CoachClientPhotoParamsDto,
   CoachProgramParamsDto,
@@ -38,11 +45,19 @@ import { CoachService } from './coach.service.js';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class CoachController {
-  constructor(private readonly coach: CoachService) {}
+  constructor(
+    private readonly coach: CoachService,
+    private readonly nutrition: NutritionService,
+  ) {}
 
   @Get('clients')
   listClients(): Promise<CoachClientsResponse> {
     return this.coach.listClients();
+  }
+
+  @Get('nutrition')
+  listNutrition(): Promise<CoachNutritionRosterResponse> {
+    return this.nutrition.listRoster(new Date());
   }
 
   @Get('programs/:templateId/clients')
@@ -95,6 +110,29 @@ export class CoachController {
     @Query() query: ListWorkoutLogsQueryDto,
   ): Promise<CoachClientWorkoutsResponse> {
     return this.coach.listWorkouts(params.userId, query);
+  }
+
+  @Get('clients/:userId/nutrition')
+  getNutrition(
+    @Param() params: CoachClientParamsDto,
+  ): Promise<CoachNutritionResponse> {
+    return this.nutrition.getForCoach(params.userId);
+  }
+
+  @Put('clients/:userId/nutrition/targets')
+  setNutritionTarget(
+    @Param() params: CoachClientParamsDto,
+    @Body() body: NutritionManualTargetDto,
+  ): Promise<NutritionTargetResponse> {
+    return this.nutrition.setManualTarget(params.userId, body);
+  }
+
+  @Post('clients/:userId/nutrition/calculations/:calculationId/activate')
+  @HttpCode(HttpStatus.OK)
+  applyNutritionCalculation(
+    @Param() params: CoachNutritionCalculationParamsDto,
+  ): Promise<NutritionTargetResponse> {
+    return this.nutrition.applyCalculation(params.userId, params.calculationId);
   }
 
   @Get('clients/:userId/measurements')

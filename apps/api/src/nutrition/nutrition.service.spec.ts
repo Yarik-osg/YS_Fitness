@@ -243,6 +243,63 @@ describe('NutritionService', () => {
     expect(result.activatedTarget).toBe(true);
   });
 
+  it('stores a manual target and leaves the calculation rows alone', async () => {
+    const { service, created, targetUpdates, targetCreates } = harness({
+      active: { id: 'calc-target', source: 'CALCULATED' },
+    });
+
+    const result = await service.setManualTarget(userId, {
+      targetCalories: '1800',
+      proteinGrams: '130',
+      fatGrams: '50',
+      carbsGrams: '180.5',
+    });
+
+    expect(created).toHaveLength(0);
+    expect(targetUpdates).toEqual([
+      { where: { id: 'calc-target' }, data: { active: false } },
+    ]);
+    expect(targetCreates[0]?.data).toMatchObject({
+      userId,
+      active: true,
+      source: 'MANUAL',
+      calculationId: null,
+    });
+    expect(result).toMatchObject({
+      source: 'MANUAL',
+      calculationId: null,
+      targetCalories: '1800',
+      carbsGrams: '180.5',
+    });
+  });
+
+  it('applies a stored calculation without changing that snapshot', async () => {
+    const { service, tx, targetUpdates, targetCreates } = harness({
+      active: { id: 'manual-target', source: 'MANUAL' },
+      racedCalculation: {
+        id: 'calc-9',
+        userId,
+        targetCalories: new Prisma.Decimal('1739.429375'),
+        proteinGrams: new Prisma.Decimal('120'),
+        fatGrams: new Prisma.Decimal('54'),
+        carbsGrams: new Prisma.Decimal('193.35734375'),
+      } as NutritionCalculation,
+    });
+
+    const result = await service.applyCalculation(userId, 'calc-9');
+
+    expect(tx.nutritionCalculation.create).not.toHaveBeenCalled();
+    expect(targetUpdates).toEqual([
+      { where: { id: 'manual-target' }, data: { active: false } },
+    ]);
+    expect(targetCreates[0]?.data).toMatchObject({
+      source: 'CALCULATED',
+      calculationId: 'calc-9',
+      active: true,
+    });
+    expect(result.targetCalories).toBe('1739.429375');
+  });
+
   it('keeps an active manual target when a new calculation is stored', async () => {
     const { service, created, targetUpdates, targetCreates } = harness({
       active: { id: 'manual-target', source: 'MANUAL' },
@@ -356,5 +413,99 @@ describe('NutritionService', () => {
       nutritionProfileSchema.safeParse({ ...valid, userId: 'someone-else' })
         .success,
     ).toBe(false);
+  });
+
+  it('lists each client target and the onboarding inputs the formula uses', async () => {
+    const listed = await new NutritionService({
+      user: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: 'with-target',
+            email: 'a@example.com',
+            isActive: true,
+            profile: {
+              name: 'Анна',
+              dateOfBirth: new Date('1996-11-01T00:00:00.000Z'),
+              biologicalSexForCalculation: 'FEMALE',
+              heightCm: new Prisma.Decimal('165'),
+              activityLevel: 'SEDENTARY',
+              goal: 'GAIN_WEIGHT',
+              timezone: 'UTC',
+            },
+            onboardingResponses: { trainingFrequency: '3' },
+            nutritionProfile: { activity: 'HIGH', goal: 'RECOMPOSITION' },
+            nutritionTargets: [
+              {
+                source: 'MANUAL',
+                targetCalories: new Prisma.Decimal('1800'),
+                proteinGrams: new Prisma.Decimal('130'),
+                fatGrams: new Prisma.Decimal('50'),
+                carbsGrams: new Prisma.Decimal('180.5'),
+              },
+            ],
+            bodyMeasurements: [{ weightKg: new Prisma.Decimal('60.5') }],
+          },
+          {
+            id: 'from-onboarding',
+            email: 'b@example.com',
+            isActive: false,
+            profile: {
+              name: null,
+              dateOfBirth: new Date('2000-01-01T00:00:00.000Z'),
+              biologicalSexForCalculation: 'MALE',
+              heightCm: new Prisma.Decimal('180'),
+              activityLevel: 'MODERATELY_ACTIVE',
+              goal: 'LOSE_WEIGHT',
+              timezone: 'UTC',
+            },
+            onboardingResponses: { trainingFrequency: '4' },
+            nutritionProfile: null,
+            nutritionTargets: [],
+            bodyMeasurements: [],
+          },
+        ]),
+      },
+    } as never).listRoster(now);
+
+    expect(listed.clients).toEqual([
+      {
+        id: 'with-target',
+        email: 'a@example.com',
+        name: 'Анна',
+        archived: false,
+        target: {
+          source: 'MANUAL',
+          targetCalories: '1800',
+          proteinGrams: '130',
+          fatGrams: '50',
+          carbsGrams: '180.5',
+        },
+        inputs: {
+          sex: 'FEMALE',
+          ageYears: 30,
+          heightCm: '165',
+          weightKg: '60.5',
+          activity: 'HIGH',
+          frequency: '3',
+          goal: 'RECOMPOSITION',
+        },
+      },
+      {
+        id: 'from-onboarding',
+        email: 'b@example.com',
+        name: null,
+        archived: true,
+        target: null,
+        inputs: {
+          sex: 'MALE',
+          ageYears: 26,
+          heightCm: '180',
+          weightKg: null,
+          activity: 'MODERATE',
+          frequency: '4',
+          goal: 'LOSE_WEIGHT',
+        },
+      },
+    ]);
   });
 });

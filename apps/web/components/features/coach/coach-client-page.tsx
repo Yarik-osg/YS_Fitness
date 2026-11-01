@@ -21,10 +21,14 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
+import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
 import {
+  useApplyNutritionCalculation,
   useAssignCoachProgram,
   useCoachClient,
+  useCoachNutrition,
   useGrantClientAccess,
+  useSetManualNutritionTarget,
   useUpdateCoachNote,
 } from '@/lib/hooks/use-coach-clients';
 import { useCoachPrograms } from '@/lib/hooks/use-coach-programs';
@@ -183,6 +187,8 @@ function ClientDetail({
         )}
       </Section>
 
+      <CoachNutrition userId={detail.id} />
+
       <Section title={t('sections.program')}>
         {detail.program ? (
           <div>
@@ -253,6 +259,192 @@ function ClientDetail({
 
       <CoachClientHistory userId={detail.id} />
     </>
+  );
+}
+
+function CoachNutrition({ userId }: { userId: string }) {
+  const t = useTranslations('coach');
+  const nutrition = useCoachNutrition(userId);
+  const manual = useSetManualNutritionTarget(userId);
+  const apply = useApplyNutritionCalculation(userId);
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [fat, setFat] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [invalid, setInvalid] = useState(false);
+  const calculation = nutrition.data?.calculation ?? null;
+  const target = nutrition.data?.target ?? null;
+  const applied =
+    target?.source === 'CALCULATED' && target.calculationId === calculation?.id;
+
+  function saveManual() {
+    const body = {
+      targetCalories: amount(calories),
+      proteinGrams: amount(protein),
+      fatGrams: amount(fat),
+      carbsGrams: amount(carbs, true),
+    };
+    if (
+      !body.targetCalories ||
+      Number(body.targetCalories) <= 0 ||
+      !body.proteinGrams ||
+      !body.fatGrams ||
+      !body.carbsGrams
+    ) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
+    manual.mutate({
+      targetCalories: body.targetCalories,
+      proteinGrams: body.proteinGrams,
+      fatGrams: body.fatGrams,
+      carbsGrams: body.carbsGrams,
+    });
+  }
+
+  return (
+    <Section title={t('sections.nutrition')}>
+      {nutrition.isPending ? <Skeleton className="h-16 w-full" /> : null}
+      {nutrition.isError ? (
+        <p className="text-sm text-amber">{t('nutritionError')}</p>
+      ) : null}
+      {nutrition.isPending ? null : (
+        <>
+          <h3 className="font-heading text-sm text-ink">{t('nutritionNow')}</h3>
+          {target ? (
+            <p className="mt-2 text-sm text-ink">
+              {t('nutritionFigures', figureValues(target))}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted">{t('nutritionNowEmpty')}</p>
+          )}
+          {target ? (
+            <p className="mt-1 text-sm text-muted">
+              {target.source === 'MANUAL'
+                ? t('nutritionNowManual')
+                : t('nutritionNowCalculated')}
+            </p>
+          ) : null}
+          {calculation && !applied ? (
+            <div className="mt-6">
+              <h3 className="font-heading text-sm text-ink">
+                {t('nutritionFormula')}
+              </h3>
+              <p className="mt-2 text-sm text-ink">
+                {t('nutritionFigures', figureValues(calculation))}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {t('nutritionFormulaIdle')}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 rounded-lg whitespace-nowrap"
+                disabled={apply.isPending}
+                onClick={() => apply.mutate(calculation.id)}
+              >
+                {apply.isPending ? t('nutritionApplying') : t('nutritionApply')}
+              </Button>
+            </div>
+          ) : null}
+          {!calculation ? (
+            <p className="mt-2 text-sm text-muted">{t('nutritionNone')}</p>
+          ) : null}
+          <div className="mt-6">
+            <h3 className="font-heading text-sm text-ink">
+              {t('nutritionOwn')}
+            </h3>
+            <p className="mt-1 text-sm text-muted">{t('nutritionOwnHint')}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <MacroField
+                label={t('nutritionCalories')}
+                value={calories}
+                onChange={setCalories}
+              />
+              <MacroField
+                label={t('nutritionProtein')}
+                value={protein}
+                onChange={setProtein}
+              />
+              <MacroField
+                label={t('nutritionFat')}
+                value={fat}
+                onChange={setFat}
+              />
+              <MacroField
+                label={t('nutritionCarbs')}
+                value={carbs}
+                onChange={setCarbs}
+              />
+            </div>
+            {invalid ? (
+              <p role="alert" className="mt-3 text-sm text-amber">
+                {t('nutritionInvalid')}
+              </p>
+            ) : null}
+            {manual.isError || apply.isError ? (
+              <p role="alert" className="mt-3 text-sm text-amber">
+                {t('nutritionError')}
+              </p>
+            ) : null}
+            <Button
+              size="sm"
+              className="mt-4 rounded-lg whitespace-nowrap"
+              disabled={manual.isPending}
+              onClick={saveManual}
+            >
+              {manual.isPending
+                ? t('nutritionSaving')
+                : t('nutritionManualSave')}
+            </Button>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+function figureValues(row: {
+  targetCalories: string;
+  proteinGrams: string;
+  fatGrams: string;
+  carbsGrams: string;
+}) {
+  return {
+    calories: roundHalfAwayFromZero(row.targetCalories),
+    protein: roundHalfAwayFromZero(row.proteinGrams),
+    fat: roundHalfAwayFromZero(row.fatGrams),
+    carbs: roundHalfAwayFromZero(row.carbsGrams),
+  };
+}
+
+function amount(value: string, signed = false) {
+  const text = value.trim().replace(',', '.');
+  const pattern = signed ? /^-?\d{1,6}(\.\d{1,4})?$/ : /^\d{1,6}(\.\d{1,4})?$/;
+  return pattern.test(text) ? text : null;
+}
+
+function MacroField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block text-sm text-ink">
+      {label}
+      <input
+        value={value}
+        inputMode="decimal"
+        aria-label={label}
+        className="mt-2 h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink"
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
   );
 }
 

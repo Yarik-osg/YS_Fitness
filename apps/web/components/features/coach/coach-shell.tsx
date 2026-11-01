@@ -19,6 +19,7 @@ export function CoachShell({ children }: { children: ReactNode }) {
   const logout = useLogout();
   const [error, setError] = useState<string | null>(null);
   const onRoster = pathname === '/coach';
+  const onNutrition = pathname.startsWith('/coach/nutrition');
   const onPrograms = pathname.startsWith('/coach/programs');
 
   async function signOut() {
@@ -52,6 +53,17 @@ export function CoachShell({ children }: { children: ReactNode }) {
               }`}
             >
               {t('roster')}
+            </Link>
+            <Link
+              href="/coach/nutrition"
+              aria-current={onNutrition ? 'page' : undefined}
+              className={`font-label text-xs font-semibold motion-safe:transition-colors ${focusRing} ${
+                onNutrition
+                  ? 'text-ink shadow-[inset_0_-1px_0_0_var(--color-teal)]'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              {t('nutritionRoster.nav')}
             </Link>
             <Link
               href="/coach/programs"

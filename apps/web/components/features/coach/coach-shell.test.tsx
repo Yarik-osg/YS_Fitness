@@ -112,6 +112,18 @@ describe('CoachShell', () => {
     expect(useAuthStore.getState().accessToken).toBeNull();
   });
 
+  it('marks Nutrition as the current page on the nutrition table', () => {
+    navigation.pathname = '/coach/nutrition';
+    renderShell();
+    expect(screen.getByRole('link', { name: 'Nutrition' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Clients' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
   it('does not mark Clients as the current page on a client file', () => {
     navigation.pathname = '/coach/clients/client-1';
     renderShell();
