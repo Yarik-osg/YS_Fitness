@@ -6,7 +6,12 @@ import type {
   OnboardingInput,
   ProfileUpdateInput,
 } from '@repo/validation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { nutritionCalculationsQueryKey } from '@/lib/hooks/use-nutrition';
 import { sessionHintFor } from '@/lib/auth/routing';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
@@ -62,7 +67,7 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: (input: ProfileUpdateInput) => updateProfile(input),
     onSuccess: (response, input) => {
-      if (input.weightKg !== undefined) {
+      if (nutritionInputsChanged(queryClient, input)) {
         void queryClient.invalidateQueries({
           queryKey: nutritionCalculationsQueryKey,
         });
@@ -121,6 +126,29 @@ export function useUpdateProfile() {
       });
     },
   });
+}
+
+function nutritionInputsChanged(
+  queryClient: QueryClient,
+  input: ProfileUpdateInput,
+) {
+  const me =
+    queryClient.getQueryData<Awaited<ReturnType<typeof getMe>>>(meQueryKey);
+  const answers = queryClient.getQueryData<
+    Awaited<ReturnType<typeof getOnboardingResponses>>
+  >(onboardingResponsesQueryKey);
+  const heightChanged =
+    input.heightCm !== undefined && me?.profile?.heightCm !== input.heightCm;
+  const weightChanged =
+    input.weightKg !== undefined &&
+    Number(me?.bodyMeasurements[0]?.weightKg) !== input.weightKg;
+  const goalChanged =
+    input.mainGoal !== undefined &&
+    answers?.responses?.mainGoal !== input.mainGoal;
+  const frequencyChanged =
+    input.trainingFrequency !== undefined &&
+    answers?.responses?.trainingFrequency !== input.trainingFrequency;
+  return heightChanged || weightChanged || goalChanged || frequencyChanged;
 }
 
 export function useSaveOnboarding() {

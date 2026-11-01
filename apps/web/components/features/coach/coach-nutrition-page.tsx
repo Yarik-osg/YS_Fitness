@@ -210,7 +210,9 @@ function NutritionRow({
           : blank}
       </Cell>
       <Cell>
-        {inputs ? t(`nutritionRoster.activityLevel.${inputs.activity}`) : blank}
+        {inputs?.activity
+          ? t(`nutritionRoster.activityLevel.${inputs.activity}`)
+          : blank}
       </Cell>
       <Cell>
         {inputs ? t(`nutritionRoster.nutritionGoal.${inputs.goal}`) : blank}

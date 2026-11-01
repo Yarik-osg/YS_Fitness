@@ -46,6 +46,7 @@ import {
   MAIN_GOAL_FROM_PRISMA,
   MAIN_GOAL_TO_PRISMA,
   sameOnboardingResponses,
+  TRAINING_GOAL_FROM_MAIN,
   toOnboardingResponsesRecord,
   toPrismaOnboardingResponses,
 } from './onboarding-responses.mapper.js';
@@ -153,10 +154,14 @@ function chartOrder<T extends { id: string; measuredAt: Date }>(
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  private async refreshNutrition(userId: string) {
+  private async refreshNutrition(userId: string, kind: 'weight' | 'profile') {
     if (!this.nutrition) return;
     try {
-      await this.nutrition.refreshAfterWeightChange(userId);
+      if (kind === 'weight') {
+        await this.nutrition.refreshAfterWeightChange(userId);
+      } else {
+        await this.nutrition.replaceFromProfile(userId);
+      }
     } catch (error) {
       this.logger.warn(
         error instanceof Error ? error.message : 'Nutrition refresh failed',
@@ -241,7 +246,7 @@ export class UsersService {
       select: weightMeasurementSelect,
     });
 
-    await this.refreshNutrition(userId);
+    await this.refreshNutrition(userId, 'weight');
     return toWeightMeasurement(created);
   }
 
@@ -473,6 +478,8 @@ export class UsersService {
     userId: string,
     input: ProfileUpdateInput,
   ): Promise<ProfileUpdateResponse> {
+    let rewriteNutrition = false;
+    let refreshForWeight = false;
     const updated = await this.prisma.$transaction(
       async (transaction) => {
         await this.programs.holdAssignment(userId, transaction);
@@ -489,10 +496,33 @@ export class UsersService {
           throw new NotFoundException(PROFILE_INCOMPLETE);
         }
 
-        if (input.heightCm !== undefined) {
+        const heightChanged =
+          input.heightCm !== undefined &&
+          !new Prisma.Decimal(input.heightCm).equals(profile.heightCm);
+        const goalChanged =
+          input.mainGoal !== undefined &&
+          (!responses ||
+            MAIN_GOAL_TO_PRISMA[input.mainGoal] !== responses.mainGoal);
+        const frequencyChanged =
+          input.trainingFrequency !== undefined &&
+          (!responses ||
+            input.trainingFrequency !== responses.trainingFrequency);
+        const profilePatch: {
+          heightCm?: number;
+          goal?: (typeof TRAINING_GOAL_FROM_MAIN)[keyof typeof TRAINING_GOAL_FROM_MAIN];
+        } = {};
+        if (input.heightCm !== undefined)
+          profilePatch.heightCm = input.heightCm;
+        if (goalChanged && input.mainGoal) {
+          profilePatch.goal = TRAINING_GOAL_FROM_MAIN[input.mainGoal];
+        }
+        if (
+          profilePatch.heightCm !== undefined ||
+          profilePatch.goal !== undefined
+        ) {
           await transaction.userProfile.update({
             where: { userId },
-            data: { heightCm: input.heightCm },
+            data: profilePatch,
           });
         }
 
@@ -598,6 +628,8 @@ export class UsersService {
             matchFieldsChanged(responses, input),
         });
 
+        refreshForWeight = weightChanged;
+        rewriteNutrition = heightChanged || goalChanged || frequencyChanged;
         return {
           heightCm: input.heightCm ?? profile.heightCm.toNumber(),
           weightKg,
@@ -622,8 +654,10 @@ export class UsersService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    if (input.weightKg !== undefined) {
-      await this.refreshNutrition(userId);
+    if (rewriteNutrition) {
+      await this.refreshNutrition(userId, 'profile');
+    } else if (refreshForWeight) {
+      await this.refreshNutrition(userId, 'weight');
     }
     return updated;
   }

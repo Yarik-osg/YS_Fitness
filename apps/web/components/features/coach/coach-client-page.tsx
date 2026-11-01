@@ -277,6 +277,15 @@ function CoachNutrition({ userId }: { userId: string }) {
   const applied =
     target?.source === 'CALCULATED' && target.calculationId === calculation?.id;
 
+  function syncCalories(
+    proteinValue: string,
+    fatValue: string,
+    carbValue: string,
+  ) {
+    const kcal = caloriesFromMacros(proteinValue, fatValue, carbValue);
+    if (kcal !== null) setCalories(kcal);
+  }
+
   function saveManual() {
     const body = {
       targetCalories: amount(calories),
@@ -365,17 +374,26 @@ function CoachNutrition({ userId }: { userId: string }) {
               <MacroField
                 label={t('nutritionProtein')}
                 value={protein}
-                onChange={setProtein}
+                onChange={(value) => {
+                  setProtein(value);
+                  syncCalories(value, fat, carbs);
+                }}
               />
               <MacroField
                 label={t('nutritionFat')}
                 value={fat}
-                onChange={setFat}
+                onChange={(value) => {
+                  setFat(value);
+                  syncCalories(protein, value, carbs);
+                }}
               />
               <MacroField
                 label={t('nutritionCarbs')}
                 value={carbs}
-                onChange={setCarbs}
+                onChange={(value) => {
+                  setCarbs(value);
+                  syncCalories(protein, fat, value);
+                }}
               />
             </div>
             {invalid ? (
@@ -417,6 +435,35 @@ function figureValues(row: {
     fat: roundHalfAwayFromZero(row.fatGrams),
     carbs: roundHalfAwayFromZero(row.carbsGrams),
   };
+}
+
+function caloriesFromMacros(protein: string, fat: string, carbs: string) {
+  const proteinAmount = amount(protein);
+  const fatAmount = amount(fat);
+  const carbAmount = amount(carbs, true);
+  if (!proteinAmount || !fatAmount || !carbAmount) return null;
+  const total =
+    scaled(proteinAmount) * 4n +
+    scaled(carbAmount) * 4n +
+    scaled(fatAmount) * 9n;
+  return unscaled(total);
+}
+
+function scaled(value: string) {
+  const negative = value.startsWith('-');
+  const unsigned = negative ? value.slice(1) : value;
+  const [whole = '0', fraction = ''] = unsigned.split('.');
+  const digits = BigInt(`${whole}${fraction.padEnd(4, '0')}`);
+  return negative ? -digits : digits;
+}
+
+function unscaled(value: bigint) {
+  const negative = value < 0n;
+  const digits = (negative ? -value : value).toString().padStart(5, '0');
+  const whole = digits.slice(0, -4).replace(/^0+(?=\d)/, '');
+  const fraction = digits.slice(-4).replace(/0+$/, '');
+  const text = fraction ? `${whole}.${fraction}` : whole;
+  return negative && text !== '0' ? `-${text}` : text;
 }
 
 function amount(value: string, signed = false) {

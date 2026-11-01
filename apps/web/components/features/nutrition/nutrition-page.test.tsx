@@ -117,4 +117,50 @@ describe('NutritionPage', () => {
       expect(nutritionApi.calculateNutrition).not.toHaveBeenCalled();
     });
   });
+
+  it('shows the trainer target instead of the stored calculation', async () => {
+    nutritionApi.listNutritionCalculations.mockResolvedValue({
+      calculations: [calculation],
+      target: {
+        id: 'manual-1',
+        source: 'MANUAL',
+        calculationId: null,
+        targetCalories: '1800',
+        proteinGrams: '130',
+        fatGrams: '50',
+        carbsGrams: '180',
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByText('1800')).toBeInTheDocument();
+    expect(screen.getByText('130')).toBeInTheDocument();
+    expect(screen.queryByText('1739')).not.toBeInTheDocument();
+  });
+
+  it('shows a trainer target before a calculation exists', async () => {
+    nutritionApi.calculateNutrition.mockRejectedValue(
+      new ApiClientError(400, 'NUTRITION_INPUT_UNSUPPORTED', 'missing weight'),
+    );
+    nutritionApi.listNutritionCalculations.mockResolvedValue({
+      calculations: [],
+      target: {
+        id: 'manual-1',
+        source: 'MANUAL',
+        calculationId: null,
+        targetCalories: '1800',
+        proteinGrams: '130',
+        fatGrams: '50',
+        carbsGrams: '180',
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByText('1800')).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Calories cannot be calculated until your profile has weight, height, age, and workouts per week.',
+      ),
+    ).not.toBeInTheDocument();
+  });
 });

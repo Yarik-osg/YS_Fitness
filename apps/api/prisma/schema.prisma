@@ -494,7 +494,8 @@ model NutritionCalculation {
 model NutritionTarget {
   id             String                @id @default(uuid()) @db.Uuid
   userId         String                @map("user_id") @db.Uuid
-  /// Only the active flag changes. The four copied numbers are never updated.
+  /// Append-only. A new calculated norm deactivates the previous active row
+  /// and inserts another. Only that active flag changes. A manual row stays.
   /// One active row per user is the partial unique index
   /// nutrition_one_active_target (user_id WHERE active), hand-written in the
   /// nutrition migration because Prisma cannot model that predicate.
