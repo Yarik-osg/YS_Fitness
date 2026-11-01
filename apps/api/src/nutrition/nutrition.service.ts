@@ -239,9 +239,10 @@ export class NutritionService {
         where: { userId, active: true },
       });
       // Several 1 kg saves count. The baseline is the last stored calculation.
+      // A manual target stays active, but the new snapshot is still stored.
       if (
         already &&
-        !replacesStoredCalculation(already.weightKg, weightKg, active?.source)
+        !weightShiftedByAtLeastFiveKg(already.weightKg, weightKg)
       ) {
         return { ...toCalculation(already), activatedTarget: false };
       }
@@ -417,12 +418,10 @@ function unsupported(message: string): never {
 
 const WEIGHT_SHIFT_KG = new Prisma.Decimal(5);
 
-function replacesStoredCalculation(
+function weightShiftedByAtLeastFiveKg(
   storedKg: Prisma.Decimal,
   currentKg: Prisma.Decimal,
-  activeSource: 'CALCULATED' | 'MANUAL' | undefined,
 ) {
-  if (activeSource === 'MANUAL') return false;
   return currentKg.minus(storedKg).abs().greaterThanOrEqualTo(WEIGHT_SHIFT_KG);
 }
 

@@ -394,7 +394,7 @@ describe('NutritionService', () => {
     expect(created).toHaveLength(1);
   });
 
-  it('does not store a new calculation while a manual target is active', async () => {
+  it('stores a shifted calculation without replacing an active manual target', async () => {
     const { service, created, targetUpdates, targetCreates } = harness({
       weightKg: '70',
       active: { id: 'manual-target', source: 'MANUAL' },
@@ -403,9 +403,9 @@ describe('NutritionService', () => {
 
     const result = await service.calculate(userId, now);
 
-    expect(result.id).toBe('calc-old');
+    expect(result.weightKg).toBe('70');
     expect(result.activatedTarget).toBe(false);
-    expect(created).toHaveLength(0);
+    expect(created).toHaveLength(1);
     expect(targetUpdates).toEqual([]);
     expect(targetCreates).toEqual([]);
   });
