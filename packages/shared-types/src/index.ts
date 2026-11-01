@@ -551,6 +551,7 @@ export interface NutritionCalculationCreatedResponse extends NutritionCalculatio
 
 export interface NutritionCalculationListResponse {
   calculations: NutritionCalculationResponse[];
+  target: NutritionTargetResponse | null;
 }
 
 export interface NutritionTargetResponse {
@@ -582,7 +583,7 @@ export interface CoachNutritionRosterInputs {
   ageYears: number | null;
   heightCm: string;
   weightKg: string | null;
-  activity: NutritionActivity;
+  activity: NutritionActivity | null;
   frequency: string | null;
   goal: NutritionGoal;
 }

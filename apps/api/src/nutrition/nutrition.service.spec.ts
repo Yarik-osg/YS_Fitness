@@ -53,6 +53,7 @@ function harness(options?: {
     | 'EXTRA_ACTIVE';
   trainingGoal?: 'LOSE_WEIGHT' | 'MAINTAIN_WEIGHT' | 'GAIN_WEIGHT';
   mealsPerDay?: string;
+  mainGoal?: string;
   racedCalculation?: NutritionCalculation | null;
 }) {
   const created: { data: Record<string, unknown> }[] = [];
@@ -91,6 +92,10 @@ function harness(options?: {
         profileCreates.push(args);
         return { id: 'profile-1', ...args.data };
       }),
+      update: vi.fn(async (args: { data: Record<string, unknown> }) => {
+        profileCreates.push(args);
+        return args.data;
+      }),
     },
     bodyMeasurement: {
       findFirst: vi.fn(async () => {
@@ -108,6 +113,14 @@ function harness(options?: {
         created.push(args);
         return {
           id: 'calc-1',
+          createdAt: now,
+          ...args.data,
+        };
+      }),
+      update: vi.fn(async (args: { data: Record<string, unknown> }) => {
+        created.push(args);
+        return {
+          id: options?.racedCalculation?.id ?? 'calc-1',
           createdAt: now,
           ...args.data,
         };
@@ -158,6 +171,7 @@ function harness(options?: {
         return {
           trainingFrequency: options?.frequency ?? '3',
           mealsPerDay: options?.mealsPerDay ?? '3',
+          mainGoal: options?.mainGoal,
         };
       }),
     },
@@ -165,6 +179,12 @@ function harness(options?: {
       findMany: vi.fn(async (args: unknown) => {
         reads.push({ model: 'nutritionCalculation', args });
         return [];
+      }),
+    },
+    nutritionTarget: {
+      findFirst: vi.fn(async (args: unknown) => {
+        reads.push({ model: 'nutritionTarget', args });
+        return null;
       }),
     },
     $transaction: vi.fn(async (work: (db: typeof tx) => Promise<unknown>) =>
@@ -244,6 +264,48 @@ describe('NutritionService', () => {
     });
   });
 
+  it('overwrites the stored calculation when height, goal, or frequency changed', async () => {
+    const stored = storedCalculation('60');
+    const { service, created, targetUpdates, profileCreates } = harness({
+      racedCalculation: stored,
+      active: { id: 'old-target', source: 'CALCULATED' },
+      mainGoal: 'BUILD_MUSCLE',
+    });
+
+    await service.replaceFromProfile(userId, now);
+
+    expect(created).toHaveLength(1);
+    expect(created[0]?.data).toMatchObject({
+      activity: 'HIGH',
+      frequency: 3,
+      goal: 'GAIN_MUSCLE',
+      heightCm: new Prisma.Decimal('165'),
+    });
+    expect(profileCreates[0]?.data).toMatchObject({
+      activity: 'HIGH',
+      goal: 'GAIN_MUSCLE',
+    });
+    expect(targetUpdates[0]).toMatchObject({
+      where: { id: 'old-target' },
+      data: { calculationId: stored.id },
+    });
+  });
+
+  it('keeps a manual target while the calculation is rewritten', async () => {
+    const stored = storedCalculation('60');
+    const { service, created, targetUpdates } = harness({
+      racedCalculation: stored,
+      active: { id: 'manual-target', source: 'MANUAL' },
+      mainGoal: 'IMPROVE_BODY',
+    });
+
+    await service.replaceFromProfile(userId, now);
+
+    expect(created).toHaveLength(1);
+    expect(created[0]?.data.goal).toBe('RECOMPOSITION');
+    expect(targetUpdates).toEqual([]);
+  });
+
   it('replaces an active calculated target and keeps its numbers untouched', async () => {
     const { service, targetUpdates, targetCreates } = harness({
       active: { id: 'old-target', source: 'CALCULATED' },
@@ -270,11 +332,11 @@ describe('NutritionService', () => {
 
     expect(profileCreates[0]?.data).toMatchObject({
       userId,
-      activity: 'SEDENTARY',
+      activity: 'MODERATE',
       goal: 'GAIN_MUSCLE',
       mealCount: 4,
     });
-    expect(created[0]?.data.activity).toBe('SEDENTARY');
+    expect(created[0]?.data.activity).toBe('MODERATE');
     expect(created[0]?.data.goal).toBe('GAIN_MUSCLE');
     expect(result.activatedTarget).toBe(true);
   });
@@ -568,10 +630,34 @@ describe('NutritionService', () => {
               goal: 'LOSE_WEIGHT',
               timezone: 'UTC',
             },
-            onboardingResponses: { trainingFrequency: '4' },
+            onboardingResponses: {
+              trainingFrequency: '4',
+              mainGoal: 'LOSE_WEIGHT',
+            },
             nutritionProfile: null,
             nutritionTargets: [],
             bodyMeasurements: [],
+          },
+          {
+            id: 'unsupported-activity',
+            email: 'c@example.com',
+            isActive: true,
+            profile: {
+              name: null,
+              dateOfBirth: new Date('1990-01-01T00:00:00.000Z'),
+              biologicalSexForCalculation: 'FEMALE',
+              heightCm: new Prisma.Decimal('170'),
+              activityLevel: 'EXTRA_ACTIVE',
+              goal: 'MAINTAIN_WEIGHT',
+              timezone: 'UTC',
+            },
+            onboardingResponses: {
+              trainingFrequency: '2',
+              mainGoal: 'MAINTAIN',
+            },
+            nutritionProfile: null,
+            nutritionTargets: [],
+            bodyMeasurements: [{ weightKg: new Prisma.Decimal('60') }],
           },
         ]),
       },
@@ -611,9 +697,25 @@ describe('NutritionService', () => {
           ageYears: 26,
           heightCm: '180',
           weightKg: null,
-          activity: 'MODERATE',
+          activity: 'HIGH',
           frequency: '4',
           goal: 'LOSE_WEIGHT',
+        },
+      },
+      {
+        id: 'unsupported-activity',
+        email: 'c@example.com',
+        name: null,
+        archived: false,
+        target: null,
+        inputs: {
+          sex: 'FEMALE',
+          ageYears: 36,
+          heightCm: '170',
+          weightKg: '60',
+          activity: null,
+          frequency: '2',
+          goal: 'MAINTAIN',
         },
       },
     ]);

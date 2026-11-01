@@ -12,6 +12,7 @@ import type {
   ProgramTrack,
   TrainingExperience,
   TrainingFrequency,
+  WeightGoal,
 } from '@repo/shared-types';
 import type { OnboardingInput } from '@repo/validation';
 
@@ -32,6 +33,14 @@ export const MAIN_GOAL_TO_PRISMA = {
   maintain: 'MAINTAIN',
   get_stronger: 'GET_STRONGER',
 } as const satisfies Record<OnboardingInput['mainGoal'], PrismaMainGoal>;
+
+export const TRAINING_GOAL_FROM_MAIN = {
+  lose_weight: 'LOSE_WEIGHT',
+  maintain: 'MAINTAIN_WEIGHT',
+  improve_body: 'MAINTAIN_WEIGHT',
+  build_muscle: 'GAIN_WEIGHT',
+  get_stronger: 'GAIN_WEIGHT',
+} as const satisfies Record<OnboardingInput['mainGoal'], WeightGoal>;
 
 export const MAIN_GOAL_FROM_PRISMA = {
   LOSE_WEIGHT: 'lose_weight',

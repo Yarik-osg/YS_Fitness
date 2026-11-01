@@ -1,4 +1,19 @@
-/** Whole kcal or grams. Ties round away from zero. */
+type NutritionFigures = {
+  targetCalories: string;
+  proteinGrams: string;
+  fatGrams: string;
+  carbsGrams: string;
+};
+
+/** Trainer numbers stay on screen. A calculated target follows the stored formula. */
+export function shownNutrition(
+  calculation: NutritionFigures | null,
+  target:
+    (NutritionFigures & { source: 'CALCULATED' | 'MANUAL' }) | null | undefined,
+): NutritionFigures | null {
+  if (target?.source === 'MANUAL') return target;
+  return calculation;
+}
 export function roundHalfAwayFromZero(value: string): string {
   const trimmed = value.trim();
   const negative = trimmed.startsWith('-');

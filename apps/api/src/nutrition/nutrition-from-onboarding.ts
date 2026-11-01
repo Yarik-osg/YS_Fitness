@@ -4,29 +4,51 @@ import type {
   NutritionGoal,
   WeightGoal,
 } from '@repo/shared-types';
+import { NutritionInputError } from './nutrition-calculation.js';
 
-/**
- * Onboarding asks five daily-activity levels and the formula has four.
- * Lightly active sits with sedentary. Extra active sits with very high.
- */
+/** The four onboarding slider stops, in order, are the four formula rows. */
 export function nutritionActivityFromDailyActivity(
   level: ActivityLevel,
 ): NutritionActivity {
   switch (level) {
     case 'SEDENTARY':
-    case 'LIGHTLY_ACTIVE':
       return 'SEDENTARY';
-    case 'MODERATELY_ACTIVE':
+    case 'LIGHTLY_ACTIVE':
       return 'MODERATE';
-    case 'VERY_ACTIVE':
+    case 'MODERATELY_ACTIVE':
       return 'HIGH';
-    case 'EXTRA_ACTIVE':
+    case 'VERY_ACTIVE':
       return 'VERY_HIGH';
+    case 'EXTRA_ACTIVE':
+      throw new NutritionInputError(
+        'activity level is not one of the four formula levels',
+      );
   }
 }
 
-/** Recomposition is not an onboarding answer. Gaining weight uses the muscle goal. */
-export function nutritionGoalFromTrainingGoal(goal: WeightGoal): NutritionGoal {
+const NUTRITION_GOAL_FROM_MAIN_GOAL: Record<string, NutritionGoal> = {
+  LOSE_WEIGHT: 'LOSE_WEIGHT',
+  MAINTAIN: 'MAINTAIN',
+  IMPROVE_BODY: 'RECOMPOSITION',
+  BUILD_MUSCLE: 'GAIN_MUSCLE',
+  GET_STRONGER: 'GAIN_MUSCLE',
+};
+
+/** The onboarding main goal is the formula goal. Training goal is only a fallback. */
+export function nutritionGoalFromMainGoal(mainGoal: string): NutritionGoal {
+  const goal = NUTRITION_GOAL_FROM_MAIN_GOAL[mainGoal];
+  if (!goal) throw new NutritionInputError('goal is not supported');
+  return goal;
+}
+
+/** «Покращити якість тіла» is recomposition. A stored training goal is the fallback. */
+export function nutritionGoalFromTrainingGoal(
+  goal: WeightGoal,
+  mainGoal?: string | null,
+): NutritionGoal {
+  if (mainGoal && Object.hasOwn(NUTRITION_GOAL_FROM_MAIN_GOAL, mainGoal)) {
+    return nutritionGoalFromMainGoal(mainGoal);
+  }
   switch (goal) {
     case 'LOSE_WEIGHT':
       return 'LOSE_WEIGHT';

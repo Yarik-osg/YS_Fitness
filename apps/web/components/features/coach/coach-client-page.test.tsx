@@ -593,10 +593,12 @@ describe('CoachClientPage', () => {
     );
     expect(applyTarget.mutate).toHaveBeenCalledWith('calc-1');
 
-    await userEvent.type(screen.getByLabelText('Calories'), '1900');
     await userEvent.type(screen.getByLabelText('Protein, g'), '140');
     await userEvent.type(screen.getByLabelText('Fat, g'), '55');
     await userEvent.type(screen.getByLabelText('Carbs, g'), '160,25');
+    expect(screen.getByLabelText('Calories')).toHaveValue('1696');
+    await userEvent.clear(screen.getByLabelText('Calories'));
+    await userEvent.type(screen.getByLabelText('Calories'), '1900');
     await userEvent.click(
       screen.getByRole('button', { name: "Save as the client's target" }),
     );

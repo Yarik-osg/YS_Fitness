@@ -1,6 +1,5 @@
 'use client';
 
-import type { NutritionCalculationResponse } from '@repo/shared-types';
 import { Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -13,7 +12,7 @@ import {
   useCalculateNutrition,
   useNutritionCalculations,
 } from '@/lib/hooks/use-nutrition';
-import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
+import { roundHalfAwayFromZero, shownNutrition } from '@/lib/nutrition-display';
 
 export function NutritionPage() {
   const t = useTranslations('nutrition');
@@ -23,6 +22,7 @@ export function NutritionPage() {
   const { mutate } = calculate;
   const started = useRef(false);
   const latest = calculations.data?.calculations[0] ?? null;
+  const shown = shownNutrition(latest, calculations.data?.target);
   const needsPlan = isSubscriptionRequired(calculations.error);
   const unsupported =
     calculate.error instanceof ApiClientError &&
@@ -68,23 +68,31 @@ export function NutritionPage() {
     );
   }
 
-  if (!latest && !calculate.isError) {
+  if (!shown && !calculate.isError) {
     return <NutritionLoading label={t('loading')} />;
   }
 
   return (
     <NutritionFrame>
-      {unsupported ? (
+      {unsupported && !shown ? (
         <p role="alert" className="text-sm leading-6 text-white/35">
           {t('unsupported')}
         </p>
       ) : null}
-      {calculate.isError && !unsupported ? (
+      {calculate.isError && !unsupported && !shown ? (
         <p role="alert" className="text-sm leading-6 text-white/35">
           {getUserFacingError(calculate.error, tAuth)}
         </p>
       ) : null}
-      {latest ? <DailyTargets calculation={latest} /> : null}
+      {shown ? (
+        <DailyTargets
+          calculation={shown}
+          carbsNonPositive={
+            calculations.data?.target?.source !== 'MANUAL' &&
+            Boolean(latest?.carbsNonPositive)
+          }
+        />
+      ) : null}
       <MenuSoon />
     </NutritionFrame>
   );
@@ -92,8 +100,15 @@ export function NutritionPage() {
 
 function DailyTargets({
   calculation,
+  carbsNonPositive,
 }: {
-  calculation: NutritionCalculationResponse;
+  calculation: {
+    targetCalories: string;
+    proteinGrams: string;
+    fatGrams: string;
+    carbsGrams: string;
+  };
+  carbsNonPositive: boolean;
 }) {
   const t = useTranslations('nutrition');
   const kcal = roundHalfAwayFromZero(calculation.targetCalories);
@@ -162,7 +177,7 @@ function DailyTargets({
       <p className="px-0.5 text-[11px] leading-relaxed font-medium text-white/35">
         {t('note')}
       </p>
-      {calculation.carbsNonPositive ? (
+      {carbsNonPositive ? (
         <p className="px-0.5 text-[11px] leading-relaxed font-medium text-amber">
           {t('carbsNonPositive')}
         </p>

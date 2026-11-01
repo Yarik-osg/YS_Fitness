@@ -29,7 +29,7 @@ import {
   useCalculateNutrition,
   useNutritionCalculations,
 } from '@/lib/hooks/use-nutrition';
-import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
+import { roundHalfAwayFromZero, shownNutrition } from '@/lib/nutrition-display';
 import { useClientProgramTitle } from '@/lib/program-title';
 import {
   formatDelta,
@@ -399,6 +399,7 @@ function NutritionHomeCard() {
   const { mutate } = useCalculateNutrition();
   const started = useRef(false);
   const latest = calculations.data?.calculations[0] ?? null;
+  const shown = shownNutrition(latest, calculations.data?.target);
 
   useEffect(() => {
     if (
@@ -426,11 +427,11 @@ function NutritionHomeCard() {
       </p>
       {pending ? (
         <Skeleton className="h-7 w-20" />
-      ) : latest ? (
+      ) : shown ? (
         <>
           <p className="mb-1.5 flex items-baseline gap-1">
             <span className="font-heading text-[26px] leading-none tracking-[-0.02em] text-teal tabular-nums">
-              {roundHalfAwayFromZero(latest.targetCalories)}
+              {roundHalfAwayFromZero(shown.targetCalories)}
             </span>
             <span className="font-label text-[8px] font-semibold tracking-[0.08em] text-white/30 uppercase">
               {t('home.nutritionKcal')}
@@ -438,9 +439,9 @@ function NutritionHomeCard() {
           </p>
           <p className="text-[9px] leading-snug font-medium text-white/40 tabular-nums">
             {t('home.nutritionMacros', {
-              protein: roundHalfAwayFromZero(latest.proteinGrams),
-              fat: roundHalfAwayFromZero(latest.fatGrams),
-              carbs: roundHalfAwayFromZero(latest.carbsGrams),
+              protein: roundHalfAwayFromZero(shown.proteinGrams),
+              fat: roundHalfAwayFromZero(shown.fatGrams),
+              carbs: roundHalfAwayFromZero(shown.carbsGrams),
             })}
           </p>
         </>

@@ -23,6 +23,7 @@ import { ageInTimeZone } from './nutrition-age.js';
 import {
   mealCountFromBand,
   nutritionActivityFromDailyActivity,
+  nutritionGoalFromMainGoal,
   nutritionGoalFromTrainingGoal,
 } from './nutrition-from-onboarding.js';
 import {
@@ -85,7 +86,9 @@ export class NutritionService {
             timezone: true,
           },
         },
-        onboardingResponses: { select: { trainingFrequency: true } },
+        onboardingResponses: {
+          select: { trainingFrequency: true, mainGoal: true },
+        },
         nutritionProfile: { select: { activity: true, goal: true } },
         nutritionTargets: {
           where: { active: true },
@@ -208,11 +211,19 @@ export class NutritionService {
     userId: string,
   ): Promise<NutritionCalculationListResponse> {
     await this.assertClient(userId);
-    const rows = await this.prisma.nutritionCalculation.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    return { calculations: rows.map(toCalculation) };
+    const [rows, target] = await Promise.all([
+      this.prisma.nutritionCalculation.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      }),
+    ]);
+    return {
+      calculations: rows.map(toCalculation),
+      target: target ? toTarget(target) : null,
+    };
   }
 
   async calculate(
@@ -303,6 +314,92 @@ export class NutritionService {
     });
   }
 
+  /** Height, main goal, or weekly frequency changed. Rewrite the stored norm. */
+  async replaceFromProfile(userId: string, now = new Date()) {
+    await this.assertClient(userId);
+    const inputs = await this.calculationInputs(userId, now, true);
+    await this.prisma.$transaction(async (db) => {
+      await this.lockClient(db, userId);
+      const measured = await db.bodyMeasurement.findFirst({
+        where: { userId },
+        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+      });
+      if (!measured) throw unsupported('Nutrition inputs are incomplete');
+      const weightKg = measured.weightKg;
+      const result = calculateOrReject({ ...inputs, weightKg });
+      if (inputs.profileToCreate) {
+        try {
+          await db.nutritionProfile.create({
+            data: { userId, ...inputs.profileToCreate },
+          });
+        } catch (error) {
+          if (!isUniqueConflict(error)) throw error;
+        }
+      } else {
+        await db.nutritionProfile.update({
+          where: { userId },
+          data: { activity: inputs.activity, goal: inputs.goal },
+        });
+      }
+      const numbers = {
+        weightKg,
+        heightCm: inputs.heightCm,
+        ageYears: inputs.ageYears,
+        sex: inputs.sex,
+        activity: inputs.activity,
+        frequency: inputs.frequency,
+        goal: inputs.goal,
+        activityMultiplier: result.activityMultiplier,
+        goalAdjustment: result.goalAdjustment,
+        bmr: result.bmr,
+        tdee: result.tdee,
+        targetCalories: result.targetCalories,
+        proteinGrams: result.proteinGrams,
+        fatGrams: result.fatGrams,
+        carbsGrams: result.carbsGrams,
+        carbsNonPositive: result.carbsNonPositive,
+      };
+      const already = await db.nutritionCalculation.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      const calculation = already
+        ? await db.nutritionCalculation.update({
+            where: { id: already.id },
+            data: numbers,
+          })
+        : await db.nutritionCalculation.create({
+            data: { userId, ...numbers },
+          });
+      const active = await db.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      });
+      if (active?.source === 'MANUAL') return;
+      const targetNumbers = {
+        calculationId: calculation.id,
+        targetCalories: result.targetCalories,
+        proteinGrams: result.proteinGrams,
+        fatGrams: result.fatGrams,
+        carbsGrams: result.carbsGrams,
+      };
+      if (active) {
+        await db.nutritionTarget.update({
+          where: { id: active.id },
+          data: targetNumbers,
+        });
+      } else {
+        await db.nutritionTarget.create({
+          data: {
+            userId,
+            active: true,
+            source: 'CALCULATED',
+            ...targetNumbers,
+          },
+        });
+      }
+    });
+  }
+
   /** No-op until a calculation exists. Weight saves call this after the row is stored. */
   async refreshAfterWeightChange(userId: string, now = new Date()) {
     const existing = await this.prisma.nutritionCalculation.findFirst({
@@ -341,7 +438,11 @@ export class NutritionService {
     }
   }
 
-  private async calculationInputs(userId: string, now: Date) {
+  private async calculationInputs(
+    userId: string,
+    now: Date,
+    fromOnboarding = false,
+  ) {
     const [profile, body, measurement, onboarding] = await Promise.all([
       this.prisma.nutritionProfile.findUnique({ where: { userId } }),
       this.prisma.userProfile.findUnique({ where: { userId } }),
@@ -351,19 +452,23 @@ export class NutritionService {
       }),
       this.prisma.onboardingResponses.findUnique({
         where: { userId },
-        select: { trainingFrequency: true, mealsPerDay: true },
+        select: { trainingFrequency: true, mealsPerDay: true, mainGoal: true },
       }),
     ]);
     if (!body || !measurement) {
       throw unsupported('Nutrition inputs are incomplete');
     }
-    const activity = profile
-      ? profile.activity
-      : nutritionActivityFromDailyActivity(body.activityLevel);
-    const goal = profile
-      ? profile.goal
-      : nutritionGoalFromTrainingGoal(body.goal);
+    const goal =
+      profile && !fromOnboarding
+        ? profile.goal
+        : fromOnboarding && onboarding?.mainGoal
+          ? nutritionGoalFromMainGoal(onboarding.mainGoal)
+          : nutritionGoalFromTrainingGoal(body.goal, onboarding?.mainGoal);
     try {
+      const activity =
+        profile && !fromOnboarding
+          ? profile.activity
+          : nutritionActivityFromDailyActivity(body.activityLevel);
       return {
         sex: body.biologicalSexForCalculation,
         weightKg: measurement.weightKg,
@@ -468,7 +573,10 @@ function toRoster(
       goal: Parameters<typeof nutritionGoalFromTrainingGoal>[0];
       timezone: string;
     } | null;
-    onboardingResponses: { trainingFrequency: string } | null;
+    onboardingResponses: {
+      trainingFrequency: string;
+      mainGoal?: string | null;
+    } | null;
     nutritionProfile: {
       activity: NutritionActivity;
       goal: NutritionGoal;
@@ -486,6 +594,7 @@ function toRoster(
 ): CoachNutritionRosterResponse['clients'][number] {
   const target = user.nutritionTargets[0] ?? null;
   const profile = user.profile;
+  const activity = profile ? formulaActivity(user) : null;
   return {
     id: user.id,
     email: user.email,
@@ -508,16 +617,33 @@ function toRoster(
           weightKg: user.bodyMeasurements[0]
             ? decimal(user.bodyMeasurements[0].weightKg)
             : null,
-          activity: user.nutritionProfile
-            ? user.nutritionProfile.activity
-            : nutritionActivityFromDailyActivity(profile.activityLevel),
+          activity,
           frequency: user.onboardingResponses?.trainingFrequency ?? null,
           goal: user.nutritionProfile
             ? user.nutritionProfile.goal
-            : nutritionGoalFromTrainingGoal(profile.goal),
+            : nutritionGoalFromTrainingGoal(
+                profile.goal,
+                user.onboardingResponses?.mainGoal,
+              ),
         }
       : null,
   };
+}
+
+function formulaActivity(user: {
+  nutritionProfile: { activity: NutritionActivity } | null;
+  profile: {
+    activityLevel: Parameters<typeof nutritionActivityFromDailyActivity>[0];
+  } | null;
+}): NutritionActivity | null {
+  if (!user.profile) return null;
+  if (user.nutritionProfile) return user.nutritionProfile.activity;
+  try {
+    return nutritionActivityFromDailyActivity(user.profile.activityLevel);
+  } catch (error) {
+    if (error instanceof NutritionInputError) return null;
+    throw error;
+  }
 }
 
 function ageYearsOf(dateOfBirth: Date, timeZone: string, now: Date) {
