@@ -1,4 +1,7 @@
 import type {
+  CoachNutritionResponse,
+  CoachNutritionRosterResponse,
+  NutritionTargetResponse,
   CoachClientDetail,
   CoachClientWorkoutsResponse,
   CoachClientsResponse,
@@ -67,6 +70,42 @@ export function listCoachWorkouts(
 ) {
   return apiRequest<CoachClientWorkoutsResponse>(
     `${clientPath(userId, '/workouts')}?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export function listCoachNutritionRoster() {
+  return apiRequest<CoachNutritionRosterResponse>('/coach/nutrition');
+}
+
+export function getCoachNutrition(userId: string) {
+  return apiRequest<CoachNutritionResponse>(clientPath(userId, '/nutrition'));
+}
+
+export function setManualNutritionTarget(
+  userId: string,
+  body: {
+    targetCalories: string;
+    proteinGrams: string;
+    fatGrams: string;
+    carbsGrams: string;
+  },
+) {
+  return apiRequest<NutritionTargetResponse>(
+    clientPath(userId, '/nutrition/targets'),
+    { method: 'PUT', body },
+  );
+}
+
+export function applyNutritionCalculation(
+  userId: string,
+  calculationId: string,
+) {
+  return apiRequest<NutritionTargetResponse>(
+    clientPath(
+      userId,
+      `/nutrition/calculations/${encodeURIComponent(calculationId)}/activate`,
+    ),
+    { method: 'POST' },
   );
 }
 

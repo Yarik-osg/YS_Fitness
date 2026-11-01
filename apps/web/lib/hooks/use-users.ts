@@ -7,6 +7,7 @@ import type {
   ProfileUpdateInput,
 } from '@repo/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { nutritionCalculationsQueryKey } from '@/lib/hooks/use-nutrition';
 import { sessionHintFor } from '@/lib/auth/routing';
 import { writeSessionHint } from '@/lib/auth/session-cookie';
 import {
@@ -60,7 +61,12 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: (input: ProfileUpdateInput) => updateProfile(input),
-    onSuccess: (response) => {
+    onSuccess: (response, input) => {
+      if (input.weightKg !== undefined) {
+        void queryClient.invalidateQueries({
+          queryKey: nutritionCalculationsQueryKey,
+        });
+      }
       queryClient.setQueryData(assignedProgramQueryKey, response.program);
       void queryClient.invalidateQueries({ queryKey: myProgramQueryKey });
       queryClient.setQueryData(
@@ -156,6 +162,9 @@ export function useCreateMeasurement() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: measurementsQueryKey });
       await queryClient.invalidateQueries({ queryKey: meQueryKey });
+      await queryClient.invalidateQueries({
+        queryKey: nutritionCalculationsQueryKey,
+      });
     },
   });
 }

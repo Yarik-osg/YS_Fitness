@@ -50,15 +50,21 @@ function createService(
       findUnique: vi.fn(),
     },
   };
+  const nutrition = {
+    refreshAfterWeightChange: vi.fn().mockResolvedValue(undefined),
+  };
   return {
     service: new UsersService(
       prisma as never,
       programs as never,
       subscriptions as never,
+      undefined,
+      nutrition as never,
     ),
     prisma,
     programs,
     subscriptions,
+    nutrition,
   };
 }
 
@@ -535,12 +541,13 @@ describe('UsersService.updateProfile', () => {
   });
 
   it('does not reassign when the submitted focus is already stored', async () => {
-    const { service, programs } = serviceWithAssign();
+    const { service, programs, nutrition } = serviceWithAssign();
 
     await service.updateProfile(userId, { focusAreas: ['glutes'] });
 
     expect(onboardingResponses.update).not.toHaveBeenCalled();
     expect(programs.assign).not.toHaveBeenCalled();
+    expect(nutrition.refreshAfterWeightChange).not.toHaveBeenCalled();
   });
 
   it.each(['chest', 'abs'])(
@@ -611,7 +618,7 @@ describe('UsersService.updateProfile', () => {
   });
 
   it('reads the latest profile weight with an id tie-break', async () => {
-    const { service } = serviceWithAssign();
+    const { service, nutrition } = serviceWithAssign();
 
     await service.updateProfile(userId, { weightKg: 58 });
 
@@ -619,6 +626,7 @@ describe('UsersService.updateProfile', () => {
       where: { userId },
       orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
     });
+    expect(nutrition.refreshAfterWeightChange).toHaveBeenCalledWith(userId);
   });
 });
 
@@ -647,6 +655,9 @@ describe('UsersService measurements', () => {
       user: { findUniqueOrThrow: vi.fn() },
       bodyMeasurement,
     };
+    const nutrition = {
+      refreshAfterWeightChange: vi.fn().mockResolvedValue(undefined),
+    };
     const service = new UsersService(
       prisma as never,
       {
@@ -656,8 +667,10 @@ describe('UsersService measurements', () => {
         holdAssignment: vi.fn(),
       } as never,
       { hasActiveAccess: vi.fn() } as never,
+      undefined,
+      nutrition as never,
     );
-    return { service, prisma, bodyMeasurement };
+    return { service, prisma, bodyMeasurement, nutrition };
   }
 
   it('loads the profile weight with an id tie-break', async () => {
@@ -773,5 +786,28 @@ describe('UsersService measurements', () => {
       measuredAt: '2026-04-01T12:00:00.000Z',
     });
     vi.useRealTimers();
+  });
+
+  it('asks nutrition to refresh after the weight row is stored', async () => {
+    const { service, bodyMeasurement, nutrition } = serviceWithMeasurements();
+    bodyMeasurement.create.mockResolvedValue(
+      measurement(laterId, '70.5', new Date('2026-04-01T12:00:00.000Z')),
+    );
+
+    await service.createMeasurement(userId, 70.5);
+
+    expect(nutrition.refreshAfterWeightChange).toHaveBeenCalledWith(userId);
+  });
+
+  it('keeps the saved weight when nutrition refresh fails', async () => {
+    const { service, bodyMeasurement, nutrition } = serviceWithMeasurements();
+    bodyMeasurement.create.mockResolvedValue(
+      measurement(laterId, '70.5', new Date('2026-04-01T12:00:00.000Z')),
+    );
+    nutrition.refreshAfterWeightChange.mockRejectedValueOnce(new Error('down'));
+
+    await expect(
+      service.createMeasurement(userId, 70.5),
+    ).resolves.toMatchObject({ id: laterId, weightKg: 70.5 });
   });
 });

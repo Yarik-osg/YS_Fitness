@@ -12,8 +12,12 @@ import {
   archiveCoachClient,
   listProgramClients,
   restoreCoachClient,
+  applyNutritionCalculation,
   assignCoachProgram,
   getCoachClient,
+  getCoachNutrition,
+  listCoachNutritionRoster,
+  setManualNutritionTarget,
   updateCoachNote,
   listCoachClients,
   listCoachMeasurements,
@@ -28,6 +32,13 @@ export function useCoachClients() {
   return useQuery({
     queryKey: ['coach', 'clients'],
     queryFn: listCoachClients,
+  });
+}
+
+export function useCoachNutritionRoster() {
+  return useQuery({
+    queryKey: ['coach', 'nutrition'],
+    queryFn: listCoachNutritionRoster,
   });
 }
 
@@ -115,6 +126,51 @@ export function useAssignCoachProgram(userId: string) {
       });
     },
   });
+}
+
+export function useCoachNutrition(userId: string) {
+  return useQuery({
+    queryKey: ['coach', 'clients', userId, 'nutrition'],
+    queryFn: () => getCoachNutrition(userId),
+  });
+}
+
+export function useSetManualNutritionTarget(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      targetCalories: string;
+      proteinGrams: string;
+      fatGrams: string;
+      carbsGrams: string;
+    }) => setManualNutritionTarget(userId, body),
+    onSuccess: async () => {
+      await invalidateNutrition(queryClient, userId);
+    },
+  });
+}
+
+export function useApplyNutritionCalculation(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (calculationId: string) =>
+      applyNutritionCalculation(userId, calculationId),
+    onSuccess: async () => {
+      await invalidateNutrition(queryClient, userId);
+    },
+  });
+}
+
+function invalidateNutrition(
+  queryClient: ReturnType<typeof useQueryClient>,
+  userId: string,
+) {
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: ['coach', 'clients', userId, 'nutrition'],
+    }),
+    queryClient.invalidateQueries({ queryKey: ['coach', 'nutrition'] }),
+  ]);
 }
 
 export function useCoachClient(userId: string) {

@@ -152,11 +152,11 @@ export function CoachClientsPage() {
 
       {clients.data && clients.data.clients.length > 0 ? (
         <>
-          <div className="mt-6 flex gap-2">
+          <div className="mt-6 flex flex-wrap gap-2">
             <Button
               size="sm"
               variant={view === 'active' ? 'primary' : 'outline'}
-              className="rounded-lg"
+              className="rounded-lg whitespace-nowrap"
               aria-pressed={view === 'active'}
               onClick={() => {
                 setView('active');
@@ -168,7 +168,7 @@ export function CoachClientsPage() {
             <Button
               size="sm"
               variant={view === 'archived' ? 'primary' : 'outline'}
-              className="rounded-lg"
+              className="rounded-lg whitespace-nowrap"
               aria-pressed={view === 'archived'}
               onClick={() => {
                 setView('archived');

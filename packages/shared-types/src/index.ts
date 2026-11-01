@@ -552,3 +552,50 @@ export interface NutritionCalculationCreatedResponse extends NutritionCalculatio
 export interface NutritionCalculationListResponse {
   calculations: NutritionCalculationResponse[];
 }
+
+export interface NutritionTargetResponse {
+  id: string;
+  source: 'CALCULATED' | 'MANUAL';
+  calculationId: string | null;
+  targetCalories: string;
+  proteinGrams: string;
+  fatGrams: string;
+  carbsGrams: string;
+}
+
+export interface CoachNutritionResponse {
+  calculation: NutritionCalculationResponse | null;
+  target: NutritionTargetResponse | null;
+}
+
+export interface CoachNutritionRosterTarget {
+  source: 'CALCULATED' | 'MANUAL';
+  targetCalories: string;
+  proteinGrams: string;
+  fatGrams: string;
+  carbsGrams: string;
+}
+
+/** Values the formula would use. Activity and goal follow a nutrition profile when one exists. */
+export interface CoachNutritionRosterInputs {
+  sex: BiologicalSexForCalculation;
+  ageYears: number | null;
+  heightCm: string;
+  weightKg: string | null;
+  activity: NutritionActivity;
+  frequency: string | null;
+  goal: NutritionGoal;
+}
+
+export interface CoachNutritionRosterRow {
+  id: string;
+  email: string;
+  name: string | null;
+  archived: boolean;
+  target: CoachNutritionRosterTarget | null;
+  inputs: CoachNutritionRosterInputs | null;
+}
+
+export interface CoachNutritionRosterResponse {
+  clients: CoachNutritionRosterRow[];
+}

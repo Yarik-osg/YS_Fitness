@@ -60,11 +60,51 @@ const catalog = vi.hoisted(() => ({
   enabled: true,
 }));
 
+const nutrition = vi.hoisted(() => ({
+  current: {
+    isPending: false,
+    isError: false,
+    data: {
+      calculation: null as null | {
+        id: string;
+        targetCalories: string;
+        proteinGrams: string;
+        fatGrams: string;
+        carbsGrams: string;
+      },
+      target: null as null | {
+        id: string;
+        source: 'CALCULATED' | 'MANUAL';
+        calculationId: string | null;
+        targetCalories: string;
+        proteinGrams: string;
+        fatGrams: string;
+        carbsGrams: string;
+      },
+    },
+  },
+}));
+
+const manualTarget = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  isPending: false,
+  isError: false,
+}));
+
+const applyTarget = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  isPending: false,
+  isError: false,
+}));
+
 vi.mock('@/lib/hooks/use-coach-clients', () => ({
   useCoachClient: () => client.current,
   useAssignCoachProgram: () => assign,
   useUpdateCoachNote: () => noteSave,
   useGrantClientAccess: () => grant,
+  useCoachNutrition: () => nutrition.current,
+  useSetManualNutritionTarget: () => manualTarget,
+  useApplyNutritionCalculation: () => applyTarget,
 }));
 
 vi.mock('@/lib/hooks/use-subscriptions', () => ({
@@ -193,6 +233,17 @@ describe('CoachClientPage', () => {
     grant.isError = false;
     grant.error = null;
     catalog.enabled = true;
+    nutrition.current = {
+      isPending: false,
+      isError: false,
+      data: { calculation: null, target: null },
+    };
+    manualTarget.mutate.mockReset();
+    manualTarget.isPending = false;
+    manualTarget.isError = false;
+    applyTarget.mutate.mockReset();
+    applyTarget.isPending = false;
+    applyTarget.isError = false;
   });
 
   it('shows a loading state', () => {
@@ -505,6 +556,94 @@ describe('CoachClientPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This client already has access or an open checkout.',
     );
+  });
+
+  it('applies a calculation and saves a manual target', async () => {
+    client.current.data = DETAIL;
+    nutrition.current.data = {
+      calculation: {
+        id: 'calc-1',
+        targetCalories: '1739.429375',
+        proteinGrams: '120',
+        fatGrams: '54',
+        carbsGrams: '193.35734375',
+      },
+      target: {
+        id: 'manual-1',
+        source: 'MANUAL',
+        calculationId: null,
+        targetCalories: '1800',
+        proteinGrams: '130',
+        fatGrams: '50',
+        carbsGrams: '180',
+      },
+    };
+    renderPage();
+
+    expect(
+      screen.getByText('1800 kcal. Protein 130 g, fat 50 g, carbs 180 g.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/entered by hand/)).toBeInTheDocument();
+    expect(screen.queryByText(/Saved /)).toBeNull();
+    expect(
+      screen.queryByRole('heading', { name: 'What the client sees' }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Give the client this calculation' }),
+    );
+    expect(applyTarget.mutate).toHaveBeenCalledWith('calc-1');
+
+    await userEvent.type(screen.getByLabelText('Calories'), '1900');
+    await userEvent.type(screen.getByLabelText('Protein, g'), '140');
+    await userEvent.type(screen.getByLabelText('Fat, g'), '55');
+    await userEvent.type(screen.getByLabelText('Carbs, g'), '160,25');
+    await userEvent.click(
+      screen.getByRole('button', { name: "Save as the client's target" }),
+    );
+    expect(manualTarget.mutate).toHaveBeenCalledWith({
+      targetCalories: '1900',
+      proteinGrams: '140',
+      fatGrams: '55',
+      carbsGrams: '160.25',
+    });
+  });
+
+  it('shows a calculated target once', () => {
+    client.current.data = DETAIL;
+    nutrition.current.data = {
+      calculation: {
+        id: 'calc-1',
+        targetCalories: '3041',
+        proteinGrams: '142',
+        fatGrams: '71',
+        carbsGrams: '458',
+      },
+      target: {
+        id: 'target-1',
+        source: 'CALCULATED',
+        calculationId: 'calc-1',
+        targetCalories: '3041',
+        proteinGrams: '142',
+        fatGrams: '71',
+        carbsGrams: '458',
+      },
+    };
+    renderPage();
+
+    expect(
+      screen.getAllByText('3041 kcal. Protein 142 g, fat 71 g, carbs 458 g.'),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Calculation from the questionnaire',
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Give the client this calculation',
+      }),
+    ).toBeNull();
+    expect(screen.queryByText(/Saved /)).toBeNull();
   });
 
   it('waits while a checkout is open', () => {

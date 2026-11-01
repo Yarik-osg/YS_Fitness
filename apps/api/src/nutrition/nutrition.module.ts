@@ -9,5 +9,6 @@ import { NutritionService } from './nutrition.service.js';
   imports: [AuthModule, SubscriptionsModule],
   controllers: [NutritionController],
   providers: [NutritionService, NutritionIndexCheck],
+  exports: [NutritionService],
 })
 export class NutritionModule {}

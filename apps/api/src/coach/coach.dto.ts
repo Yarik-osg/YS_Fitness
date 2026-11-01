@@ -53,3 +53,15 @@ export class CoachClientPhotoParamsDto {
   userId!: string;
   photoId!: string;
 }
+
+export const coachNutritionCalculationParamsSchema =
+  coachClientParamsSchema.extend({
+    calculationId: z.string().uuid(),
+  });
+
+export class CoachNutritionCalculationParamsDto {
+  static readonly schema = coachNutritionCalculationParamsSchema;
+
+  userId!: string;
+  calculationId!: string;
+}

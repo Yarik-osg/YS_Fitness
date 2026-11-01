@@ -5,13 +5,19 @@ import {
 } from '@nestjs/common';
 import { Prisma, type NutritionCalculation } from '@prisma/client';
 import type {
+  CoachNutritionResponse,
+  CoachNutritionRosterResponse,
   NutritionCalculationCreatedResponse,
   NutritionCalculationListResponse,
   NutritionCalculationResponse,
   NutritionProfileGetResponse,
   NutritionProfileResponse,
+  NutritionTargetResponse,
 } from '@repo/shared-types';
-import type { NutritionProfileInput } from '@repo/validation';
+import type {
+  NutritionManualTargetInput,
+  NutritionProfileInput,
+} from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ageInTimeZone } from './nutrition-age.js';
 import {
@@ -22,7 +28,9 @@ import {
 import {
   calculateNutrition,
   NutritionInputError,
+  type NutritionActivity,
   type NutritionFrequency,
+  type NutritionGoal,
 } from './nutrition-calculation.js';
 
 @Injectable()
@@ -58,6 +66,144 @@ export class NutritionService {
     return toProfile(profile);
   }
 
+  async listRoster(now: Date): Promise<CoachNutritionRosterResponse> {
+    const users = await this.prisma.user.findMany({
+      where: { role: 'CLIENT' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        email: true,
+        isActive: true,
+        profile: {
+          select: {
+            name: true,
+            dateOfBirth: true,
+            biologicalSexForCalculation: true,
+            heightCm: true,
+            activityLevel: true,
+            goal: true,
+            timezone: true,
+          },
+        },
+        onboardingResponses: { select: { trainingFrequency: true } },
+        nutritionProfile: { select: { activity: true, goal: true } },
+        nutritionTargets: {
+          where: { active: true },
+          take: 1,
+          select: {
+            source: true,
+            targetCalories: true,
+            proteinGrams: true,
+            fatGrams: true,
+            carbsGrams: true,
+          },
+        },
+        bodyMeasurements: {
+          orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: { weightKg: true },
+        },
+      },
+    });
+    return { clients: users.map((user) => toRoster(user, now)) };
+  }
+
+  async getForCoach(userId: string): Promise<CoachNutritionResponse> {
+    await this.assertClient(userId);
+    const [calculation, target] = await Promise.all([
+      this.prisma.nutritionCalculation.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      }),
+    ]);
+    return {
+      calculation: calculation ? toCalculation(calculation) : null,
+      target: target ? toTarget(target) : null,
+    };
+  }
+
+  async setManualTarget(
+    userId: string,
+    input: NutritionManualTargetInput,
+  ): Promise<NutritionTargetResponse> {
+    await this.assertClient(userId);
+    return this.prisma.$transaction(async (db) => {
+      await this.lockClient(db, userId);
+      const active = await db.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      });
+      if (active) {
+        await db.nutritionTarget.update({
+          where: { id: active.id },
+          data: { active: false },
+        });
+      }
+      const created = await db.nutritionTarget.create({
+        data: {
+          userId,
+          active: true,
+          source: 'MANUAL',
+          calculationId: null,
+          targetCalories: new Prisma.Decimal(input.targetCalories),
+          proteinGrams: new Prisma.Decimal(input.proteinGrams),
+          fatGrams: new Prisma.Decimal(input.fatGrams),
+          carbsGrams: new Prisma.Decimal(input.carbsGrams),
+        },
+      });
+      return toTarget(created);
+    });
+  }
+
+  async applyCalculation(
+    userId: string,
+    calculationId: string,
+  ): Promise<NutritionTargetResponse> {
+    await this.assertClient(userId);
+    return this.prisma.$transaction(async (db) => {
+      await this.lockClient(db, userId);
+      const calculation = await db.nutritionCalculation.findFirst({
+        where: { id: calculationId, userId },
+      });
+      if (!calculation) {
+        throw new NotFoundException({
+          code: 'NUTRITION_CALCULATION_NOT_FOUND',
+          message: 'Calculation not found',
+        });
+      }
+      const active = await db.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      });
+      if (
+        active?.source === 'CALCULATED' &&
+        active.calculationId === calculation.id
+      ) {
+        return toTarget(active);
+      }
+      if (active) {
+        await db.nutritionTarget.update({
+          where: { id: active.id },
+          data: { active: false },
+        });
+      }
+      const created = await db.nutritionTarget.create({
+        data: {
+          userId,
+          active: true,
+          source: 'CALCULATED',
+          calculationId: calculation.id,
+          targetCalories: calculation.targetCalories,
+          proteinGrams: calculation.proteinGrams,
+          fatGrams: calculation.fatGrams,
+          carbsGrams: calculation.carbsGrams,
+        },
+      });
+      return toTarget(created);
+    });
+  }
+
   async listCalculations(
     userId: string,
   ): Promise<NutritionCalculationListResponse> {
@@ -75,23 +221,29 @@ export class NutritionService {
   ): Promise<NutritionCalculationCreatedResponse> {
     await this.assertClient(userId);
     const inputs = await this.calculationInputs(userId, now);
-    const result = calculateOrReject(inputs);
 
     return this.prisma.$transaction(async (db) => {
-      const locked = await db.$queryRaw<{ id: string }[]>`
-        SELECT id FROM users WHERE id = CAST(${userId} AS uuid) FOR UPDATE
-      `;
-      if (locked.length === 0) {
-        throw new NotFoundException({
-          code: 'CLIENT_NOT_FOUND',
-          message: 'Client not found',
-        });
-      }
+      await this.lockClient(db, userId);
+      const measured = await db.bodyMeasurement.findFirst({
+        where: { userId },
+        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+      });
+      if (!measured) throw unsupported('Nutrition inputs are incomplete');
+      const weightKg = measured.weightKg;
+      const result = calculateOrReject({ ...inputs, weightKg });
       const already = await db.nutritionCalculation.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
       });
-      if (already) {
+      const active = await db.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      });
+      // Several 1 kg saves count. The baseline is the last stored calculation.
+      // A manual target stays active, but the new snapshot is still stored.
+      if (
+        already &&
+        !weightShiftedByAtLeastFiveKg(already.weightKg, weightKg)
+      ) {
         return { ...toCalculation(already), activatedTarget: false };
       }
 
@@ -105,13 +257,10 @@ export class NutritionService {
         }
       }
 
-      const active = await db.nutritionTarget.findFirst({
-        where: { userId, active: true },
-      });
       const calculation = await db.nutritionCalculation.create({
         data: {
           userId,
-          weightKg: inputs.weightKg,
+          weightKg,
           heightCm: inputs.heightCm,
           ageYears: inputs.ageYears,
           sex: inputs.sex,
@@ -152,6 +301,31 @@ export class NutritionService {
       }
       return { ...toCalculation(calculation), activatedTarget };
     });
+  }
+
+  /** No-op until a calculation exists. Weight saves call this after the row is stored. */
+  async refreshAfterWeightChange(userId: string, now = new Date()) {
+    const existing = await this.prisma.nutritionCalculation.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!existing) return;
+    await this.calculate(userId, now);
+  }
+
+  private async lockClient(
+    db: Pick<PrismaService, '$queryRaw'>,
+    userId: string,
+  ) {
+    const locked = await db.$queryRaw<{ id: string }[]>`
+      SELECT id FROM users WHERE id = CAST(${userId} AS uuid) FOR UPDATE
+    `;
+    if (locked.length === 0) {
+      throw new NotFoundException({
+        code: 'CLIENT_NOT_FOUND',
+        message: 'Client not found',
+      });
+    }
   }
 
   private async assertClient(userId: string) {
@@ -242,6 +416,15 @@ function unsupported(message: string): never {
   });
 }
 
+const WEIGHT_SHIFT_KG = new Prisma.Decimal(5);
+
+function weightShiftedByAtLeastFiveKg(
+  storedKg: Prisma.Decimal,
+  currentKg: Prisma.Decimal,
+) {
+  return currentKg.minus(storedKg).abs().greaterThanOrEqualTo(WEIGHT_SHIFT_KG);
+}
+
 function isUniqueConflict(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -268,6 +451,101 @@ function toProfile(profile: {
     allergies: profile.allergies,
     dislikes: profile.dislikes,
     mealCount: profile.mealCount,
+  };
+}
+
+function toRoster(
+  user: {
+    id: string;
+    email: string;
+    isActive: boolean;
+    profile: {
+      name: string | null;
+      dateOfBirth: Date;
+      biologicalSexForCalculation: 'FEMALE' | 'MALE';
+      heightCm: Prisma.Decimal;
+      activityLevel: Parameters<typeof nutritionActivityFromDailyActivity>[0];
+      goal: Parameters<typeof nutritionGoalFromTrainingGoal>[0];
+      timezone: string;
+    } | null;
+    onboardingResponses: { trainingFrequency: string } | null;
+    nutritionProfile: {
+      activity: NutritionActivity;
+      goal: NutritionGoal;
+    } | null;
+    nutritionTargets: {
+      source: 'CALCULATED' | 'MANUAL';
+      targetCalories: Prisma.Decimal;
+      proteinGrams: Prisma.Decimal;
+      fatGrams: Prisma.Decimal;
+      carbsGrams: Prisma.Decimal;
+    }[];
+    bodyMeasurements: { weightKg: Prisma.Decimal }[];
+  },
+  now: Date,
+): CoachNutritionRosterResponse['clients'][number] {
+  const target = user.nutritionTargets[0] ?? null;
+  const profile = user.profile;
+  return {
+    id: user.id,
+    email: user.email,
+    name: profile?.name ?? null,
+    archived: !user.isActive,
+    target: target
+      ? {
+          source: target.source,
+          targetCalories: decimal(target.targetCalories),
+          proteinGrams: decimal(target.proteinGrams),
+          fatGrams: decimal(target.fatGrams),
+          carbsGrams: decimal(target.carbsGrams),
+        }
+      : null,
+    inputs: profile
+      ? {
+          sex: profile.biologicalSexForCalculation,
+          ageYears: ageYearsOf(profile.dateOfBirth, profile.timezone, now),
+          heightCm: decimal(profile.heightCm),
+          weightKg: user.bodyMeasurements[0]
+            ? decimal(user.bodyMeasurements[0].weightKg)
+            : null,
+          activity: user.nutritionProfile
+            ? user.nutritionProfile.activity
+            : nutritionActivityFromDailyActivity(profile.activityLevel),
+          frequency: user.onboardingResponses?.trainingFrequency ?? null,
+          goal: user.nutritionProfile
+            ? user.nutritionProfile.goal
+            : nutritionGoalFromTrainingGoal(profile.goal),
+        }
+      : null,
+  };
+}
+
+function ageYearsOf(dateOfBirth: Date, timeZone: string, now: Date) {
+  try {
+    return ageInTimeZone(dateOfBirth, timeZone, now);
+  } catch (error) {
+    if (error instanceof NutritionInputError) return null;
+    throw error;
+  }
+}
+
+function toTarget(row: {
+  id: string;
+  source: NutritionTargetResponse['source'];
+  calculationId: string | null;
+  targetCalories: Prisma.Decimal;
+  proteinGrams: Prisma.Decimal;
+  fatGrams: Prisma.Decimal;
+  carbsGrams: Prisma.Decimal;
+}): NutritionTargetResponse {
+  return {
+    id: row.id,
+    source: row.source,
+    calculationId: row.calculationId,
+    targetCalories: decimal(row.targetCalories),
+    proteinGrams: decimal(row.proteinGrams),
+    fatGrams: decimal(row.fatGrams),
+    carbsGrams: decimal(row.carbsGrams),
   };
 }
 
