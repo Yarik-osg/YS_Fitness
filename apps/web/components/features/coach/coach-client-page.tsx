@@ -21,6 +21,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
+import { exportCoachClient } from '@/lib/api/coach';
 import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
 import {
   useApplyNutritionCalculation,
@@ -33,6 +34,7 @@ import {
 } from '@/lib/hooks/use-coach-clients';
 import { useCoachPrograms } from '@/lib/hooks/use-coach-programs';
 import { usePlans } from '@/lib/hooks/use-subscriptions';
+import { exportDay, saveBlob } from '@/lib/save-blob';
 
 export function CoachClientPage({ userId }: { userId: string }) {
   const t = useTranslations('coach');
@@ -94,16 +96,49 @@ function ClientDetail({
 }) {
   const t = useTranslations('coach');
   const locale = useLocale();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
   const title = detail.program
     ? programCatalogName({ name: detail.program.templateName })
     : null;
   const joined = formatDate(locale, detail.createdAt);
 
+  async function downloadExport() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(false);
+    try {
+      const filename = `ys-fitness-client-${exportDay()}.xlsx`;
+      const blob = await exportCoachClient(detail.id);
+      saveBlob(blob, filename);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <>
-      <h1 className="mt-4 font-heading text-3xl leading-none text-ink">
-        {detail.name?.trim() ? detail.name : t('unnamed')}
-      </h1>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-heading text-3xl leading-none text-ink">
+          {detail.name?.trim() ? detail.name : t('unnamed')}
+        </h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-lg whitespace-nowrap"
+          disabled={exporting}
+          onClick={() => void downloadExport()}
+        >
+          {exporting ? t('exporting') : t('exportExcel')}
+        </Button>
+      </div>
+      {exportError ? (
+        <p role="alert" className="mt-4 text-sm text-amber">
+          {t('exportError')}
+        </p>
+      ) : null}
       <p className="mt-3 text-sm text-ink">{detail.email}</p>
       <p className="mt-1 text-sm text-muted">
         {t('joined')} {joined}
@@ -136,7 +171,7 @@ function ClientDetail({
         />
       </div>
 
-      <Section title={t('sections.profile')}>
+      <Section title={t('sections.profile')} plain>
         {detail.profile ? (
           <dl className="grid gap-3 sm:grid-cols-2">
             <Field
@@ -179,7 +214,7 @@ function ClientDetail({
         )}
       </Section>
 
-      <Section title={t('sections.questionnaire')}>
+      <Section title={t('sections.questionnaire')} plain>
         {detail.onboarding ? (
           <Answers answers={detail.onboarding} />
         ) : (
@@ -189,7 +224,7 @@ function ClientDetail({
 
       <CoachNutrition userId={detail.id} />
 
-      <Section title={t('sections.program')}>
+      <Section title={t('sections.program')} plain>
         {detail.program ? (
           <div>
             <p className="text-xs text-muted">
@@ -1079,9 +1114,21 @@ function assignErrorMessage(
   return t('catalog.assignError');
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+  plain = false,
+}: {
+  title: string;
+  children: ReactNode;
+  plain?: boolean;
+}) {
   return (
-    <section className="mt-8 rounded-lg border border-line bg-panel px-4 py-4">
+    <section
+      className={
+        plain ? 'mt-8' : 'mt-8 rounded-lg border border-line bg-panel px-4 py-4'
+      }
+    >
       <h2 className="mb-4 font-heading text-base text-ink">{title}</h2>
       {children}
     </section>

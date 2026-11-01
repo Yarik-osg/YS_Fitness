@@ -38,7 +38,9 @@ import {
   UpdateCoachNoteDto,
   CoachClientPhotoParamsDto,
   CoachProgramParamsDto,
+  CoachTableExportDto,
 } from './coach.dto.js';
+import { CoachExportService } from './coach-export.service.js';
 import { CoachService } from './coach.service.js';
 
 @Controller('coach')
@@ -48,11 +50,30 @@ export class CoachController {
   constructor(
     private readonly coach: CoachService,
     private readonly nutrition: NutritionService,
+    private readonly exports: CoachExportService,
   ) {}
 
   @Get('clients')
   listClients(): Promise<CoachClientsResponse> {
     return this.coach.listClients();
+  }
+
+  @Post('exports/table.xlsx')
+  @Header('Cache-Control', 'private, no-store')
+  async exportTable(
+    @Body() body: CoachTableExportDto,
+  ): Promise<StreamableFile> {
+    const file = await this.exports.table(body);
+    return streamExport(file);
+  }
+
+  @Get('exports/clients/:userId.xlsx')
+  @Header('Cache-Control', 'private, no-store')
+  async exportClient(
+    @Param() params: CoachClientParamsDto,
+  ): Promise<StreamableFile> {
+    const file = await this.exports.clientWorkbook(params.userId);
+    return streamExport(file);
   }
 
   @Get('nutrition')
@@ -167,4 +188,11 @@ export class CoachController {
     );
     return new StreamableFile(image, { type: 'image/jpeg' });
   }
+}
+
+function streamExport(file: { body: Buffer; type: string; filename: string }) {
+  return new StreamableFile(file.body, {
+    type: file.type,
+    disposition: `attachment; filename="${file.filename}"`,
+  });
 }

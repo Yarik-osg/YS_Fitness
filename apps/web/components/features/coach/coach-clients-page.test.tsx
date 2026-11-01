@@ -52,6 +52,12 @@ const restore = vi.hoisted(() => ({
   },
 }));
 
+const exportFile = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/api/coach', () => ({
+  exportCoachTable: exportFile,
+}));
+
 vi.mock('@/lib/hooks/use-coach-clients', () => ({
   useCoachClients: () => roster.current,
   useArchiveClient: () => archive.current,
@@ -115,6 +121,7 @@ describe('CoachClientsPage', () => {
       isError: false,
       reset: vi.fn(),
     };
+    exportFile.mockReset();
   });
 
   it('shows a loading state', () => {
@@ -635,5 +642,43 @@ describe('CoachClientsPage', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(roster.current.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts one excel download of the visible clients and ignores a second click', async () => {
+    roster.current.data = CLIENTS;
+    let release: (blob: Blob) => void = () => undefined;
+    exportFile.mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const create = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:export');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.fn();
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      const element = realCreate(tagName);
+      if (tagName === 'a') element.click = click;
+      return element;
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const button = screen.getByRole('button', { name: 'Експорт в Excel' });
+
+    await user.click(button);
+    expect(exportFile).toHaveBeenCalledTimes(1);
+    expect(exportFile.mock.calls[0]?.[0].sheet).toBe('Clients');
+    expect(exportFile.mock.calls[0]?.[0].rows).toEqual([
+      expect.arrayContaining(['olena@example.com', 'Upper split']),
+    ]);
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(exportFile).toHaveBeenCalledTimes(1);
+
+    release(new Blob(['xlsx']));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });

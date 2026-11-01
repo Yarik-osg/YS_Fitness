@@ -16,6 +16,19 @@ export function listCoachClients() {
   return apiRequest<CoachClientsResponse>('/coach/clients');
 }
 
+export function exportCoachTable(body: {
+  filename: string;
+  sheet: 'Clients' | 'Nutrition';
+  headers: string[];
+  rows: (string | number | null)[][];
+}) {
+  return apiBlob('/coach/exports/table.xlsx', { method: 'POST', body });
+}
+
+export function exportCoachClient(userId: string) {
+  return apiBlob(`/coach/exports/clients/${encodeURIComponent(userId)}.xlsx`);
+}
+
 export function getCoachClient(userId: string) {
   return apiRequest<CoachClientDetail>(
     `/coach/clients/${encodeURIComponent(userId)}`,

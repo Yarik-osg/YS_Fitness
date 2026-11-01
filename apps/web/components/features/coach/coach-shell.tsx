@@ -35,18 +35,18 @@ export function CoachShell({ children }: { children: ReactNode }) {
   return (
     <div className="coach-app min-h-screen">
       <header className="border-b border-line">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-6">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
+          <nav className="flex max-w-full flex-wrap items-center gap-x-6 gap-y-2">
             <Link
               href="/coach"
-              className={`font-heading text-lg leading-none tracking-wide text-ink uppercase ${focusRing}`}
+              className={`font-heading text-lg leading-none tracking-wide whitespace-nowrap text-ink uppercase ${focusRing}`}
             >
               YS Fitness
             </Link>
             <Link
               href="/coach"
               aria-current={onRoster ? 'page' : undefined}
-              className={`font-label text-xs font-semibold motion-safe:transition-colors ${focusRing} ${
+              className={`font-label text-xs font-semibold whitespace-nowrap motion-safe:transition-colors ${focusRing} ${
                 onRoster
                   ? 'text-ink shadow-[inset_0_-1px_0_0_var(--color-teal)]'
                   : 'text-muted hover:text-ink'
@@ -57,7 +57,7 @@ export function CoachShell({ children }: { children: ReactNode }) {
             <Link
               href="/coach/nutrition"
               aria-current={onNutrition ? 'page' : undefined}
-              className={`font-label text-xs font-semibold motion-safe:transition-colors ${focusRing} ${
+              className={`font-label text-xs font-semibold whitespace-nowrap motion-safe:transition-colors ${focusRing} ${
                 onNutrition
                   ? 'text-ink shadow-[inset_0_-1px_0_0_var(--color-teal)]'
                   : 'text-muted hover:text-ink'
@@ -68,7 +68,7 @@ export function CoachShell({ children }: { children: ReactNode }) {
             <Link
               href="/coach/programs"
               aria-current={onPrograms ? 'page' : undefined}
-              className={`font-label text-xs font-semibold motion-safe:transition-colors ${focusRing} ${
+              className={`font-label text-xs font-semibold whitespace-nowrap motion-safe:transition-colors ${focusRing} ${
                 onPrograms
                   ? 'text-ink shadow-[inset_0_-1px_0_0_var(--color-teal)]'
                   : 'text-muted hover:text-ink'
@@ -76,10 +76,10 @@ export function CoachShell({ children }: { children: ReactNode }) {
             >
               {t('catalog.nav')}
             </Link>
-          </div>
+          </nav>
           <div className="flex items-center gap-2">
             <LocaleSwitcher
-              className={`inline-flex h-10 items-center rounded-lg px-3 text-xs font-semibold tracking-normal text-muted normal-case hover:text-ink motion-safe:transition-colors ${focusRing}`}
+              className={`inline-flex h-10 items-center rounded-lg px-3 text-xs font-semibold tracking-normal whitespace-nowrap text-muted normal-case hover:text-ink motion-safe:transition-colors ${focusRing}`}
             />
             <Button
               variant="outline"

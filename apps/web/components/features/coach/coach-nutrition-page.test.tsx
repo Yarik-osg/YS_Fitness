@@ -50,6 +50,12 @@ vi.mock('@/lib/hooks/use-coach-clients', () => ({
   useCoachNutritionRoster: () => roster.current,
 }));
 
+const exportFile = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/api/coach', () => ({
+  exportCoachTable: exportFile,
+}));
+
 function renderPage() {
   return render(
     <I18nTestProvider locale="en">
@@ -100,6 +106,7 @@ describe('CoachNutritionPage', () => {
       isError: false,
       refetch: vi.fn(),
     };
+    exportFile.mockReset();
   });
 
   it('shows every client target beside the formula inputs', async () => {
@@ -148,5 +155,20 @@ describe('CoachNutritionPage', () => {
     expect(
       screen.getByText('No clients match this search.'),
     ).toBeInTheDocument();
+  });
+
+  it('exports the nutrition rows on screen', async () => {
+    exportFile.mockResolvedValue(new Blob(['xlsx']));
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:export');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    renderPage();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Export to Excel' }),
+    );
+    expect(exportFile).toHaveBeenCalledTimes(1);
+    expect(exportFile.mock.calls[0]?.[0].sheet).toBe('Nutrition');
+    expect(exportFile.mock.calls[0]?.[0].rows).toEqual([
+      expect.arrayContaining(['Anna', 'anna@example.com', '1800 By hand']),
+    ]);
   });
 });
