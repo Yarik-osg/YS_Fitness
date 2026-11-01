@@ -12,7 +12,7 @@ export function LockedProgramScreen({
   nav,
 }: {
   children: ReactNode;
-  nav: 'home' | 'training';
+  nav: 'home' | 'training' | 'nutrition';
 }) {
   return (
     <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-24">

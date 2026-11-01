@@ -3,7 +3,7 @@
 import type { AssignedProgramResponse } from '@repo/shared-types';
 import { Dumbbell } from 'lucide-react';
 import { useLocale, useMessages, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { BrandMark } from '@/components/auth/auth-shell';
 import { LocaleSwitcher } from '@/components/locale-switcher';
@@ -25,6 +25,11 @@ import { useAssignProgram, useMyProgram } from '@/lib/hooks/use-programs';
 import { useMySubscription } from '@/lib/hooks/use-subscriptions';
 import { grantsActiveAccess } from '@/lib/subscriptions/access';
 import { useMeasurements } from '@/lib/hooks/use-users';
+import {
+  useCalculateNutrition,
+  useNutritionCalculations,
+} from '@/lib/hooks/use-nutrition';
+import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
 import { useClientProgramTitle } from '@/lib/program-title';
 import {
   formatDelta,
@@ -186,7 +191,10 @@ function AssignedHome({ program }: { program: AssignedProgramResponse }) {
             </p>
             <Chevron className="absolute right-3.5 bottom-3.5 text-lime" />
           </Link>
+          <NutritionHomeCard />
+        </div>
 
+        <div className="grid grid-cols-2 gap-2.5">
           <ProgressHomeCard
             completed={program.programProgress?.completed}
             expected={program.programProgress?.expected}
@@ -382,6 +390,65 @@ export function AssignProgramCard({
         )}
       </div>
     </article>
+  );
+}
+
+function NutritionHomeCard() {
+  const t = useTranslations('dashboard');
+  const calculations = useNutritionCalculations();
+  const { mutate } = useCalculateNutrition();
+  const started = useRef(false);
+  const latest = calculations.data?.calculations[0] ?? null;
+
+  useEffect(() => {
+    if (
+      started.current ||
+      !calculations.isSuccess ||
+      calculations.isFetching ||
+      latest
+    ) {
+      return;
+    }
+    started.current = true;
+    mutate();
+  }, [mutate, calculations.isSuccess, calculations.isFetching, latest]);
+
+  const pending = calculations.isPending && calculations.data === undefined;
+
+  return (
+    <Link
+      href="/nutrition"
+      className="relative block min-h-[130px] overflow-hidden border-[1.5px] border-teal/20 px-4 py-[18px]"
+    >
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-linear-to-r from-teal to-transparent" />
+      <p className="mb-2 font-label text-[7px] font-bold tracking-[0.16em] text-teal/70 uppercase">
+        {t('home.nav.nutrition')}
+      </p>
+      {pending ? (
+        <Skeleton className="h-7 w-20" />
+      ) : latest ? (
+        <>
+          <p className="mb-1.5 flex items-baseline gap-1">
+            <span className="font-heading text-[26px] leading-none tracking-[-0.02em] text-teal tabular-nums">
+              {roundHalfAwayFromZero(latest.targetCalories)}
+            </span>
+            <span className="font-label text-[8px] font-semibold tracking-[0.08em] text-white/30 uppercase">
+              {t('home.nutritionKcal')}
+            </span>
+          </p>
+          <p className="text-[9px] leading-snug font-medium text-white/40 tabular-nums">
+            {t('home.nutritionMacros', {
+              protein: roundHalfAwayFromZero(latest.proteinGrams),
+              fat: roundHalfAwayFromZero(latest.fatGrams),
+              carbs: roundHalfAwayFromZero(latest.carbsGrams),
+            })}
+          </p>
+        </>
+      ) : null}
+      <p className="mt-3 font-label text-[8px] font-semibold tracking-[0.08em] text-teal/60">
+        {t('home.nutritionDaily')}
+      </p>
+    </Link>
   );
 }
 

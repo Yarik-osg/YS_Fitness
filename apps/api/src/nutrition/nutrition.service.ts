@@ -15,6 +15,11 @@ import type { NutritionProfileInput } from '@repo/validation';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ageInTimeZone } from './nutrition-age.js';
 import {
+  mealCountFromBand,
+  nutritionActivityFromDailyActivity,
+  nutritionGoalFromTrainingGoal,
+} from './nutrition-from-onboarding.js';
+import {
   calculateNutrition,
   NutritionInputError,
   type NutritionFrequency,
@@ -81,6 +86,23 @@ export class NutritionService {
           code: 'CLIENT_NOT_FOUND',
           message: 'Client not found',
         });
+      }
+      const already = await db.nutritionCalculation.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (already) {
+        return { ...toCalculation(already), activatedTarget: false };
+      }
+
+      if (inputs.profileToCreate) {
+        try {
+          await db.nutritionProfile.create({
+            data: { userId, ...inputs.profileToCreate },
+          });
+        } catch (error) {
+          if (!isUniqueConflict(error)) throw error;
+        }
       }
 
       const active = await db.nutritionTarget.findFirst({
@@ -155,21 +177,37 @@ export class NutritionService {
       }),
       this.prisma.onboardingResponses.findUnique({
         where: { userId },
-        select: { trainingFrequency: true },
+        select: { trainingFrequency: true, mealsPerDay: true },
       }),
     ]);
-    if (!profile || !body || !measurement) {
+    if (!body || !measurement) {
       throw unsupported('Nutrition inputs are incomplete');
     }
+    const activity = profile
+      ? profile.activity
+      : nutritionActivityFromDailyActivity(body.activityLevel);
+    const goal = profile
+      ? profile.goal
+      : nutritionGoalFromTrainingGoal(body.goal);
     try {
       return {
         sex: body.biologicalSexForCalculation,
         weightKg: measurement.weightKg,
         heightCm: body.heightCm,
         ageYears: ageInTimeZone(body.dateOfBirth, body.timezone, now),
-        activity: profile.activity,
+        activity,
         frequency: frequencyOf(onboarding?.trainingFrequency),
-        goal: profile.goal,
+        goal,
+        profileToCreate: profile
+          ? null
+          : {
+              activity,
+              goal,
+              preferences: null,
+              allergies: null,
+              dislikes: null,
+              mealCount: mealCountFromBand(onboarding?.mealsPerDay),
+            },
       };
     } catch (error) {
       if (error instanceof NutritionInputError)
@@ -202,6 +240,13 @@ function unsupported(message: string): never {
     code: 'NUTRITION_INPUT_UNSUPPORTED',
     message,
   });
+}
+
+function isUniqueConflict(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }
 
 function decimal(value: Prisma.Decimal) {

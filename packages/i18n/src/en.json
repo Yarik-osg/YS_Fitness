@@ -615,6 +615,9 @@
       "start": "Start workout →",
       "continue": "Continue workout →",
       "training": "Training",
+      "nutritionDaily": "Your daily target →",
+      "nutritionKcal": "kcal",
+      "nutritionMacros": "P {protein} g • F {fat} g • C {carbs} g",
       "summary": "{exercises, plural, one {# exercise} other {# exercises}} · {sets, plural, one {# set} other {# sets}}",
       "profile": "Profile",
       "kg": "kg",
@@ -879,6 +882,24 @@
       "loadError": "The calendar could not be loaded.",
       "retry": "Retry"
     }
+  },
+  "nutrition": {
+    "brand": "YS Fitness",
+    "title": "Nutrition",
+    "loading": "Loading nutrition",
+    "unsupported": "Calories cannot be calculated until your profile has weight, height, age, and workouts per week.",
+    "loadError": "Nutrition could not be loaded.",
+    "perDay": "per day",
+    "kcal": "kcal",
+    "grams": "g",
+    "protein": "Protein",
+    "fat": "Fat",
+    "carbs": "Carbs",
+    "note": "Calculated for you from your details and goal.",
+    "carbsNonPositive": "Carbs are at or below zero with these inputs.",
+    "menuTitle": "A menu for your macros",
+    "menuBody": "Ready meals with portions matched to your targets.",
+    "inProgress": "In progress"
   },
   "progress": {
     "brand": "YS Fitness",

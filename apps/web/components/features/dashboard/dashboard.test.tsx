@@ -371,11 +371,16 @@ describe('Dashboard program', () => {
     expect(
       screen.getByRole('link', { name: /9 \/ 16 тренувань/ }),
     ).toHaveAttribute('href', '/progress');
-    for (const name of ['Харчування', 'Бібліотека']) {
-      const tab = screen.getByRole('button', { name });
-      expect(tab).toBeDisabled();
-      expect(tab.closest('a')).toBeNull();
-    }
+    expect(screen.getByRole('link', { name: 'Харчування' })).toHaveAttribute(
+      'href',
+      '/nutrition',
+    );
+    expect(
+      screen.getByRole('link', { name: /Твоя денна норма/ }),
+    ).toHaveAttribute('href', '/nutrition');
+    const library = screen.getByRole('button', { name: 'Бібліотека' });
+    expect(library).toBeDisabled();
+    expect(library.closest('a')).toBeNull();
   });
 
   it('shows the home for a returning member without assigning again', async () => {

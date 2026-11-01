@@ -195,6 +195,28 @@ describe('applyAuthRedirect', () => {
     ).toBe('/uk/onboarding');
   });
 
+  it('protects nutrition like the dashboard', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/nutrition',
+        locale: 'en',
+        fullPathname: '/en/nutrition',
+        hint: null,
+      }),
+    ).toBe('/en/login?next=%2Fen%2Fnutrition');
+  });
+
+  it('keeps an incomplete session away from nutrition', () => {
+    expect(
+      applyAuthRedirect({
+        pathnameWithoutLocale: '/nutrition',
+        locale: 'uk',
+        fullPathname: '/uk/nutrition',
+        hint: 'onboarding',
+      }),
+    ).toBe('/uk/onboarding');
+  });
+
   it('sends a signed-out coach visit to login', () => {
     expect(
       applyAuthRedirect({

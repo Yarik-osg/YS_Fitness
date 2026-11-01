@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type NutritionCalculation } from '@prisma/client';
 import { nutritionProfileSchema } from '@repo/validation';
 import { describe, expect, it, vi } from 'vitest';
 import { NutritionService } from './nutrition.service.js';
@@ -19,6 +19,15 @@ function harness(options?: {
   heightCm?: string;
   activity?: 'SEDENTARY' | 'MODERATE';
   goal?: 'LOSE_WEIGHT' | 'MAINTAIN';
+  activityLevel?:
+    | 'SEDENTARY'
+    | 'LIGHTLY_ACTIVE'
+    | 'MODERATELY_ACTIVE'
+    | 'VERY_ACTIVE'
+    | 'EXTRA_ACTIVE';
+  trainingGoal?: 'LOSE_WEIGHT' | 'MAINTAIN_WEIGHT' | 'GAIN_WEIGHT';
+  mealsPerDay?: string;
+  racedCalculation?: NutritionCalculation | null;
 }) {
   const created: { data: Record<string, unknown> }[] = [];
   const targetUpdates: { where: unknown; data: unknown }[] = [];
@@ -35,6 +44,7 @@ function harness(options?: {
           dislikes: null,
           mealCount: 3,
         };
+  const profileCreates: { data: Record<string, unknown> }[] = [];
   const tx = {
     $queryRaw: vi
       .fn()
@@ -50,7 +60,14 @@ function harness(options?: {
         return { id: 'target-1', ...args.data };
       }),
     },
+    nutritionProfile: {
+      create: vi.fn(async (args: { data: Record<string, unknown> }) => {
+        profileCreates.push(args);
+        return { id: 'profile-1', ...args.data };
+      }),
+    },
     nutritionCalculation: {
+      findFirst: vi.fn(async () => options?.racedCalculation ?? null),
       create: vi.fn(async (args: { data: Record<string, unknown> }) => {
         created.push(args);
         return {
@@ -83,6 +100,8 @@ function harness(options?: {
         return {
           biologicalSexForCalculation: 'FEMALE',
           heightCm: new Prisma.Decimal(options?.heightCm ?? '165'),
+          activityLevel: options?.activityLevel ?? 'MODERATELY_ACTIVE',
+          goal: options?.trainingGoal ?? 'LOSE_WEIGHT',
           dateOfBirth: new Date(
             options?.ageYears?.dob ?? '1996-11-01T00:00:00.000Z',
           ),
@@ -100,7 +119,10 @@ function harness(options?: {
     onboardingResponses: {
       findUnique: vi.fn(async (args: unknown) => {
         reads.push({ model: 'onboardingResponses', args });
-        return { trainingFrequency: options?.frequency ?? '3' };
+        return {
+          trainingFrequency: options?.frequency ?? '3',
+          mealsPerDay: options?.mealsPerDay ?? '3',
+        };
       }),
     },
     nutritionCalculation: {
@@ -121,6 +143,7 @@ function harness(options?: {
     created,
     targetUpdates,
     targetCreates,
+    profileCreates,
     reads,
   };
 }
@@ -150,6 +173,41 @@ describe('NutritionService', () => {
     ).toBe(true);
   });
 
+  it('returns the stored calculation instead of saving another', async () => {
+    const racedCalculation = {
+      id: 'calc-existing',
+      userId,
+      createdAt: now,
+      weightKg: new Prisma.Decimal('60'),
+      heightCm: new Prisma.Decimal('165'),
+      ageYears: 30,
+      sex: 'FEMALE',
+      activity: 'MODERATE',
+      frequency: 3,
+      goal: 'LOSE_WEIGHT',
+      activityMultiplier: new Prisma.Decimal('1.55'),
+      goalAdjustment: new Prisma.Decimal('-0.15'),
+      bmr: new Prisma.Decimal('1320.25'),
+      tdee: new Prisma.Decimal('2046.3875'),
+      targetCalories: new Prisma.Decimal('1739.429375'),
+      proteinGrams: new Prisma.Decimal('120'),
+      fatGrams: new Prisma.Decimal('54'),
+      carbsGrams: new Prisma.Decimal('193.35734375'),
+      carbsNonPositive: false,
+    } as NutritionCalculation;
+    const { service, created, targetCreates } = harness({ racedCalculation });
+
+    const result = await service.calculate(userId, now);
+
+    expect(created).toHaveLength(0);
+    expect(targetCreates).toHaveLength(0);
+    expect(result).toMatchObject({
+      id: 'calc-existing',
+      activatedTarget: false,
+      targetCalories: '1739.429375',
+    });
+  });
+
   it('replaces an active calculated target and keeps its numbers untouched', async () => {
     const { service, targetUpdates, targetCreates } = harness({
       active: { id: 'old-target', source: 'CALCULATED' },
@@ -162,6 +220,27 @@ describe('NutritionService', () => {
       { where: { id: 'old-target' }, data: { active: false } },
     ]);
     expect(targetCreates).toHaveLength(1);
+  });
+
+  it('derives the first profile from onboarding when none is saved', async () => {
+    const { service, profileCreates, created } = harness({
+      profile: false,
+      activityLevel: 'LIGHTLY_ACTIVE',
+      trainingGoal: 'GAIN_WEIGHT',
+      mealsPerDay: '4-5',
+    });
+
+    const result = await service.calculate(userId, now);
+
+    expect(profileCreates[0]?.data).toMatchObject({
+      userId,
+      activity: 'SEDENTARY',
+      goal: 'GAIN_MUSCLE',
+      mealCount: 4,
+    });
+    expect(created[0]?.data.activity).toBe('SEDENTARY');
+    expect(created[0]?.data.goal).toBe('GAIN_MUSCLE');
+    expect(result.activatedTarget).toBe(true);
   });
 
   it('keeps an active manual target when a new calculation is stored', async () => {

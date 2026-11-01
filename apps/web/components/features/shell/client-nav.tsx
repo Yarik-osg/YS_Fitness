@@ -14,7 +14,7 @@ import { Link } from '@/i18n/navigation';
 const NAV_ITEMS = [
   { id: 'home', href: '/dashboard', icon: Home },
   { id: 'training', href: '/training', icon: Dumbbell },
-  { id: 'nutrition', href: null, icon: Apple },
+  { id: 'nutrition', href: '/nutrition', icon: Apple },
   { id: 'progress', href: '/progress', icon: BarChart3 },
   { id: 'profile', href: '/profile', icon: User },
   { id: 'library', href: null, icon: LayoutGrid },
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
 export function ClientNav({
   active,
 }: {
-  active: 'home' | 'training' | 'profile' | 'progress';
+  active: 'home' | 'training' | 'nutrition' | 'profile' | 'progress';
 }) {
   const t = useTranslations('dashboard');
 
