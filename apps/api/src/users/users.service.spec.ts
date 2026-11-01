@@ -630,7 +630,49 @@ describe('UsersService.updateProfile', () => {
       where: { userId },
       orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
     });
-    expect(nutrition.refreshAfterWeightChange).toHaveBeenCalledWith(userId);
+    expect(nutrition.refreshAfterWeightChange).not.toHaveBeenCalled();
+    expect(nutrition.replaceFromProfile).not.toHaveBeenCalled();
+  });
+
+  it('recalculates once when only the weight changes', async () => {
+    const { service, nutrition } = serviceWithAssign();
+
+    await service.updateProfile(userId, { weightKg: 70 });
+
+    expect(nutrition.refreshAfterWeightChange).toHaveBeenCalledTimes(1);
+    expect(nutrition.replaceFromProfile).not.toHaveBeenCalled();
+  });
+
+  it('recalculates once when only the goal changes', async () => {
+    const { service, nutrition } = serviceWithAssign();
+
+    await service.updateProfile(userId, { mainGoal: 'lose_weight' });
+
+    expect(nutrition.replaceFromProfile).toHaveBeenCalledTimes(1);
+    expect(nutrition.refreshAfterWeightChange).not.toHaveBeenCalled();
+  });
+
+  it('recalculates once when only the weekly frequency changes', async () => {
+    const { service, nutrition } = serviceWithAssign();
+
+    await service.updateProfile(userId, { trainingFrequency: '4' });
+
+    expect(nutrition.replaceFromProfile).toHaveBeenCalledTimes(1);
+    expect(nutrition.refreshAfterWeightChange).not.toHaveBeenCalled();
+  });
+
+  it('recalculates once when weight, height, goal, and frequency change together', async () => {
+    const { service, nutrition } = serviceWithAssign();
+
+    await service.updateProfile(userId, {
+      weightKg: 70,
+      heightCm: 170,
+      mainGoal: 'lose_weight',
+      trainingFrequency: '4',
+    });
+
+    expect(nutrition.replaceFromProfile).toHaveBeenCalledTimes(1);
+    expect(nutrition.refreshAfterWeightChange).not.toHaveBeenCalled();
   });
 });
 

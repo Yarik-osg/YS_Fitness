@@ -38,9 +38,9 @@ describe('calculateNutrition', () => {
     expect(result.goalAdjustment.equals('-0.15')).toBe(true);
     expect(result.tdee.equals('2046.3875')).toBe(true);
     expect(result.targetCalories.equals('1739.429375')).toBe(true);
-    expect(result.proteinGrams.equals('120')).toBe(true);
+    expect(result.proteinGrams.equals('132')).toBe(true);
     expect(result.fatGrams.equals('54')).toBe(true);
-    expect(result.carbsGrams.equals('193.35734375')).toBe(true);
+    expect(result.carbsGrams.equals('181.35734375')).toBe(true);
     expect(result.carbsNonPositive).toBe(false);
   });
 
@@ -75,9 +75,9 @@ describe('calculateNutrition', () => {
   );
 
   it.each([
-    ['LOSE_WEIGHT', '-0.15', '2'],
-    ['MAINTAIN', '0', '1.6'],
-    ['GAIN_MUSCLE', '0.075', '1.8'],
+    ['LOSE_WEIGHT', '-0.15', '2.2'],
+    ['MAINTAIN', '0', '1.8'],
+    ['GAIN_MUSCLE', '0.075', '2'],
     ['RECOMPOSITION', '0', '2'],
   ] as const)(
     'applies %s as %s and %s g/kg protein',
@@ -96,7 +96,7 @@ describe('calculateNutrition', () => {
 
     expect(result.tdee.equals('2046.3875')).toBe(true);
     expect(result.targetCalories.equals('2199.8665625')).toBe(true);
-    expect(result.proteinGrams.equals('108')).toBe(true);
+    expect(result.proteinGrams.equals('120')).toBe(true);
   });
 
   it('keeps a non-positive carbohydrate result instead of clamping it', () => {
@@ -110,7 +110,7 @@ describe('calculateNutrition', () => {
       goal: 'LOSE_WEIGHT',
     });
 
-    expect(result.carbsGrams.equals('-42.23375')).toBe(true);
+    expect(result.carbsGrams.equals('-50.23375')).toBe(true);
     expect(result.carbsNonPositive).toBe(true);
     expect(result.targetCalories.equals('475.065')).toBe(true);
   });

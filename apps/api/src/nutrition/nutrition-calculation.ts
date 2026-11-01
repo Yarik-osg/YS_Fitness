@@ -36,9 +36,9 @@ const GOAL_ADJUSTMENT: Record<NutritionGoal, string> = {
 };
 
 const PROTEIN_PER_KG: Record<NutritionGoal, string> = {
-  LOSE_WEIGHT: '2',
-  MAINTAIN: '1.6',
-  GAIN_MUSCLE: '1.8',
+  LOSE_WEIGHT: '2.2',
+  MAINTAIN: '1.8',
+  GAIN_MUSCLE: '2',
   RECOMPOSITION: '2',
 };
 

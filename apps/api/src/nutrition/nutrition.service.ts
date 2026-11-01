@@ -231,17 +231,11 @@ export class NutritionService {
     now = new Date(),
   ): Promise<NutritionCalculationCreatedResponse> {
     await this.assertClient(userId);
-    const inputs = await this.calculationInputs(userId, now);
 
     return this.prisma.$transaction(async (db) => {
       await this.lockClient(db, userId);
-      const measured = await db.bodyMeasurement.findFirst({
-        where: { userId },
-        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
-      });
-      if (!measured) throw unsupported('Nutrition inputs are incomplete');
-      const weightKg = measured.weightKg;
-      const result = calculateOrReject({ ...inputs, weightKg });
+      const inputs = await this.calculationInputs(db, userId, now);
+      const result = calculateOrReject(inputs);
       const already = await db.nutritionCalculation.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
@@ -253,7 +247,7 @@ export class NutritionService {
       // A manual target stays active, but the new snapshot is still stored.
       if (
         already &&
-        !weightShiftedByAtLeastFiveKg(already.weightKg, weightKg)
+        !weightShiftedByAtLeastFiveKg(already.weightKg, inputs.weightKg)
       ) {
         return { ...toCalculation(already), activatedTarget: false };
       }
@@ -271,7 +265,7 @@ export class NutritionService {
       const calculation = await db.nutritionCalculation.create({
         data: {
           userId,
-          weightKg,
+          weightKg: inputs.weightKg,
           heightCm: inputs.heightCm,
           ageYears: inputs.ageYears,
           sex: inputs.sex,
@@ -314,19 +308,13 @@ export class NutritionService {
     });
   }
 
-  /** Height, main goal, or weekly frequency changed. Rewrite the stored norm. */
+  /** Height, main goal, or weekly frequency changed. Append a new snapshot. */
   async replaceFromProfile(userId: string, now = new Date()) {
     await this.assertClient(userId);
-    const inputs = await this.calculationInputs(userId, now, true);
     await this.prisma.$transaction(async (db) => {
       await this.lockClient(db, userId);
-      const measured = await db.bodyMeasurement.findFirst({
-        where: { userId },
-        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
-      });
-      if (!measured) throw unsupported('Nutrition inputs are incomplete');
-      const weightKg = measured.weightKg;
-      const result = calculateOrReject({ ...inputs, weightKg });
+      const inputs = await this.calculationInputs(db, userId, now, true);
+      const result = calculateOrReject(inputs);
       if (inputs.profileToCreate) {
         try {
           await db.nutritionProfile.create({
@@ -341,62 +329,49 @@ export class NutritionService {
           data: { activity: inputs.activity, goal: inputs.goal },
         });
       }
-      const numbers = {
-        weightKg,
-        heightCm: inputs.heightCm,
-        ageYears: inputs.ageYears,
-        sex: inputs.sex,
-        activity: inputs.activity,
-        frequency: inputs.frequency,
-        goal: inputs.goal,
-        activityMultiplier: result.activityMultiplier,
-        goalAdjustment: result.goalAdjustment,
-        bmr: result.bmr,
-        tdee: result.tdee,
-        targetCalories: result.targetCalories,
-        proteinGrams: result.proteinGrams,
-        fatGrams: result.fatGrams,
-        carbsGrams: result.carbsGrams,
-        carbsNonPositive: result.carbsNonPositive,
-      };
-      const already = await db.nutritionCalculation.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
+      const calculation = await db.nutritionCalculation.create({
+        data: {
+          userId,
+          weightKg: inputs.weightKg,
+          heightCm: inputs.heightCm,
+          ageYears: inputs.ageYears,
+          sex: inputs.sex,
+          activity: inputs.activity,
+          frequency: inputs.frequency,
+          goal: inputs.goal,
+          activityMultiplier: result.activityMultiplier,
+          goalAdjustment: result.goalAdjustment,
+          bmr: result.bmr,
+          tdee: result.tdee,
+          targetCalories: result.targetCalories,
+          proteinGrams: result.proteinGrams,
+          fatGrams: result.fatGrams,
+          carbsGrams: result.carbsGrams,
+          carbsNonPositive: result.carbsNonPositive,
+        },
       });
-      const calculation = already
-        ? await db.nutritionCalculation.update({
-            where: { id: already.id },
-            data: numbers,
-          })
-        : await db.nutritionCalculation.create({
-            data: { userId, ...numbers },
-          });
       const active = await db.nutritionTarget.findFirst({
         where: { userId, active: true },
       });
       if (active?.source === 'MANUAL') return;
-      const targetNumbers = {
-        calculationId: calculation.id,
-        targetCalories: result.targetCalories,
-        proteinGrams: result.proteinGrams,
-        fatGrams: result.fatGrams,
-        carbsGrams: result.carbsGrams,
-      };
       if (active) {
         await db.nutritionTarget.update({
           where: { id: active.id },
-          data: targetNumbers,
-        });
-      } else {
-        await db.nutritionTarget.create({
-          data: {
-            userId,
-            active: true,
-            source: 'CALCULATED',
-            ...targetNumbers,
-          },
+          data: { active: false },
         });
       }
+      await db.nutritionTarget.create({
+        data: {
+          userId,
+          active: true,
+          source: 'CALCULATED',
+          calculationId: calculation.id,
+          targetCalories: result.targetCalories,
+          proteinGrams: result.proteinGrams,
+          fatGrams: result.fatGrams,
+          carbsGrams: result.carbsGrams,
+        },
+      });
     });
   }
 
@@ -439,18 +414,19 @@ export class NutritionService {
   }
 
   private async calculationInputs(
+    db: Prisma.TransactionClient,
     userId: string,
     now: Date,
     fromOnboarding = false,
   ) {
     const [profile, body, measurement, onboarding] = await Promise.all([
-      this.prisma.nutritionProfile.findUnique({ where: { userId } }),
-      this.prisma.userProfile.findUnique({ where: { userId } }),
-      this.prisma.bodyMeasurement.findFirst({
+      db.nutritionProfile.findUnique({ where: { userId } }),
+      db.userProfile.findUnique({ where: { userId } }),
+      db.bodyMeasurement.findFirst({
         where: { userId },
         orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
       }),
-      this.prisma.onboardingResponses.findUnique({
+      db.onboardingResponses.findUnique({
         where: { userId },
         select: { trainingFrequency: true, mealsPerDay: true, mainGoal: true },
       }),

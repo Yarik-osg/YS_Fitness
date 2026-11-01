@@ -479,6 +479,7 @@ export class UsersService {
     input: ProfileUpdateInput,
   ): Promise<ProfileUpdateResponse> {
     let rewriteNutrition = false;
+    let refreshForWeight = false;
     const updated = await this.prisma.$transaction(
       async (transaction) => {
         await this.programs.holdAssignment(userId, transaction);
@@ -627,6 +628,7 @@ export class UsersService {
             matchFieldsChanged(responses, input),
         });
 
+        refreshForWeight = weightChanged;
         rewriteNutrition = heightChanged || goalChanged || frequencyChanged;
         return {
           heightCm: input.heightCm ?? profile.heightCm.toNumber(),
@@ -652,11 +654,10 @@ export class UsersService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    if (input.weightKg !== undefined) {
-      await this.refreshNutrition(userId, 'weight');
-    }
     if (rewriteNutrition) {
       await this.refreshNutrition(userId, 'profile');
+    } else if (refreshForWeight) {
+      await this.refreshNutrition(userId, 'weight');
     }
     return updated;
   }
