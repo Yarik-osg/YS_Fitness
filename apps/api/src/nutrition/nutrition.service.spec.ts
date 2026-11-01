@@ -7,6 +7,30 @@ import { NutritionService } from './nutrition.service.js';
 const now = new Date('2026-11-01T12:00:00.000Z');
 const userId = 'user-b';
 
+function storedCalculation(weightKg: string): NutritionCalculation {
+  return {
+    id: 'calc-old',
+    userId,
+    weightKg: new Prisma.Decimal(weightKg),
+    heightCm: new Prisma.Decimal('165'),
+    ageYears: 30,
+    sex: 'FEMALE',
+    activity: 'MODERATE',
+    frequency: 3,
+    goal: 'LOSE_WEIGHT',
+    activityMultiplier: new Prisma.Decimal('1.55'),
+    goalAdjustment: new Prisma.Decimal('-0.2'),
+    bmr: new Prisma.Decimal('1300'),
+    tdee: new Prisma.Decimal('2000'),
+    targetCalories: new Prisma.Decimal('1700'),
+    proteinGrams: new Prisma.Decimal('100'),
+    fatGrams: new Prisma.Decimal('50'),
+    carbsGrams: new Prisma.Decimal('150'),
+    carbsNonPositive: false,
+    createdAt: now,
+  };
+}
+
 function harness(options?: {
   role?: 'CLIENT' | 'ADMIN';
   profile?: boolean;
@@ -16,6 +40,8 @@ function harness(options?: {
   locked?: boolean;
   ageYears?: { dob: string; timezone: string };
   weightKg?: string;
+  /** Weight visible after the user row lock. Differs when a later save won the race. */
+  lockedWeightKg?: string;
   heightCm?: string;
   activity?: 'SEDENTARY' | 'MODERATE';
   goal?: 'LOSE_WEIGHT' | 'MAINTAIN';
@@ -64,6 +90,16 @@ function harness(options?: {
       create: vi.fn(async (args: { data: Record<string, unknown> }) => {
         profileCreates.push(args);
         return { id: 'profile-1', ...args.data };
+      }),
+    },
+    bodyMeasurement: {
+      findFirst: vi.fn(async () => {
+        if (options?.measurement === false) return null;
+        return {
+          weightKg: new Prisma.Decimal(
+            options?.lockedWeightKg ?? options?.weightKg ?? '60',
+          ),
+        };
       }),
     },
     nutritionCalculation: {
@@ -298,6 +334,80 @@ describe('NutritionService', () => {
       active: true,
     });
     expect(result.targetCalories).toBe('1739.429375');
+  });
+
+  it('keeps the stored calculation until weight has moved 5 kg', async () => {
+    const stored = storedCalculation('60');
+    const short = harness({
+      weightKg: '64.99',
+      active: { id: 'calc-target', source: 'CALCULATED' },
+      racedCalculation: stored,
+    });
+
+    const unchanged = await short.service.calculate(userId, now);
+
+    expect(unchanged.id).toBe('calc-old');
+    expect(unchanged.activatedTarget).toBe(false);
+    expect(short.created).toHaveLength(0);
+    expect(short.targetCreates).toEqual([]);
+
+    const shifted = harness({
+      weightKg: '65',
+      active: { id: 'calc-target', source: 'CALCULATED' },
+      racedCalculation: stored,
+    });
+
+    const updated = await shifted.service.calculate(userId, now);
+
+    expect(updated.activatedTarget).toBe(true);
+    expect(updated.weightKg).toBe('65');
+    expect(shifted.created).toHaveLength(1);
+    expect(shifted.targetUpdates).toEqual([
+      { where: { id: 'calc-target' }, data: { active: false } },
+    ]);
+    expect(shifted.targetCreates[0]?.data).toMatchObject({
+      source: 'CALCULATED',
+      active: true,
+    });
+
+    const fallen = harness({
+      weightKg: '55',
+      active: { id: 'calc-target', source: 'CALCULATED' },
+      racedCalculation: stored,
+    });
+    const lost = await fallen.service.calculate(userId, now);
+    expect(lost.weightKg).toBe('55');
+    expect(fallen.created).toHaveLength(1);
+  });
+
+  it('uses the weight read after the user row is locked', async () => {
+    const { service, created } = harness({
+      weightKg: '64.99',
+      lockedWeightKg: '65',
+      active: { id: 'calc-target', source: 'CALCULATED' },
+      racedCalculation: storedCalculation('60'),
+    });
+
+    const updated = await service.calculate(userId, now);
+
+    expect(updated.weightKg).toBe('65');
+    expect(created).toHaveLength(1);
+  });
+
+  it('does not store a new calculation while a manual target is active', async () => {
+    const { service, created, targetUpdates, targetCreates } = harness({
+      weightKg: '70',
+      active: { id: 'manual-target', source: 'MANUAL' },
+      racedCalculation: storedCalculation('60'),
+    });
+
+    const result = await service.calculate(userId, now);
+
+    expect(result.id).toBe('calc-old');
+    expect(result.activatedTarget).toBe(false);
+    expect(created).toHaveLength(0);
+    expect(targetUpdates).toEqual([]);
+    expect(targetCreates).toEqual([]);
   });
 
   it('keeps an active manual target when a new calculation is stored', async () => {

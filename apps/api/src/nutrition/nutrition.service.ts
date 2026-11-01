@@ -221,15 +221,28 @@ export class NutritionService {
   ): Promise<NutritionCalculationCreatedResponse> {
     await this.assertClient(userId);
     const inputs = await this.calculationInputs(userId, now);
-    const result = calculateOrReject(inputs);
 
     return this.prisma.$transaction(async (db) => {
       await this.lockClient(db, userId);
+      const measured = await db.bodyMeasurement.findFirst({
+        where: { userId },
+        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+      });
+      if (!measured) throw unsupported('Nutrition inputs are incomplete');
+      const weightKg = measured.weightKg;
+      const result = calculateOrReject({ ...inputs, weightKg });
       const already = await db.nutritionCalculation.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
       });
-      if (already) {
+      const active = await db.nutritionTarget.findFirst({
+        where: { userId, active: true },
+      });
+      // Several 1 kg saves count. The baseline is the last stored calculation.
+      if (
+        already &&
+        !replacesStoredCalculation(already.weightKg, weightKg, active?.source)
+      ) {
         return { ...toCalculation(already), activatedTarget: false };
       }
 
@@ -243,13 +256,10 @@ export class NutritionService {
         }
       }
 
-      const active = await db.nutritionTarget.findFirst({
-        where: { userId, active: true },
-      });
       const calculation = await db.nutritionCalculation.create({
         data: {
           userId,
-          weightKg: inputs.weightKg,
+          weightKg,
           heightCm: inputs.heightCm,
           ageYears: inputs.ageYears,
           sex: inputs.sex,
@@ -290,6 +300,16 @@ export class NutritionService {
       }
       return { ...toCalculation(calculation), activatedTarget };
     });
+  }
+
+  /** No-op until a calculation exists. Weight saves call this after the row is stored. */
+  async refreshAfterWeightChange(userId: string, now = new Date()) {
+    const existing = await this.prisma.nutritionCalculation.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!existing) return;
+    await this.calculate(userId, now);
   }
 
   private async lockClient(
@@ -393,6 +413,17 @@ function unsupported(message: string): never {
     code: 'NUTRITION_INPUT_UNSUPPORTED',
     message,
   });
+}
+
+const WEIGHT_SHIFT_KG = new Prisma.Decimal(5);
+
+function replacesStoredCalculation(
+  storedKg: Prisma.Decimal,
+  currentKg: Prisma.Decimal,
+  activeSource: 'CALCULATED' | 'MANUAL' | undefined,
+) {
+  if (activeSource === 'MANUAL') return false;
+  return currentKg.minus(storedKg).abs().greaterThanOrEqualTo(WEIGHT_SHIFT_KG);
 }
 
 function isUniqueConflict(error: unknown) {

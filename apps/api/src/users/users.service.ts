@@ -24,6 +24,7 @@ import {
   type OnboardingInput,
   type ProfileUpdateInput,
 } from '@repo/validation';
+import { NutritionService } from '../nutrition/nutrition.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   ProgramsService,
@@ -152,6 +153,17 @@ function chartOrder<T extends { id: string; measuredAt: Date }>(
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
+  private async refreshNutrition(userId: string) {
+    if (!this.nutrition) return;
+    try {
+      await this.nutrition.refreshAfterWeightChange(userId);
+    } catch (error) {
+      this.logger.warn(
+        error instanceof Error ? error.message : 'Nutrition refresh failed',
+      );
+    }
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly programs: ProgramsService,
@@ -159,6 +171,7 @@ export class UsersService {
     @Optional()
     @Inject(LocalProgressPhotoStorage)
     private readonly photos?: ProgressPhotoStorage,
+    private readonly nutrition?: NutritionService,
   ) {}
 
   async getMe(userId: string) {
@@ -228,6 +241,7 @@ export class UsersService {
       select: weightMeasurementSelect,
     });
 
+    await this.refreshNutrition(userId);
     return toWeightMeasurement(created);
   }
 
@@ -459,7 +473,7 @@ export class UsersService {
     userId: string,
     input: ProfileUpdateInput,
   ): Promise<ProfileUpdateResponse> {
-    return this.prisma.$transaction(
+    const updated = await this.prisma.$transaction(
       async (transaction) => {
         await this.programs.holdAssignment(userId, transaction);
         const [profile, latestMeasurement, responses] = await Promise.all([
@@ -608,6 +622,10 @@ export class UsersService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    if (input.weightKg !== undefined) {
+      await this.refreshNutrition(userId);
+    }
+    return updated;
   }
 
   async getOnboardingResponses(
