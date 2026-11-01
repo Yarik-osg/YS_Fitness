@@ -953,6 +953,9 @@
   },
   "coach": {
     "title": "Clients",
+    "exportExcel": "Export to Excel",
+    "exporting": "Preparing the file",
+    "exportError": "The Excel file could not be created.",
     "count": "{count, plural, one {# client} other {# clients}}",
     "empty": "No clients yet.",
     "loadError": "Clients could not be loaded.",

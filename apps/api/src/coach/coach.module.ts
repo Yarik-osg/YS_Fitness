@@ -7,6 +7,7 @@ import { TrainerTemplatesController } from '../programs/trainer-templates.contro
 import { UsersModule } from '../users/users.module.js';
 import { WorkoutsModule } from '../workouts/workouts.module.js';
 import { CoachController } from './coach.controller.js';
+import { CoachExportService } from './coach-export.service.js';
 import { CoachService } from './coach.service.js';
 
 @Module({
@@ -19,6 +20,6 @@ import { CoachService } from './coach.service.js';
     NutritionModule,
   ],
   controllers: [CoachController, TrainerTemplatesController],
-  providers: [CoachService],
+  providers: [CoachService, CoachExportService],
 })
 export class CoachModule {}

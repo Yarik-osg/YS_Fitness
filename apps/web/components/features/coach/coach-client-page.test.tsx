@@ -146,6 +146,12 @@ vi.mock('@/i18n/navigation', () => ({
   ),
 }));
 
+const exportFile = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/api/coach', () => ({
+  exportCoachClient: exportFile,
+}));
+
 vi.mock('@/lib/program-title', () => ({
   useProgramTitle: () => 'Upper-body program',
 }));
@@ -244,6 +250,7 @@ describe('CoachClientPage', () => {
     applyTarget.mutate.mockReset();
     applyTarget.isPending = false;
     applyTarget.isError = false;
+    exportFile.mockReset();
   });
 
   it('shows a loading state', () => {
@@ -274,6 +281,37 @@ describe('CoachClientPage', () => {
     expect(
       screen.getByRole('link', { name: 'Back to clients' }),
     ).toHaveAttribute('href', '/coach');
+  });
+
+  it('downloads this client and ignores a second click while pending', async () => {
+    let release: (blob: Blob) => void = () => undefined;
+    exportFile.mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        release = resolve;
+      }),
+    );
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:export');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.fn();
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      const element = realCreate(tagName);
+      if (tagName === 'a') element.click = click;
+      return element;
+    });
+    client.current.data = DETAIL;
+    renderPage();
+    const user = userEvent.setup();
+    const button = screen.getByRole('button', { name: 'Export to Excel' });
+
+    await user.click(button);
+    expect(exportFile).toHaveBeenCalledTimes(1);
+    expect(exportFile).toHaveBeenCalledWith('client-1');
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(exportFile).toHaveBeenCalledTimes(1);
+    release(new Blob(['xlsx']));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
   });
 
   it('shows a pinned program separately from a matched one', () => {

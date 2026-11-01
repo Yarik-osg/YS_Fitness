@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
+import { exportCoachTable } from '@/lib/api/coach';
 import {
   useArchiveClient,
   useCoachClients,
   useRestoreClient,
 } from '@/lib/hooks/use-coach-clients';
 import { programCatalogName } from '@/lib/program-catalog-name';
+import { exportDay, saveBlob } from '@/lib/save-blob';
 
 export const QUIET_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -48,6 +50,8 @@ export function CoachClientsPage() {
   const [sort, setSort] = useState<ClientSort | null>(null);
   const [workFilters, setWorkFilters] = useState<WorkFilter[]>([]);
   const [now] = useState(() => Date.now());
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
   const inView = useMemo(
     () =>
       (clients.data?.clients ?? []).filter((client) =>
@@ -102,6 +106,48 @@ export function CoachClientsPage() {
     restore.reset();
   }
 
+  async function downloadExport() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(false);
+    try {
+      const filename = `ys-fitness-clients-${exportDay()}.xlsx`;
+      const blob = await exportCoachTable({
+        filename,
+        sheet: 'Clients',
+        headers: [
+          t('name'),
+          t('email'),
+          t('joined'),
+          t('program'),
+          t('lastWorkout'),
+          t('subscription'),
+        ],
+        rows: visible.map((client) => [
+          client.name?.trim() ? client.name : t('unnamed'),
+          client.email,
+          formatDay(locale, client.createdAt),
+          client.programName
+            ? programCatalogName({ name: client.programName })
+            : t('programMissing'),
+          client.lastWorkoutAt
+            ? formatDay(locale, client.lastWorkoutAt)
+            : t('noWorkout'),
+          client.subscriptionActive
+            ? t('subscriptionActive')
+            : client.subscriptionOnFile
+              ? t('subscriptionInactive')
+              : t('noSubscription'),
+        ]),
+      });
+      saveBlob(blob, filename);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   function toggleSort(column: ClientSort['id']) {
     setSort((current) => {
       if (current?.id !== column) return { id: column, desc: false };
@@ -112,9 +158,25 @@ export function CoachClientsPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
-      <h1 className="font-heading text-3xl leading-none text-ink">
-        {t('title')}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-heading text-3xl leading-none text-ink">
+          {t('title')}
+        </h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-lg whitespace-nowrap"
+          disabled={exporting}
+          onClick={() => void downloadExport()}
+        >
+          {exporting ? t('exporting') : t('exportExcel')}
+        </Button>
+      </div>
+      {exportError ? (
+        <p role="alert" className="mt-4 text-sm text-amber">
+          {t('exportError')}
+        </p>
+      ) : null}
       {clients.data ? (
         <p className="mt-2 text-sm text-muted">
           {t('count', { count: listed.length })}

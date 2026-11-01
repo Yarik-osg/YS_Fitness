@@ -950,6 +950,9 @@
   },
   "coach": {
     "title": "Клієнти",
+    "exportExcel": "Експорт в Excel",
+    "exporting": "Готуємо файл",
+    "exportError": "Не вдалося створити файл Excel.",
     "count": "{count, plural, one {# клієнт} few {# клієнти} many {# клієнтів} other {# клієнта}}",
     "empty": "Клієнтів ще немає.",
     "loadError": "Не вдалося завантажити клієнтів.",

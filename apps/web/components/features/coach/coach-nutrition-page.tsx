@@ -6,8 +6,10 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
+import { exportCoachTable } from '@/lib/api/coach';
 import { useCoachNutritionRoster } from '@/lib/hooks/use-coach-clients';
 import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
+import { exportDay, saveBlob } from '@/lib/save-blob';
 
 export function CoachNutritionPage() {
   const t = useTranslations('coach');
@@ -15,6 +17,8 @@ export function CoachNutritionPage() {
   const roster = useCoachNutritionRoster();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'active' | 'archived'>('active');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
   const inView = useMemo(
     () =>
       (roster.data?.clients ?? []).filter((row) =>
@@ -31,11 +35,88 @@ export function CoachNutritionPage() {
     });
   }, [inView, search, locale, t]);
 
+  async function downloadExport() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(false);
+    const blank = t('emptyValue');
+    const filename = `ys-fitness-nutrition-${exportDay()}.xlsx`;
+    try {
+      const blob = await exportCoachTable({
+        filename,
+        sheet: 'Nutrition',
+        headers: [
+          t('name'),
+          t('email'),
+          t('nutritionRoster.kcal'),
+          t('nutritionRoster.protein'),
+          t('nutritionRoster.fat'),
+          t('nutritionRoster.carbs'),
+          t('fields.sex'),
+          t('nutritionRoster.age'),
+          t('nutritionRoster.height'),
+          t('nutritionRoster.weight'),
+          t('nutritionRoster.activity'),
+          t('nutritionRoster.goal'),
+        ],
+        rows: rows.map((row) => {
+          const inputs = row.inputs;
+          const target = row.target;
+          return [
+            row.name?.trim() ? row.name : t('unnamed'),
+            row.email,
+            target
+              ? `${roundHalfAwayFromZero(target.targetCalories)} ${t(
+                  target.source === 'MANUAL'
+                    ? 'nutritionRoster.manual'
+                    : 'nutritionRoster.calculated',
+                )}`
+              : t('nutritionRoster.noTarget'),
+            target ? String(roundHalfAwayFromZero(target.proteinGrams)) : blank,
+            target ? String(roundHalfAwayFromZero(target.fatGrams)) : blank,
+            target ? String(roundHalfAwayFromZero(target.carbsGrams)) : blank,
+            inputs ? t(`sex.${inputs.sex}`) : blank,
+            inputs?.ageYears ?? blank,
+            inputs ? `${measure(locale, inputs.heightCm)} ${t('cm')}` : blank,
+            inputs?.weightKg
+              ? `${measure(locale, inputs.weightKg)} ${t('kg')}`
+              : blank,
+            inputs?.activity
+              ? t(`nutritionRoster.activityLevel.${inputs.activity}`)
+              : blank,
+            inputs ? t(`nutritionRoster.nutritionGoal.${inputs.goal}`) : blank,
+          ];
+        }),
+      });
+      saveBlob(blob, filename);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:px-6">
-      <h1 className="font-heading text-3xl leading-none text-ink">
-        {t('nutritionRoster.title')}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-heading text-3xl leading-none text-ink">
+          {t('nutritionRoster.title')}
+        </h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-lg whitespace-nowrap"
+          disabled={exporting}
+          onClick={() => void downloadExport()}
+        >
+          {exporting ? t('exporting') : t('exportExcel')}
+        </Button>
+      </div>
+      {exportError ? (
+        <p role="alert" className="mt-4 text-sm text-amber">
+          {t('exportError')}
+        </p>
+      ) : null}
       <p className="mt-3 max-w-2xl text-sm text-muted">
         {t('nutritionRoster.hint')}
       </p>
