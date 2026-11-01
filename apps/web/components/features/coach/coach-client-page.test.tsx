@@ -584,6 +584,7 @@ describe('CoachClientPage', () => {
       screen.getByText('1800 kcal. Protein 130 g, fat 50 g, carbs 180 g.'),
     ).toBeInTheDocument();
     expect(screen.getByText(/entered by hand/)).toBeInTheDocument();
+    expect(screen.queryByText(/Saved /)).toBeNull();
     expect(
       screen.queryByRole('heading', { name: 'What the client sees' }),
     ).toBeInTheDocument();
@@ -642,6 +643,7 @@ describe('CoachClientPage', () => {
         name: 'Give the client this calculation',
       }),
     ).toBeNull();
+    expect(screen.queryByText(/Saved /)).toBeNull();
   });
 
   it('waits while a checkout is open', () => {

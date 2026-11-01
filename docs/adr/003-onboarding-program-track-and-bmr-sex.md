@@ -32,7 +32,7 @@ This reverses the earlier product/architecture choice to keep the two questions 
 
 - A user whose UX preference differs from their BMR-relevant sex is not asked separately during onboarding.
 - Correcting `biologicalSexForCalculation` independently of `programTrack` still requires a dedicated edit. `/profile` and `PATCH /users/me/profile` do not change either field; they remain onboarding-only until a later flow.
-- Until nutrition exists, a mismatch would show up as a wrong calorie/macro target that the user would have to fix later.
+- A mismatch shows up as the sex stored on the calorie calculation. `/profile` still cannot correct it. The trainer can replace the active target with manual numbers; that does not change the stored calculation or the calculation sex.
 
 ## Alternatives considered
 

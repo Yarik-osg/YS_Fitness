@@ -999,7 +999,9 @@
     "nutritionRoster": {
       "nav": "Nutrition",
       "title": "Nutrition",
-      "hint": "Calories and macros are the target the client sees. Sex, age, height, and weight come from the questionnaire. Activity and goal are the values the formula uses.",
+      "hint": "Calories and macros are the client's target: calculated or entered by hand. Sex, age, height, and weight come from the questionnaire. Activity and goal are the values the formula uses.",
+      "calculated": "Calculated",
+      "manual": "By hand",
       "kcal": "Kcal",
       "protein": "Protein",
       "fat": "Fat",

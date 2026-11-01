@@ -114,7 +114,8 @@ describe('CoachNutritionPage', () => {
     );
     expect(screen.getByText('anna@example.com')).toBeInTheDocument();
     expect(screen.queryByText('blank@example.com')).toBeNull();
-    expect(screen.getByRole('cell', { name: '1800' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: /1800/ })).toBeInTheDocument();
+    expect(screen.getByText('By hand')).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '130' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '50' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '180' })).toBeInTheDocument();
@@ -128,6 +129,7 @@ describe('CoachNutritionPage', () => {
     expect(
       screen.getByRole('cell', { name: 'Recomposition' }),
     ).toBeInTheDocument();
+    expect(screen.queryByText('from the nutrition profile')).toBeNull();
     expect(screen.queryByRole('link', { name: 'No name' })).toBeNull();
 
     await userEvent.click(

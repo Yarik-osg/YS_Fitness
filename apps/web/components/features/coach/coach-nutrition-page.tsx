@@ -2,7 +2,7 @@
 
 import type { CoachNutritionRosterRow } from '@repo/shared-types';
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
@@ -181,9 +181,20 @@ function NutritionRow({
         </span>
       </th>
       <Cell>
-        {target
-          ? roundHalfAwayFromZero(target.targetCalories)
-          : t('nutritionRoster.noTarget')}
+        <span>
+          {target
+            ? roundHalfAwayFromZero(target.targetCalories)
+            : t('nutritionRoster.noTarget')}
+        </span>
+        {target ? (
+          <span className="mt-1 block text-xs font-normal text-muted">
+            {t(
+              target.source === 'MANUAL'
+                ? 'nutritionRoster.manual'
+                : 'nutritionRoster.calculated',
+            )}
+          </span>
+        ) : null}
       </Cell>
       <Cell>{target ? roundHalfAwayFromZero(target.proteinGrams) : blank}</Cell>
       <Cell>{target ? roundHalfAwayFromZero(target.fatGrams) : blank}</Cell>
@@ -208,7 +219,7 @@ function NutritionRow({
   );
 }
 
-function Cell({ children }: { children: string | number }) {
+function Cell({ children }: { children: ReactNode }) {
   return <td className="px-4 py-3 whitespace-nowrap text-ink">{children}</td>;
 }
 
