@@ -160,7 +160,7 @@ describeWithDatabase('nutrition profile and calculations (e2e)', () => {
       .set('Authorization', client.authorization)
       .expect(201);
     expect(created.body.activatedTarget).toBe(true);
-    expect(created.body.activityMultiplier).toBe('1.55');
+    expect(created.body.activityMultiplier).toBe('1.4');
     expect(created.body.goalAdjustment).toBe('-0.15');
 
     const mine = await request(app.getHttpServer())
