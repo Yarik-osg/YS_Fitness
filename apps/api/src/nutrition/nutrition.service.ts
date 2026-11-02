@@ -660,7 +660,7 @@ function toRoster(
       goal: NutritionGoal;
     } | null;
     nutritionCalculations: {
-      status: 'VALID' | 'REQUIRES_REVIEW' | 'INVALID_INPUT';
+      status: 'VALID' | 'REQUIRES_REVIEW';
     }[];
     nutritionTargets: {
       source: 'CALCULATED' | 'MANUAL';
@@ -785,7 +785,7 @@ function toCalculation(
     fatGrams: decimal(row.fatGrams),
     carbsGrams: decimal(row.carbsGrams),
     carbsNonPositive: row.carbsNonPositive,
-    status: row.status === 'REQUIRES_REVIEW' ? 'REQUIRES_REVIEW' : 'VALID',
+    status: row.status,
     reviewReasons: row.reviewReasons,
     displayCalories: row.displayCalories,
     displayProteinGrams: row.displayProteinGrams,

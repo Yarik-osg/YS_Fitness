@@ -449,7 +449,6 @@ enum NutritionTargetSource {
 enum NutritionCalculationStatus {
   VALID
   REQUIRES_REVIEW
-  INVALID_INPUT
 }
 
 enum NutritionReviewReason {
