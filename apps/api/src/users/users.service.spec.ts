@@ -52,6 +52,7 @@ function createService(
   };
   const nutrition = {
     refreshAfterWeightChange: vi.fn().mockResolvedValue(undefined),
+    refreshAfterRecordedInputs: vi.fn().mockResolvedValue(undefined),
     replaceFromProfile: vi.fn().mockResolvedValue(undefined),
   };
   return {

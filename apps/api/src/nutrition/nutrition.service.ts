@@ -90,6 +90,11 @@ export class NutritionService {
           select: { trainingFrequency: true, mainGoal: true },
         },
         nutritionProfile: { select: { activity: true, goal: true } },
+        nutritionCalculations: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true },
+        },
         nutritionTargets: {
           where: { active: true },
           take: 1,
@@ -111,8 +116,12 @@ export class NutritionService {
     return { clients: users.map((user) => toRoster(user, now)) };
   }
 
-  async getForCoach(userId: string): Promise<CoachNutritionResponse> {
+  async getForCoach(
+    userId: string,
+    now = new Date(),
+  ): Promise<CoachNutritionResponse> {
     await this.assertClient(userId);
+    await this.refreshCurrent(userId, now);
     const [calculation, target] = await Promise.all([
       this.prisma.nutritionCalculation.findFirst({
         where: { userId },
@@ -176,6 +185,12 @@ export class NutritionService {
           message: 'Calculation not found',
         });
       }
+      if (calculation.status === 'REQUIRES_REVIEW') {
+        throw new BadRequestException({
+          code: 'NUTRITION_NEEDS_REVIEW',
+          message: 'This calculation needs a trainer target',
+        });
+      }
       const active = await db.nutritionTarget.findFirst({
         where: { userId, active: true },
       });
@@ -209,8 +224,10 @@ export class NutritionService {
 
   async listCalculations(
     userId: string,
+    now = new Date(),
   ): Promise<NutritionCalculationListResponse> {
     await this.assertClient(userId);
+    await this.refreshCurrent(userId, now);
     const [rows, target] = await Promise.all([
       this.prisma.nutritionCalculation.findMany({
         where: { userId },
@@ -235,7 +252,6 @@ export class NutritionService {
     return this.prisma.$transaction(async (db) => {
       await this.lockClient(db, userId);
       const inputs = await this.calculationInputs(db, userId, now);
-      const result = calculateOrReject(inputs);
       const already = await db.nutritionCalculation.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
@@ -243,12 +259,8 @@ export class NutritionService {
       const active = await db.nutritionTarget.findFirst({
         where: { userId, active: true },
       });
-      // Several 1 kg saves count. The baseline is the last stored calculation.
-      // A manual target stays active, but the new snapshot is still stored.
-      if (
-        already &&
-        !weightShiftedByAtLeastFiveKg(already.weightKg, inputs.weightKg)
-      ) {
+      const result = calculateOrReject(inputs);
+      if (already && sameSnapshot(already, inputs, result)) {
         return { ...toCalculation(already), activatedTarget: false };
       }
 
@@ -263,47 +275,15 @@ export class NutritionService {
       }
 
       const calculation = await db.nutritionCalculation.create({
-        data: {
-          userId,
-          weightKg: inputs.weightKg,
-          heightCm: inputs.heightCm,
-          ageYears: inputs.ageYears,
-          sex: inputs.sex,
-          activity: inputs.activity,
-          frequency: inputs.frequency,
-          goal: inputs.goal,
-          activityMultiplier: result.activityMultiplier,
-          goalAdjustment: result.goalAdjustment,
-          bmr: result.bmr,
-          tdee: result.tdee,
-          targetCalories: result.targetCalories,
-          proteinGrams: result.proteinGrams,
-          fatGrams: result.fatGrams,
-          carbsGrams: result.carbsGrams,
-          carbsNonPositive: result.carbsNonPositive,
-        },
+        data: calculationData(userId, inputs, result),
       });
-      const activatedTarget = !active || active.source === 'CALCULATED';
-      if (activatedTarget) {
-        if (active) {
-          await db.nutritionTarget.update({
-            where: { id: active.id },
-            data: { active: false },
-          });
-        }
-        await db.nutritionTarget.create({
-          data: {
-            userId,
-            active: true,
-            source: 'CALCULATED',
-            calculationId: calculation.id,
-            targetCalories: result.targetCalories,
-            proteinGrams: result.proteinGrams,
-            fatGrams: result.fatGrams,
-            carbsGrams: result.carbsGrams,
-          },
-        });
-      }
+      const activatedTarget = await this.activateCalculatedTarget(
+        db,
+        userId,
+        calculation.id,
+        result,
+        active,
+      );
       return { ...toCalculation(calculation), activatedTarget };
     });
   }
@@ -314,7 +294,12 @@ export class NutritionService {
     await this.prisma.$transaction(async (db) => {
       await this.lockClient(db, userId);
       const inputs = await this.calculationInputs(db, userId, now, true);
+      const already = await db.nutritionCalculation.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
       const result = calculateOrReject(inputs);
+      if (already && sameSnapshot(already, inputs, result)) return;
       if (inputs.profileToCreate) {
         try {
           await db.nutritionProfile.create({
@@ -330,49 +315,41 @@ export class NutritionService {
         });
       }
       const calculation = await db.nutritionCalculation.create({
-        data: {
-          userId,
-          weightKg: inputs.weightKg,
-          heightCm: inputs.heightCm,
-          ageYears: inputs.ageYears,
-          sex: inputs.sex,
-          activity: inputs.activity,
-          frequency: inputs.frequency,
-          goal: inputs.goal,
-          activityMultiplier: result.activityMultiplier,
-          goalAdjustment: result.goalAdjustment,
-          bmr: result.bmr,
-          tdee: result.tdee,
-          targetCalories: result.targetCalories,
-          proteinGrams: result.proteinGrams,
-          fatGrams: result.fatGrams,
-          carbsGrams: result.carbsGrams,
-          carbsNonPositive: result.carbsNonPositive,
-        },
+        data: calculationData(userId, inputs, result),
       });
       const active = await db.nutritionTarget.findFirst({
         where: { userId, active: true },
       });
-      if (active?.source === 'MANUAL') return;
-      if (active) {
-        await db.nutritionTarget.update({
-          where: { id: active.id },
-          data: { active: false },
-        });
-      }
-      await db.nutritionTarget.create({
-        data: {
-          userId,
-          active: true,
-          source: 'CALCULATED',
-          calculationId: calculation.id,
-          targetCalories: result.targetCalories,
-          proteinGrams: result.proteinGrams,
-          fatGrams: result.fatGrams,
-          carbsGrams: result.carbsGrams,
-        },
-      });
+      await this.activateCalculatedTarget(
+        db,
+        userId,
+        calculation.id,
+        result,
+        active,
+      );
     });
+  }
+
+  /** No-op until a calculation exists. A later onboarding save uses the new inputs. */
+  async refreshAfterRecordedInputs(userId: string, now = new Date()) {
+    const existing = await this.prisma.nutritionCalculation.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!existing) return;
+    await this.replaceFromProfile(userId, now);
+  }
+
+  /**
+   * A birthday, or figures that no longer match the formula, is applied the
+   * next time this client's nutrition is read. Missing inputs stay an error.
+   */
+  private async refreshCurrent(userId: string, now: Date) {
+    try {
+      await this.calculate(userId, now);
+    } catch (error) {
+      if (!isInvalidInput(error)) throw error;
+    }
   }
 
   /** No-op until a calculation exists. Weight saves call this after the row is stored. */
@@ -383,6 +360,35 @@ export class NutritionService {
     });
     if (!existing) return;
     await this.calculate(userId, now);
+  }
+
+  private async activateCalculatedTarget(
+    db: Prisma.TransactionClient,
+    userId: string,
+    calculationId: string,
+    result: ReturnType<typeof calculateNutrition>,
+    active: { id: string; source: 'CALCULATED' | 'MANUAL' } | null,
+  ) {
+    if (result.status !== 'VALID' || active?.source === 'MANUAL') return false;
+    if (active) {
+      await db.nutritionTarget.update({
+        where: { id: active.id },
+        data: { active: false },
+      });
+    }
+    await db.nutritionTarget.create({
+      data: {
+        userId,
+        active: true,
+        source: 'CALCULATED',
+        calculationId,
+        targetCalories: result.targetCalories,
+        proteinGrams: result.proteinGrams,
+        fatGrams: result.fatGrams,
+        carbsGrams: result.carbsGrams,
+      },
+    });
+    return true;
   }
 
   private async lockClient(
@@ -492,18 +498,114 @@ function frequencyOf(value: string | undefined): NutritionFrequency {
 
 function unsupported(message: string): never {
   throw new BadRequestException({
-    code: 'NUTRITION_INPUT_UNSUPPORTED',
+    code: 'INVALID_INPUT',
+    status: 'INVALID_INPUT',
+    reason: message,
     message,
   });
 }
 
-const WEIGHT_SHIFT_KG = new Prisma.Decimal(5);
-
-function weightShiftedByAtLeastFiveKg(
-  storedKg: Prisma.Decimal,
-  currentKg: Prisma.Decimal,
+function sameSnapshot(
+  stored: {
+    weightKg: Prisma.Decimal;
+    heightCm: Prisma.Decimal;
+    ageYears: number;
+    sex: string;
+    activity: string;
+    frequency: number;
+    goal: string;
+    status: string;
+    reviewReasons: readonly string[];
+    activityMultiplier: Prisma.Decimal;
+    goalAdjustment: Prisma.Decimal;
+    bmr: Prisma.Decimal;
+    tdee: Prisma.Decimal;
+    targetCalories: Prisma.Decimal;
+    proteinGrams: Prisma.Decimal;
+    fatGrams: Prisma.Decimal;
+    carbsGrams: Prisma.Decimal;
+  },
+  inputs: {
+    weightKg: Prisma.Decimal;
+    heightCm: Prisma.Decimal;
+    ageYears: number;
+    sex: string;
+    activity: string;
+    frequency: number;
+    goal: string;
+  },
+  result: ReturnType<typeof calculateNutrition>,
 ) {
-  return currentKg.minus(storedKg).abs().greaterThanOrEqualTo(WEIGHT_SHIFT_KG);
+  return (
+    stored.weightKg.equals(inputs.weightKg) &&
+    stored.heightCm.equals(inputs.heightCm) &&
+    stored.ageYears === inputs.ageYears &&
+    stored.sex === inputs.sex &&
+    stored.activity === inputs.activity &&
+    stored.frequency === inputs.frequency &&
+    stored.goal === inputs.goal &&
+    stored.status === result.status &&
+    stored.reviewReasons.join() === result.reviewReasons.join() &&
+    stored.activityMultiplier.equals(result.activityMultiplier) &&
+    stored.goalAdjustment.equals(result.goalAdjustment) &&
+    stored.bmr.equals(result.bmr) &&
+    stored.tdee.equals(result.tdee) &&
+    stored.targetCalories.equals(result.targetCalories) &&
+    stored.proteinGrams.equals(result.proteinGrams) &&
+    stored.fatGrams.equals(result.fatGrams) &&
+    stored.carbsGrams.equals(result.carbsGrams)
+  );
+}
+
+function isInvalidInput(error: unknown) {
+  if (!(error instanceof BadRequestException)) return false;
+  const body = error.getResponse();
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'code' in body &&
+    body.code === 'INVALID_INPUT'
+  );
+}
+
+function calculationData(
+  userId: string,
+  inputs: {
+    weightKg: Prisma.Decimal;
+    heightCm: Prisma.Decimal;
+    ageYears: number;
+    sex: 'FEMALE' | 'MALE';
+    activity: NutritionActivity;
+    frequency: NutritionFrequency;
+    goal: NutritionGoal;
+  },
+  result: ReturnType<typeof calculateNutrition>,
+) {
+  return {
+    userId,
+    weightKg: inputs.weightKg,
+    heightCm: inputs.heightCm,
+    ageYears: inputs.ageYears,
+    sex: inputs.sex,
+    activity: inputs.activity,
+    frequency: inputs.frequency,
+    goal: inputs.goal,
+    activityMultiplier: result.activityMultiplier,
+    goalAdjustment: result.goalAdjustment,
+    bmr: result.bmr,
+    tdee: result.tdee,
+    targetCalories: result.targetCalories,
+    proteinGrams: result.proteinGrams,
+    fatGrams: result.fatGrams,
+    carbsGrams: result.carbsGrams,
+    carbsNonPositive: result.carbsNonPositive,
+    status: result.status,
+    reviewReasons: result.reviewReasons,
+    displayCalories: result.displayCalories,
+    displayProteinGrams: result.displayProteinGrams,
+    displayFatGrams: result.displayFatGrams,
+    displayCarbsGrams: result.displayCarbsGrams,
+  };
 }
 
 function isUniqueConflict(error: unknown) {
@@ -557,6 +659,9 @@ function toRoster(
       activity: NutritionActivity;
       goal: NutritionGoal;
     } | null;
+    nutritionCalculations: {
+      status: 'VALID' | 'REQUIRES_REVIEW' | 'INVALID_INPUT';
+    }[];
     nutritionTargets: {
       source: 'CALCULATED' | 'MANUAL';
       targetCalories: Prisma.Decimal;
@@ -569,6 +674,7 @@ function toRoster(
   now: Date,
 ): CoachNutritionRosterResponse['clients'][number] {
   const target = user.nutritionTargets[0] ?? null;
+  const latest = user.nutritionCalculations[0] ?? null;
   const profile = user.profile;
   const activity = profile ? formulaActivity(user) : null;
   return {
@@ -576,6 +682,7 @@ function toRoster(
     email: user.email,
     name: profile?.name ?? null,
     archived: !user.isActive,
+    reviewRequired: latest?.status === 'REQUIRES_REVIEW',
     target: target
       ? {
           source: target.source,
@@ -678,6 +785,12 @@ function toCalculation(
     fatGrams: decimal(row.fatGrams),
     carbsGrams: decimal(row.carbsGrams),
     carbsNonPositive: row.carbsNonPositive,
+    status: row.status === 'REQUIRES_REVIEW' ? 'REQUIRES_REVIEW' : 'VALID',
+    reviewReasons: row.reviewReasons,
+    displayCalories: row.displayCalories,
+    displayProteinGrams: row.displayProteinGrams,
+    displayFatGrams: row.displayFatGrams,
+    displayCarbsGrams: row.displayCarbsGrams,
     createdAt: row.createdAt.toISOString(),
   };
 }

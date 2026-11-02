@@ -5,13 +5,27 @@ type NutritionFigures = {
   carbsGrams: string;
 };
 
-/** Trainer numbers stay on screen. A calculated target follows the stored formula. */
+/** Trainer numbers stay on screen. A review snapshot is not a client recommendation. */
 export function shownNutrition(
-  calculation: NutritionFigures | null,
+  calculation:
+    | (NutritionFigures & {
+        id?: string;
+        status?: 'VALID' | 'REQUIRES_REVIEW';
+      })
+    | null,
   target:
-    (NutritionFigures & { source: 'CALCULATED' | 'MANUAL' }) | null | undefined,
+    | (NutritionFigures & {
+        source: 'CALCULATED' | 'MANUAL';
+        calculationId?: string | null;
+      })
+    | null
+    | undefined,
 ): NutritionFigures | null {
   if (target?.source === 'MANUAL') return target;
+  if (calculation?.status === 'REQUIRES_REVIEW') {
+    if (target && target.calculationId !== calculation.id) return target;
+    return null;
+  }
   return calculation;
 }
 export function roundHalfAwayFromZero(value: string): string {

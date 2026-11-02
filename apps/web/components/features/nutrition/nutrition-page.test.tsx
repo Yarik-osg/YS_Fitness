@@ -47,6 +47,12 @@ const calculation: NutritionCalculationResponse = {
   fatGrams: '54',
   carbsGrams: '193.35734375',
   carbsNonPositive: false,
+  status: 'VALID',
+  reviewReasons: [],
+  displayCalories: 1739,
+  displayProteinGrams: 120,
+  displayFatGrams: 54,
+  displayCarbsGrams: 193,
   createdAt: '2026-11-01T00:00:00.000Z',
 };
 
@@ -136,6 +142,62 @@ describe('NutritionPage', () => {
     expect(await screen.findByText('1800')).toBeInTheDocument();
     expect(screen.getByText('130')).toBeInTheDocument();
     expect(screen.queryByText('1739')).not.toBeInTheDocument();
+  });
+
+  it('keeps the previous target when the latest calculation needs review', async () => {
+    nutritionApi.listNutritionCalculations.mockResolvedValue({
+      calculations: [
+        {
+          ...calculation,
+          id: 'calc-2',
+          status: 'REQUIRES_REVIEW',
+          reviewReasons: ['NEGATIVE_CARBS'],
+          targetCalories: '457.47',
+          carbsGrams: '-30.6325',
+          carbsNonPositive: true,
+          displayCalories: 457,
+          displayCarbsGrams: -31,
+        },
+      ],
+      target: {
+        id: 'target-1',
+        source: 'CALCULATED',
+        calculationId: 'calc-1',
+        targetCalories: '1739.429375',
+        proteinGrams: '120',
+        fatGrams: '54',
+        carbsGrams: '193.35734375',
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByText('1739')).toBeInTheDocument();
+    expect(screen.getByText('193')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Carbs are at or below zero with these inputs.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('457')).not.toBeInTheDocument();
+  });
+
+  it('warns when the shown calculation has no carbs left', async () => {
+    nutritionApi.listNutritionCalculations.mockResolvedValue({
+      calculations: [
+        {
+          ...calculation,
+          targetCalories: '900',
+          carbsGrams: '0',
+          carbsNonPositive: true,
+          displayCalories: 900,
+          displayCarbsGrams: 0,
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByText('900')).toBeInTheDocument();
+    expect(
+      screen.getByText('Carbs are at or below zero with these inputs.'),
+    ).toBeInTheDocument();
   });
 
   it('shows a trainer target before a calculation exists', async () => {

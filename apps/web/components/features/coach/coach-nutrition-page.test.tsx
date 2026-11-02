@@ -14,6 +14,7 @@ const roster = vi.hoisted(() => ({
             email: string;
             name: string | null;
             archived: boolean;
+            reviewRequired?: boolean;
             target: {
               source: 'CALCULATED' | 'MANUAL';
               targetCalories: string;
@@ -75,6 +76,7 @@ describe('CoachNutritionPage', () => {
             email: 'anna@example.com',
             name: 'Anna',
             archived: false,
+            reviewRequired: true,
             target: {
               source: 'MANUAL',
               targetCalories: '1800',
@@ -120,6 +122,7 @@ describe('CoachNutritionPage', () => {
       '/coach/clients/anna',
     );
     expect(screen.getByText('anna@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Needs a check')).toBeInTheDocument();
     expect(screen.queryByText('blank@example.com')).toBeNull();
     expect(screen.getByRole('cell', { name: /1800/ })).toBeInTheDocument();
     expect(screen.getByText('By hand')).toBeInTheDocument();

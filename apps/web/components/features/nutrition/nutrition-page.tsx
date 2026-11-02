@@ -26,7 +26,8 @@ export function NutritionPage() {
   const needsPlan = isSubscriptionRequired(calculations.error);
   const unsupported =
     calculate.error instanceof ApiClientError &&
-    calculate.error.code === 'NUTRITION_INPUT_UNSUPPORTED';
+    (calculate.error.code === 'INVALID_INPUT' ||
+      calculate.error.code === 'NUTRITION_INPUT_UNSUPPORTED');
 
   useEffect(() => {
     if (
@@ -68,7 +69,9 @@ export function NutritionPage() {
     );
   }
 
-  if (!shown && !calculate.isError) {
+  const waitingForReview = latest?.status === 'REQUIRES_REVIEW' && !shown;
+
+  if (!shown && !calculate.isError && !waitingForReview) {
     return <NutritionLoading label={t('loading')} />;
   }
 
@@ -84,11 +87,15 @@ export function NutritionPage() {
           {getUserFacingError(calculate.error, tAuth)}
         </p>
       ) : null}
+      {waitingForReview ? (
+        <p className="text-sm leading-6 text-white/35">{t('pendingReview')}</p>
+      ) : null}
       {shown ? (
         <DailyTargets
           calculation={shown}
           carbsNonPositive={
             calculations.data?.target?.source !== 'MANUAL' &&
+            latest?.status !== 'REQUIRES_REVIEW' &&
             Boolean(latest?.carbsNonPositive)
           }
         />

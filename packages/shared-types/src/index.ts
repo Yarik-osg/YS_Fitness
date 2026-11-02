@@ -524,6 +524,15 @@ export interface NutritionProfileGetResponse {
   profile: NutritionProfileResponse | null;
 }
 
+export type NutritionCalculationStatus = 'VALID' | 'REQUIRES_REVIEW';
+export type NutritionReviewReason =
+  | 'NEGATIVE_CARBS'
+  | 'LOW_CALORIES'
+  | 'EXCESSIVE_PROTEIN_RATIO'
+  | 'EXCESSIVE_FAT_RATIO'
+  | 'UNUSUAL_BODY_WEIGHT'
+  | 'UNDERAGE';
+
 export interface NutritionCalculationResponse {
   id: string;
   weightKg: string;
@@ -542,6 +551,12 @@ export interface NutritionCalculationResponse {
   fatGrams: string;
   carbsGrams: string;
   carbsNonPositive: boolean;
+  status: NutritionCalculationStatus;
+  reviewReasons: NutritionReviewReason[];
+  displayCalories: number;
+  displayProteinGrams: number;
+  displayFatGrams: number;
+  displayCarbsGrams: number;
   createdAt: string;
 }
 
@@ -593,6 +608,7 @@ export interface CoachNutritionRosterRow {
   email: string;
   name: string | null;
   archived: boolean;
+  reviewRequired: boolean;
   target: CoachNutritionRosterTarget | null;
   inputs: CoachNutritionRosterInputs | null;
 }

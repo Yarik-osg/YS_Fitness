@@ -154,11 +154,16 @@ function chartOrder<T extends { id: string; measuredAt: Date }>(
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  private async refreshNutrition(userId: string, kind: 'weight' | 'profile') {
+  private async refreshNutrition(
+    userId: string,
+    kind: 'weight' | 'profile' | 'onboarding',
+  ) {
     if (!this.nutrition) return;
     try {
       if (kind === 'weight') {
         await this.nutrition.refreshAfterWeightChange(userId);
+      } else if (kind === 'onboarding') {
+        await this.nutrition.refreshAfterRecordedInputs(userId);
       } else {
         await this.nutrition.replaceFromProfile(userId);
       }
@@ -472,6 +477,7 @@ export class UsersService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    await this.refreshNutrition(userId, 'onboarding');
   }
 
   async updateProfile(
