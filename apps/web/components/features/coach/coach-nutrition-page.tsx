@@ -260,6 +260,11 @@ function NutritionRow({
         <span className="mt-1 block text-xs font-normal break-all text-muted">
           {row.email}
         </span>
+        {row.reviewRequired ? (
+          <span className="mt-1 block text-xs font-normal whitespace-nowrap text-amber">
+            {t('nutritionReview')}
+          </span>
+        ) : null}
       </th>
       <Cell>
         <span>

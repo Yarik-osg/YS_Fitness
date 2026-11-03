@@ -370,7 +370,24 @@ function CoachNutrition({ userId }: { userId: string }) {
                 : t('nutritionNowCalculated')}
             </p>
           ) : null}
-          {calculation && !applied ? (
+          {calculation?.status === 'REQUIRES_REVIEW' ? (
+            <div className="mt-6">
+              <h3 className="font-heading text-sm text-amber">
+                {t('nutritionReview')}
+              </h3>
+              <p className="mt-2 text-sm text-ink">
+                {t('nutritionFigures', figureValues(calculation))}
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-ink">
+                {calculation.reviewReasons.map((reason) => (
+                  <li key={reason}>{t(`nutritionReviewReason.${reason}`)}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {calculation &&
+          !applied &&
+          calculation.status !== 'REQUIRES_REVIEW' ? (
             <div className="mt-6">
               <h3 className="font-heading text-sm text-ink">
                 {t('nutritionFormula')}
@@ -463,7 +480,19 @@ function figureValues(row: {
   proteinGrams: string;
   fatGrams: string;
   carbsGrams: string;
+  displayCalories?: number;
+  displayProteinGrams?: number;
+  displayFatGrams?: number;
+  displayCarbsGrams?: number;
 }) {
+  if (row.displayCalories !== undefined) {
+    return {
+      calories: String(row.displayCalories),
+      protein: String(row.displayProteinGrams),
+      fat: String(row.displayFatGrams),
+      carbs: String(row.displayCarbsGrams),
+    };
+  }
   return {
     calories: roundHalfAwayFromZero(row.targetCalories),
     protein: roundHalfAwayFromZero(row.proteinGrams),

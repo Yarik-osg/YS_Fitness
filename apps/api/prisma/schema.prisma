@@ -446,6 +446,20 @@ enum NutritionTargetSource {
   MANUAL
 }
 
+enum NutritionCalculationStatus {
+  VALID
+  REQUIRES_REVIEW
+}
+
+enum NutritionReviewReason {
+  NEGATIVE_CARBS
+  LOW_CALORIES
+  EXCESSIVE_PROTEIN_RATIO
+  EXCESSIVE_FAT_RATIO
+  UNUSUAL_BODY_WEIGHT
+  UNDERAGE
+}
+
 model NutritionProfile {
   id          String            @id @default(uuid()) @db.Uuid
   userId      String            @unique @map("user_id") @db.Uuid
@@ -482,6 +496,12 @@ model NutritionCalculation {
   fatGrams           Decimal                     @map("fat_grams") @db.Decimal(24, 12)
   carbsGrams         Decimal                     @map("carbs_grams") @db.Decimal(24, 12)
   carbsNonPositive   Boolean                     @map("carbs_non_positive")
+  status             NutritionCalculationStatus  @default(VALID)
+  reviewReasons      NutritionReviewReason[]     @default([]) @map("review_reasons")
+  displayCalories    Int                         @map("display_calories")
+  displayProteinGrams Int                        @map("display_protein_grams")
+  displayFatGrams    Int                         @map("display_fat_grams")
+  displayCarbsGrams  Int                         @map("display_carbs_grams")
   createdAt          DateTime                    @default(now()) @map("created_at")
 
   user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)

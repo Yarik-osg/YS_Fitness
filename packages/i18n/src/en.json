@@ -897,6 +897,7 @@
     "carbs": "Carbs",
     "note": "Calculated for you from your details and goal.",
     "carbsNonPositive": "Carbs are at or below zero with these inputs.",
+    "pendingReview": "The automatic calculation needs a trainer to check it. It is not shown as your target yet.",
     "menuTitle": "A menu for your macros",
     "menuBody": "Ready meals with portions matched to your targets.",
     "inProgress": "In progress"
@@ -1068,6 +1069,15 @@
     "nutritionFigures": "{calories} kcal. Protein {protein} g, fat {fat} g, carbs {carbs} g.",
     "nutritionFormula": "Calculation from the questionnaire",
     "nutritionFormulaIdle": "The client does not see these numbers yet.",
+    "nutritionReview": "Needs a check",
+    "nutritionReviewReason": {
+      "NEGATIVE_CARBS": "Carbs came out below zero.",
+      "LOW_CALORIES": "Target calories are too low.",
+      "EXCESSIVE_PROTEIN_RATIO": "Protein is too large a share of the calories.",
+      "EXCESSIVE_FAT_RATIO": "Fat is too large a share of the calories.",
+      "UNUSUAL_BODY_WEIGHT": "Body weight may make a per-kilogram calculation a poor fit.",
+      "UNDERAGE": "This calculation is not a ready recommendation for someone under 18."
+    },
     "nutritionApply": "Give the client this calculation",
     "nutritionApplying": "Setting the calculation",
     "nutritionNone": "There is no calculation from the questionnaire yet.",

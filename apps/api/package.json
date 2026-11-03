@@ -23,7 +23,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "backfill:progress-photos": "tsx src/users/backfill-progress-photos.ts"
+    "backfill:progress-photos": "tsx src/users/backfill-progress-photos.ts",
+    "backfill:nutrition": "node --env-file=.env --import tsx src/nutrition/backfill-nutrition-formula.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

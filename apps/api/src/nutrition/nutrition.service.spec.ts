@@ -2,31 +2,50 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma, type NutritionCalculation } from '@prisma/client';
 import { nutritionProfileSchema } from '@repo/validation';
 import { describe, expect, it, vi } from 'vitest';
+import { calculateNutrition } from './nutrition-calculation.js';
 import { NutritionService } from './nutrition.service.js';
 
 const now = new Date('2026-11-01T12:00:00.000Z');
 const userId = 'user-b';
 
-function storedCalculation(weightKg: string): NutritionCalculation {
+function storedCalculation(
+  weightKg: string,
+  ageYears = 30,
+): NutritionCalculation {
+  const result = calculateNutrition({
+    sex: 'FEMALE',
+    weightKg,
+    heightCm: '165',
+    ageYears,
+    activity: 'MODERATE',
+    frequency: 3,
+    goal: 'LOSE_WEIGHT',
+  });
   return {
     id: 'calc-old',
     userId,
     weightKg: new Prisma.Decimal(weightKg),
     heightCm: new Prisma.Decimal('165'),
-    ageYears: 30,
+    ageYears,
     sex: 'FEMALE',
     activity: 'MODERATE',
     frequency: 3,
     goal: 'LOSE_WEIGHT',
-    activityMultiplier: new Prisma.Decimal('1.55'),
-    goalAdjustment: new Prisma.Decimal('-0.2'),
-    bmr: new Prisma.Decimal('1300'),
-    tdee: new Prisma.Decimal('2000'),
-    targetCalories: new Prisma.Decimal('1700'),
-    proteinGrams: new Prisma.Decimal('100'),
-    fatGrams: new Prisma.Decimal('50'),
-    carbsGrams: new Prisma.Decimal('150'),
-    carbsNonPositive: false,
+    activityMultiplier: result.activityMultiplier,
+    goalAdjustment: result.goalAdjustment,
+    bmr: result.bmr,
+    tdee: result.tdee,
+    targetCalories: result.targetCalories,
+    proteinGrams: result.proteinGrams,
+    fatGrams: result.fatGrams,
+    carbsGrams: result.carbsGrams,
+    carbsNonPositive: result.carbsNonPositive,
+    status: result.status,
+    reviewReasons: result.reviewReasons,
+    displayCalories: result.displayCalories,
+    displayProteinGrams: result.displayProteinGrams,
+    displayFatGrams: result.displayFatGrams,
+    displayCarbsGrams: result.displayCarbsGrams,
     createdAt: now,
   };
 }
@@ -204,6 +223,10 @@ function harness(options?: {
         reads.push({ model: 'nutritionCalculation', args });
         return [];
       }),
+      findFirst: vi.fn(async (args: unknown) => {
+        reads.push({ model: 'nutritionCalculation', args });
+        return options?.racedCalculation ?? null;
+      }),
     },
     nutritionTarget: {
       findFirst: vi.fn(async (args: unknown) => {
@@ -251,8 +274,9 @@ describe('NutritionService', () => {
     expect(tx.$queryRaw).toHaveBeenCalledOnce();
     expect(result.activatedTarget).toBe(true);
     expect(result.bmr).toBe('1320.25');
-    expect(result.targetCalories).toBe('1739.429375');
-    expect(result.carbsGrams).toBe('181.35734375');
+    expect(result.targetCalories).toBe('1571.0975');
+    expect(result.carbsGrams).toBe('139.274375');
+    expect(result.status).toBe('VALID');
     expect(created[0]?.data.userId).toBe(userId);
     expect(targetCreates[0]?.data).toMatchObject({
       userId,
@@ -262,33 +286,14 @@ describe('NutritionService', () => {
     });
     expect(
       (targetCreates[0]?.data.targetCalories as Prisma.Decimal).equals(
-        '1739.429375',
+        '1571.0975',
       ),
     ).toBe(true);
   });
 
   it('returns the stored calculation instead of saving another', async () => {
-    const racedCalculation = {
-      id: 'calc-existing',
-      userId,
-      createdAt: now,
-      weightKg: new Prisma.Decimal('60'),
-      heightCm: new Prisma.Decimal('165'),
-      ageYears: 30,
-      sex: 'FEMALE',
-      activity: 'MODERATE',
-      frequency: 3,
-      goal: 'LOSE_WEIGHT',
-      activityMultiplier: new Prisma.Decimal('1.55'),
-      goalAdjustment: new Prisma.Decimal('-0.15'),
-      bmr: new Prisma.Decimal('1320.25'),
-      tdee: new Prisma.Decimal('2046.3875'),
-      targetCalories: new Prisma.Decimal('1739.429375'),
-      proteinGrams: new Prisma.Decimal('120'),
-      fatGrams: new Prisma.Decimal('54'),
-      carbsGrams: new Prisma.Decimal('193.35734375'),
-      carbsNonPositive: false,
-    } as NutritionCalculation;
+    const racedCalculation = storedCalculation('60');
+    racedCalculation.id = 'calc-existing';
     const { service, created, targetCreates } = harness({ racedCalculation });
 
     const result = await service.calculate(userId, now);
@@ -298,8 +303,72 @@ describe('NutritionService', () => {
     expect(result).toMatchObject({
       id: 'calc-existing',
       activatedTarget: false,
-      targetCalories: '1739.429375',
+      targetCalories: '1571.0975',
     });
+  });
+
+  it('stores a new snapshot when the saved figures are not the current formula', async () => {
+    const stored = storedCalculation('60');
+    stored.targetCalories = new Prisma.Decimal('1739.185');
+    const { service, created, targetUpdates, targetCreates } = harness({
+      racedCalculation: stored,
+      active: { id: 'old-target', source: 'CALCULATED' },
+    });
+
+    const result = await service.calculate(userId, now);
+
+    expect(stored.targetCalories.toString()).toBe('1739.185');
+    expect(created).toHaveLength(1);
+    expect(result.targetCalories).toBe('1571.0975');
+    expect(result.activatedTarget).toBe(true);
+    expect(targetUpdates).toEqual([
+      { where: { id: 'old-target' }, data: { active: false } },
+    ]);
+    expect(targetCreates).toHaveLength(1);
+  });
+
+  it('keeps the manual target when the saved figures are recalculated', async () => {
+    const stored = storedCalculation('60');
+    stored.targetCalories = new Prisma.Decimal('1739.185');
+    const { service, created, targetUpdates, targetCreates } = harness({
+      racedCalculation: stored,
+      active: { id: 'manual-target', source: 'MANUAL' },
+    });
+
+    const result = await service.calculate(userId, now);
+
+    expect(created).toHaveLength(1);
+    expect(result.activatedTarget).toBe(false);
+    expect(targetUpdates).toEqual([]);
+    expect(targetCreates).toEqual([]);
+  });
+
+  it('appends a snapshot on the birthday when nutrition is read', async () => {
+    const stored = storedCalculation('60', 29);
+    const listed = harness({
+      racedCalculation: stored,
+      ageYears: { dob: '1996-11-02T00:00:00.000Z', timezone: 'Europe/Kyiv' },
+      active: { id: 'calc-target', source: 'CALCULATED' },
+    });
+    const dayBefore = new Date('2026-11-01T21:30:00.000Z');
+    const birthday = new Date('2026-11-01T22:30:00.000Z');
+
+    await listed.service.listCalculations(userId, dayBefore);
+
+    expect(listed.created).toHaveLength(0);
+    expect(stored.ageYears).toBe(29);
+
+    const opened = harness({
+      racedCalculation: stored,
+      ageYears: { dob: '1996-11-02T00:00:00.000Z', timezone: 'Europe/Kyiv' },
+      active: { id: 'calc-target', source: 'CALCULATED' },
+    });
+    await opened.service.getForCoach(userId, birthday);
+
+    expect(opened.created).toHaveLength(1);
+    expect(opened.created[0]?.data.ageYears).toBe(30);
+    expect(stored.ageYears).toBe(29);
+    expect(stored.targetCalories.toString()).toBe('1577.0475');
   });
 
   it('appends a calculation and a calculated target without changing the old rows', async () => {
@@ -320,7 +389,7 @@ describe('NutritionService', () => {
     await service.replaceFromProfile(userId, now);
 
     expect(tx.nutritionCalculation.update).not.toHaveBeenCalled();
-    expect(stored.targetCalories.toString()).toBe('1700');
+    expect(stored.targetCalories.toString()).toBe('1571.0975');
     expect(stored.goal).toBe('LOSE_WEIGHT');
     expect(created).toHaveLength(1);
     expect(created[0]?.data).toMatchObject({
@@ -358,7 +427,7 @@ describe('NutritionService', () => {
     expect(tx.nutritionCalculation.update).not.toHaveBeenCalled();
     expect(targetUpdates).toEqual([]);
     expect(targetCreates).toEqual([]);
-    expect(stored.targetCalories.toString()).toBe('1700');
+    expect(stored.targetCalories.toString()).toBe('1571.0975');
   });
 
   it('creates a calculated target when none is active', async () => {
@@ -556,23 +625,22 @@ describe('NutritionService', () => {
     expect(result.targetCalories).toBe('1739.429375');
   });
 
-  it('keeps the stored calculation until weight has moved 5 kg', async () => {
+  it('stores a new calculation for any weight change and keeps an unchanged snapshot', async () => {
     const stored = storedCalculation('60');
-    const short = harness({
-      weightKg: '64.99',
+    const same = harness({
+      weightKg: '60',
       active: { id: 'calc-target', source: 'CALCULATED' },
       racedCalculation: stored,
     });
 
-    const unchanged = await short.service.calculate(userId, now);
+    const unchanged = await same.service.calculate(userId, now);
 
     expect(unchanged.id).toBe('calc-old');
     expect(unchanged.activatedTarget).toBe(false);
-    expect(short.created).toHaveLength(0);
-    expect(short.targetCreates).toEqual([]);
-
+    expect(same.created).toHaveLength(0);
+    expect(same.targetCreates).toEqual([]);
     const shifted = harness({
-      weightKg: '65',
+      weightKg: '61',
       active: { id: 'calc-target', source: 'CALCULATED' },
       racedCalculation: stored,
     });
@@ -580,7 +648,7 @@ describe('NutritionService', () => {
     const updated = await shifted.service.calculate(userId, now);
 
     expect(updated.activatedTarget).toBe(true);
-    expect(updated.weightKg).toBe('65');
+    expect(updated.weightKg).toBe('61');
     expect(shifted.created).toHaveLength(1);
     expect(shifted.targetUpdates).toEqual([
       { where: { id: 'calc-target' }, data: { active: false } },
@@ -589,15 +657,7 @@ describe('NutritionService', () => {
       source: 'CALCULATED',
       active: true,
     });
-
-    const fallen = harness({
-      weightKg: '55',
-      active: { id: 'calc-target', source: 'CALCULATED' },
-      racedCalculation: stored,
-    });
-    const lost = await fallen.service.calculate(userId, now);
-    expect(lost.weightKg).toBe('55');
-    expect(fallen.created).toHaveLength(1);
+    expect(stored.targetCalories.toString()).toBe('1571.0975');
   });
 
   it('uses the weight read after the user row is locked', async () => {
@@ -655,8 +715,47 @@ describe('NutritionService', () => {
     const result = await service.calculate(userId, now);
 
     expect(result.carbsNonPositive).toBe(true);
-    expect(result.carbsGrams).toBe('-50.23375');
+    expect(result.carbsGrams).toBe('-30.6325');
+    expect(result.status).toBe('REQUIRES_REVIEW');
+    expect(result.reviewReasons).toEqual(['NEGATIVE_CARBS']);
+    expect(result.activatedTarget).toBe(false);
     expect(created[0]?.data.carbsNonPositive).toBe(true);
+    expect(created[0]?.data.status).toBe('REQUIRES_REVIEW');
+  });
+
+  it('does not replace an active target when the new calculation needs review', async () => {
+    const { service, targetUpdates, targetCreates } = harness({
+      weightKg: '40',
+      heightCm: '100',
+      activity: 'SEDENTARY',
+      frequency: '2',
+      ageYears: { dob: '1936-11-01T00:00:00.000Z', timezone: 'UTC' },
+      active: { id: 'calc-target', source: 'CALCULATED' },
+    });
+
+    const result = await service.calculate(userId, now);
+
+    expect(result.activatedTarget).toBe(false);
+    expect(targetUpdates).toEqual([]);
+    expect(targetCreates).toEqual([]);
+  });
+
+  it('does not apply a calculation that needs review', async () => {
+    const { service, targetUpdates, targetCreates } = harness({
+      active: { id: 'manual-target', source: 'MANUAL' },
+      racedCalculation: {
+        ...storedCalculation('60'),
+        id: 'calc-9',
+        status: 'REQUIRES_REVIEW',
+        reviewReasons: ['NEGATIVE_CARBS'],
+      },
+    });
+
+    await expect(
+      service.applyCalculation(userId, 'calc-9'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(targetUpdates).toEqual([]);
+    expect(targetCreates).toEqual([]);
   });
 
   it('counts age in the profile timezone', async () => {
@@ -766,6 +865,7 @@ describe('NutritionService', () => {
             },
             onboardingResponses: { trainingFrequency: '3' },
             nutritionProfile: { activity: 'HIGH', goal: 'RECOMPOSITION' },
+            nutritionCalculations: [{ status: 'REQUIRES_REVIEW' }],
             nutritionTargets: [
               {
                 source: 'MANUAL',
@@ -795,6 +895,7 @@ describe('NutritionService', () => {
               mainGoal: 'LOSE_WEIGHT',
             },
             nutritionProfile: null,
+            nutritionCalculations: [],
             nutritionTargets: [],
             bodyMeasurements: [],
           },
@@ -816,6 +917,7 @@ describe('NutritionService', () => {
               mainGoal: 'MAINTAIN',
             },
             nutritionProfile: null,
+            nutritionCalculations: [],
             nutritionTargets: [],
             bodyMeasurements: [{ weightKg: new Prisma.Decimal('60') }],
           },
@@ -829,6 +931,7 @@ describe('NutritionService', () => {
         email: 'a@example.com',
         name: 'Анна',
         archived: false,
+        reviewRequired: true,
         target: {
           source: 'MANUAL',
           targetCalories: '1800',
@@ -851,6 +954,7 @@ describe('NutritionService', () => {
         email: 'b@example.com',
         name: null,
         archived: true,
+        reviewRequired: false,
         target: null,
         inputs: {
           sex: 'MALE',
@@ -867,6 +971,7 @@ describe('NutritionService', () => {
         email: 'c@example.com',
         name: null,
         archived: false,
+        reviewRequired: false,
         target: null,
         inputs: {
           sex: 'FEMALE',
