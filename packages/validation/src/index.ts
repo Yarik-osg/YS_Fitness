@@ -700,6 +700,19 @@ export const foodLogQuerySchema = z
 
 export type FoodLogQuery = z.infer<typeof foodLogQuerySchema>;
 
+const recentLimit = z.preprocess(
+  (value) => (value === undefined || value === '' ? 20 : value),
+  z.coerce.number().int().min(1).max(50),
+);
+
+export const foodRecentQuerySchema = z
+  .object({
+    limit: recentLimit,
+  })
+  .strict();
+
+export type FoodRecentQuery = z.infer<typeof foodRecentQuerySchema>;
+
 export const createFoodLogSchema = z
   .object({
     productId: z.string().uuid(),

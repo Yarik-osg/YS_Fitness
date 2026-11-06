@@ -16,7 +16,11 @@ Split the work into `food-catalog` and `food-log`.
 
 `food-catalog` owns `FoodProduct` and `FoodSearchQuery`. Rows are either `OFF` (cached from Open Food Facts, keyed by source and barcode) or `CUSTOM` (owned by one user). The HTTP client sits behind the `OFF_CLIENT` token, and that implementation also holds the in-process outbound budget. The web app does not call Open Food Facts.
 
-`food-log` owns favorites and log entries. It calls the catalog service and `NutritionService.getActiveTarget`. It does not query nutrition or product tables itself.
+`food-log` owns favorites and log entries. It calls the catalog service and `NutritionService.getActiveTarget`. It does not query nutrition tables. The catalog does not read favorites or log rows, and it does not import the log module.
+
+`FoodProductResponse.isFavorite` is filled by the log module for the signed-in user. The catalog returns the product without that flag. Search and creating a custom product are HTTP routes on the log controller so the flag can be added without a cycle: one `favorite_foods` lookup for the ids in the response. A brand-new product is not a favorite. `GET /food/favorites` is newest first and every row is a favorite. `PATCH` of a log entry still returns the entry, not a product.
+
+`GET /food/recent` lists distinct products the caller logged, newest log first. `productId` null is skipped. Grams, meal, and date come from that latest entry so the client can log the same amount again. Per-100g values come from the product row now, not from the entry snapshot. A product the caller cannot see is excluded in the same query.
 
 Each log entry stores the product name, image, grams, and kcal, protein, fat, and carbs. That snapshot is what history and the daily total use, including after the product is edited or deleted.
 

@@ -1,7 +1,10 @@
 import type { FoodProduct } from '@prisma/client';
 import type { FoodProductResponse } from '@repo/shared-types';
 
-export function toFoodProduct(row: FoodProduct): FoodProductResponse {
+/** Catalog view. The log module adds `isFavorite` before the response leaves the API. */
+export type CatalogFoodProduct = Omit<FoodProductResponse, 'isFavorite'>;
+
+export function toFoodProduct(row: FoodProduct): CatalogFoodProduct {
   return {
     id: row.id,
     source: row.source,

@@ -631,6 +631,7 @@ export interface FoodProductResponse {
   proteinPer100g: number;
   fatPer100g: number;
   carbsPer100g: number;
+  isFavorite: boolean;
 }
 
 export interface FoodProductListResponse {
@@ -679,4 +680,16 @@ export interface FoodDayResponse {
   totals: FoodMacroTotal;
   target: ActiveNutritionTarget | null;
   remaining: FoodMacroTotal | null;
+}
+
+export interface FoodRecentItemResponse {
+  product: FoodProductResponse;
+  lastGrams: number;
+  lastMeal: FoodMeal;
+  /** Calendar date from the latest log entry, YYYY-MM-DD. */
+  lastLoggedOn: string;
+}
+
+export interface FoodRecentResponse {
+  items: FoodRecentItemResponse[];
 }

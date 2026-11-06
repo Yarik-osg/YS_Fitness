@@ -3,11 +3,13 @@ import {
   foodLogParamsSchema,
   foodLogQuerySchema,
   foodProductParamsSchema,
+  foodRecentQuerySchema,
   patchFoodLogSchema,
   type CreateFoodLogInput,
   type FoodLogParams,
   type FoodLogQuery,
   type FoodProductParams,
+  type FoodRecentQuery,
   type PatchFoodLogInput,
 } from '@repo/validation';
 
@@ -15,6 +17,12 @@ export class FoodProductParamsDto implements FoodProductParams {
   static readonly schema = foodProductParamsSchema;
 
   productId!: string;
+}
+
+export class FoodRecentQueryDto implements FoodRecentQuery {
+  static readonly schema = foodRecentQuerySchema;
+
+  limit!: number;
 }
 
 export class FoodLogQueryDto implements FoodLogQuery {

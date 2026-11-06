@@ -12,15 +12,23 @@ import type {
   FoodMacroTotal,
   FoodProductListResponse,
   FoodProductResponse,
+  FoodRecentResponse,
+  FoodSearchResponse,
 } from '@repo/shared-types';
+import type { FoodRecentQuery } from '@repo/validation';
 import {
   foodPer100gSchema,
   type CreateFoodLogInput,
+  type CreateFoodProductInput,
+  type FoodSearchQuery,
   type PatchFoodLogInput,
 } from '@repo/validation';
 import { roundHalfUp } from '../common/round-half-up.js';
 import { FoodCatalogService } from '../food-catalog/food-catalog.service.js';
-import { toFoodProduct } from '../food-catalog/food-product.js';
+import {
+  toFoodProduct,
+  type CatalogFoodProduct,
+} from '../food-catalog/food-product.js';
 import { NutritionService } from '../nutrition/nutrition.service.js';
 import { FoodLogRepository } from './food-log.repository.js';
 import {
@@ -41,6 +49,25 @@ export class FoodLogService {
     private readonly nutrition: NutritionService,
   ) {}
 
+  async searchFoods(
+    userId: string,
+    query: FoodSearchQuery,
+  ): Promise<FoodSearchResponse> {
+    const found = await this.catalog.search(userId, query);
+    return {
+      fromCacheOnly: found.fromCacheOnly,
+      products: await this.withFavorites(userId, found.products),
+    };
+  }
+
+  async createProduct(
+    userId: string,
+    input: CreateFoodProductInput,
+  ): Promise<FoodProductResponse> {
+    const created = await this.catalog.create(userId, input);
+    return { ...created, isFavorite: false };
+  }
+
   async listFavorites(userId: string): Promise<FoodProductListResponse> {
     const links = await this.entries.listFavorites(userId);
     const products = await this.catalog.findVisibleByIds(
@@ -51,7 +78,7 @@ export class FoodLogService {
     return {
       products: links.flatMap((link) => {
         const product = byId.get(link.productId);
-        return product ? [toFoodProduct(product)] : [];
+        return product ? [{ ...toFoodProduct(product), isFavorite: true }] : [];
       }),
     };
   }
@@ -63,7 +90,44 @@ export class FoodLogService {
     const product = await this.catalog.findVisible(userId, productId);
     if (!product) throw productNotFound();
     await this.entries.favorite(userId, productId);
-    return toFoodProduct(product);
+    return { ...toFoodProduct(product), isFavorite: true };
+  }
+
+  async recent(
+    userId: string,
+    query: FoodRecentQuery,
+  ): Promise<FoodRecentResponse> {
+    const rows = await this.entries.recent(userId, query.limit);
+    const flagged = await this.withFavorites(
+      userId,
+      rows.map((row) => ({
+        id: row.productId,
+        source: row.source,
+        externalId: row.externalId,
+        name: row.name,
+        brand: row.brand,
+        imageUrl: row.imageUrl,
+        kcalPer100g: decimalNumber(row.kcalPer100g),
+        proteinPer100g: decimalNumber(row.proteinPer100g),
+        fatPer100g: decimalNumber(row.fatPer100g),
+        carbsPer100g: decimalNumber(row.carbsPer100g),
+      })),
+    );
+    const byId = new Map(flagged.map((product) => [product.id, product]));
+    return {
+      items: rows.flatMap((row) => {
+        const product = byId.get(row.productId);
+        if (!product) return [];
+        return [
+          {
+            product,
+            lastGrams: decimalNumber(row.grams),
+            lastMeal: row.meal,
+            lastLoggedOn: formatCalendarDate(row.loggedOn),
+          },
+        ];
+      }),
+    };
   }
 
   async unfavorite(userId: string, productId: string): Promise<void> {
@@ -189,6 +253,20 @@ export class FoodLogService {
     const count = await this.entries.deleteOwned(userId, entryId);
     if (count !== 1) throw entryNotFound();
   }
+
+  private async withFavorites(
+    userId: string,
+    products: CatalogFoodProduct[],
+  ): Promise<FoodProductResponse[]> {
+    const flags = await this.entries.favoriteIdSet(
+      userId,
+      products.map((product) => product.id),
+    );
+    return products.map((product) => ({
+      ...product,
+      isFavorite: flags.has(product.id),
+    }));
+  }
 }
 
 function remaining(
@@ -227,6 +305,10 @@ function toEntry(row: FoodLogEntry): FoodLogEntryResponse {
     carbs: row.carbs.toNumber(),
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function decimalNumber(value: Prisma.Decimal | number): number {
+  return value instanceof Prisma.Decimal ? value.toNumber() : Number(value);
 }
 
 function productNotFound(): NotFoundException {

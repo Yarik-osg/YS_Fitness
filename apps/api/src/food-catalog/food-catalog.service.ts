@@ -5,10 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { FoodProduct } from '@prisma/client';
-import type {
-  FoodProductResponse,
-  FoodSearchResponse,
-} from '@repo/shared-types';
+import type { CatalogFoodProduct } from './food-product.js';
 import type { CreateFoodProductInput, FoodSearchQuery } from '@repo/validation';
 import { FoodCatalogRepository } from './food-catalog.repository.js';
 import { foodSearchKey } from './food-search-key.js';
@@ -33,7 +30,7 @@ export class FoodCatalogService {
   async search(
     userId: string,
     query: FoodSearchQuery,
-  ): Promise<FoodSearchResponse> {
+  ): Promise<{ products: CatalogFoodProduct[]; fromCacheOnly: boolean }> {
     const terms = query.q ? foodSearchKey(query.q) : undefined;
     const customs = await this.products.matchingCustom(userId, {
       q: terms,
@@ -51,7 +48,7 @@ export class FoodCatalogService {
   async create(
     userId: string,
     input: CreateFoodProductInput,
-  ): Promise<FoodProductResponse> {
+  ): Promise<CatalogFoodProduct> {
     const created = await this.products.createCustom(userId, {
       name: input.name,
       imageUrl: input.imageUrl ?? null,

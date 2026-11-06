@@ -605,4 +605,235 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     expect(product?.source).toBe('CUSTOM');
     expect(product?.ownerId).toBe(user.id);
   });
+
+  it('marks favorites for the caller only and lists them newest first', async () => {
+    const user = await account('food-flag@example.com');
+    const other = await account('food-flag-other@example.com');
+    await subscribe(user.id);
+    await subscribe(other.id);
+    const first = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Oats',
+        kcalPer100g: 370,
+        proteinPer100g: 13,
+        fatPer100g: 7,
+        carbsPer100g: 60,
+      })
+      .expect(201);
+    expect(first.body.isFavorite).toBe(false);
+    const shared = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=milk')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    const sharedId = shared.body.products[0].id as string;
+    await request(app.getHttpServer())
+      .put(`/api/v1/food/favorites/${first.body.id}`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    await request(app.getHttpServer())
+      .put(`/api/v1/food/favorites/${sharedId}`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    await prisma.favoriteFood.update({
+      where: {
+        userId_productId: { userId: user.id, productId: first.body.id },
+      },
+      data: { createdAt: new Date('2026-11-01T00:00:00.000Z') },
+    });
+    await prisma.favoriteFood.update({
+      where: { userId_productId: { userId: user.id, productId: sharedId } },
+      data: { createdAt: new Date('2026-11-02T00:00:00.000Z') },
+    });
+    const before = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=milk')
+      .set('Authorization', other.authorization)
+      .expect(200);
+    expect(
+      before.body.products.find(
+        (product: { id: string }) => product.id === sharedId,
+      ).isFavorite,
+    ).toBe(false);
+    await request(app.getHttpServer())
+      .put(`/api/v1/food/favorites/${sharedId}`)
+      .set('Authorization', other.authorization)
+      .expect(200);
+
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=milk')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    const theirs = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=milk')
+      .set('Authorization', other.authorization)
+      .expect(200);
+    expect(
+      mine.body.products.find(
+        (product: { id: string }) => product.id === sharedId,
+      ).isFavorite,
+    ).toBe(true);
+    expect(
+      theirs.body.products.find(
+        (product: { id: string }) => product.id === sharedId,
+      ).isFavorite,
+    ).toBe(true);
+    const oats = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=oats')
+      .set('Authorization', other.authorization)
+      .expect(200);
+    expect(
+      oats.body.products.find(
+        (product: { id: string }) => product.id === first.body.id,
+      ),
+    ).toBeUndefined();
+
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/food/favorites')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(
+      list.body.products.map((product: { id: string }) => product.id),
+    ).toEqual([sharedId, first.body.id]);
+    expect(
+      list.body.products.every(
+        (product: { isFavorite: boolean }) => product.isFavorite,
+      ),
+    ).toBe(true);
+  });
+
+  it('lists recent products from the product row, not the entry snapshot', async () => {
+    const open = await request(app.getHttpServer()).get('/api/v1/food/recent');
+    expect(open.status).toBe(401);
+    const bare = await account('food-recent-open@example.com');
+    const denied = await request(app.getHttpServer())
+      .get('/api/v1/food/recent')
+      .set('Authorization', bare.authorization);
+    expect(denied.status).toBe(403);
+
+    const user = await account('food-recent@example.com');
+    const other = await account('food-recent-other@example.com');
+    await subscribe(user.id);
+    await subscribe(other.id);
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get('/api/v1/food/recent?limit=0')
+          .set('Authorization', user.authorization)
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get('/api/v1/food/recent?limit=51')
+          .set('Authorization', user.authorization)
+      ).status,
+    ).toBe(400);
+
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Rice',
+        kcalPer100g: 130,
+        proteinPer100g: 3,
+        fatPer100g: 1,
+        carbsPer100g: 28,
+      })
+      .expect(201);
+    const otherProduct = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', other.authorization)
+      .send({
+        name: 'Secret',
+        kcalPer100g: 10,
+        proteinPer100g: 1,
+        fatPer100g: 1,
+        carbsPer100g: 1,
+      })
+      .expect(201);
+    const first = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 100,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-01',
+      })
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 80,
+        meal: 'SNACK',
+        loggedOn: '2026-11-02',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 40,
+        meal: 'BREAKFAST',
+        loggedOn: '2026-11-03',
+      })
+      .expect(201);
+    await prisma.foodLogEntry.update({
+      where: { id: first.body.id },
+      data: { productId: null },
+    });
+    await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', other.authorization)
+      .send({
+        productId: otherProduct.body.id,
+        grams: 20,
+        meal: 'DINNER',
+        loggedOn: '2026-11-04',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${second.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 40, saveAsMyProduct: true })
+      .expect(200);
+
+    const recent = await request(app.getHttpServer())
+      .get('/api/v1/food/recent?limit=1')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(recent.body.items).toHaveLength(1);
+
+    const all = await request(app.getHttpServer())
+      .get('/api/v1/food/recent')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(all.body.items).toHaveLength(2);
+    expect(
+      all.body.items.map(
+        (item: { product: { name: string } }) => item.product.name,
+      ),
+    ).toEqual(['Rice', 'Rice']);
+    const original = all.body.items[0];
+    const copy = all.body.items[1];
+    expect(original.product.id).toBe(created.body.id);
+    expect(original.product.kcalPer100g).toBe(130);
+    expect(original.lastGrams).toBe(40);
+    expect(original.lastMeal).toBe('BREAKFAST');
+    expect(original.lastLoggedOn).toBe('2026-11-03');
+    expect(copy.product.id).not.toBe(created.body.id);
+    expect(copy.product.kcalPer100g).toBe(50);
+    expect(copy.lastGrams).toBe(80);
+    expect(copy.lastMeal).toBe('SNACK');
+    expect(copy.lastLoggedOn).toBe('2026-11-02');
+    expect(
+      all.body.items.some(
+        (item: { product: { name: string } }) => item.product.name === 'Secret',
+      ),
+    ).toBe(false);
+  });
 });

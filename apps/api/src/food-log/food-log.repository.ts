@@ -4,6 +4,22 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 type Client = Prisma.TransactionClient;
 
+export interface RecentFoodRow {
+  productId: string;
+  grams: Prisma.Decimal;
+  meal: FoodMeal;
+  loggedOn: Date;
+  source: 'OFF' | 'CUSTOM';
+  externalId: string | null;
+  name: string;
+  brand: string | null;
+  imageUrl: string | null;
+  kcalPer100g: Prisma.Decimal;
+  proteinPer100g: Prisma.Decimal;
+  fatPer100g: Prisma.Decimal;
+  carbsPer100g: Prisma.Decimal;
+}
+
 export interface FoodLogWrite {
   productId: string | null;
   meal: FoodMeal;
@@ -40,6 +56,69 @@ export class FoodLogRepository {
 
   async unfavorite(userId: string, productId: string): Promise<void> {
     await this.prisma.favoriteFood.deleteMany({ where: { userId, productId } });
+  }
+
+  async favoriteIdSet(
+    userId: string,
+    productIds: string[],
+  ): Promise<Set<string>> {
+    if (productIds.length === 0) return new Set();
+    const rows = await this.prisma.favoriteFood.findMany({
+      where: { userId, productId: { in: productIds } },
+      select: { productId: true },
+    });
+    return new Set(rows.map((row) => row.productId));
+  }
+
+  recent(userId: string, limit: number): Promise<RecentFoodRow[]> {
+    return this.prisma.$queryRaw<RecentFoodRow[]>`
+      SELECT
+        picked.product_id AS "productId",
+        picked.grams,
+        picked.meal,
+        picked.logged_on AS "loggedOn",
+        picked.source,
+        picked.external_id AS "externalId",
+        picked.name,
+        picked.brand,
+        picked.image_url AS "imageUrl",
+        picked.kcal_per_100g AS "kcalPer100g",
+        picked.protein_per_100g AS "proteinPer100g",
+        picked.fat_per_100g AS "fatPer100g",
+        picked.carbs_per_100g AS "carbsPer100g"
+      FROM (
+        SELECT DISTINCT ON (e.product_id)
+          e.product_id,
+          e.grams,
+          e.meal,
+          e.logged_on,
+          e.created_at,
+          e.id,
+          p.source,
+          p.external_id,
+          p.name,
+          p.brand,
+          p.image_url,
+          p.kcal_per_100g,
+          p.protein_per_100g,
+          p.fat_per_100g,
+          p.carbs_per_100g
+        FROM food_log_entries e
+        INNER JOIN food_products p ON p.id = e.product_id
+        WHERE e.user_id = CAST(${userId} AS uuid)
+          AND e.product_id IS NOT NULL
+          AND (
+            p.source = 'OFF'
+            OR (
+              p.source = 'CUSTOM'
+              AND p.owner_id = CAST(${userId} AS uuid)
+            )
+          )
+        ORDER BY e.product_id, e.created_at DESC, e.id DESC
+      ) picked
+      ORDER BY picked.created_at DESC, picked.id DESC
+      LIMIT ${limit}
+    `;
   }
 
   listDay(userId: string, loggedOn: Date): Promise<FoodLogEntry[]> {

@@ -1,8 +1,5 @@
 import { Module } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service.js';
-import { AuthModule } from '../auth/auth.module.js';
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module.js';
-import { FoodCatalogController } from './food-catalog.controller.js';
 import { FoodCatalogRepository } from './food-catalog.repository.js';
 import { FoodCatalogService } from './food-catalog.service.js';
 import { OFF_BARCODE_BUDGET_PER_MIN } from './food-search-limits.js';
@@ -19,8 +16,6 @@ import {
 } from './off-client.js';
 
 @Module({
-  imports: [AuthModule, SubscriptionsModule],
-  controllers: [FoodCatalogController],
   providers: [
     FoodCatalogRepository,
     FoodCatalogService,

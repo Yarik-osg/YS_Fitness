@@ -13,21 +13,33 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type {
   FoodDayResponse,
   FoodLogEntryResponse,
   FoodProductListResponse,
   FoodProductResponse,
+  FoodRecentResponse,
+  FoodSearchResponse,
 } from '@repo/shared-types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedUser } from '../common/authenticated-user.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import {
+  CreateFoodProductDto,
+  FoodSearchQueryDto,
+} from '../food-catalog/dto/food-catalog.dto.js';
+import {
+  FOOD_SEARCH_ROUTE_LIMIT,
+  FOOD_SEARCH_ROUTE_TTL_MS,
+} from '../food-catalog/food-search-limits.js';
 import { SubscriptionGuard } from '../subscriptions/subscription.guard.js';
 import {
   CreateFoodLogDto,
   FoodLogParamsDto,
   FoodLogQueryDto,
   FoodProductParamsDto,
+  FoodRecentQueryDto,
   PatchFoodLogDto,
 } from './dto/food-log.dto.js';
 import { FoodLogService } from './food-log.service.js';
@@ -38,6 +50,34 @@ import { FoodLogService } from './food-log.service.js';
 @UseGuards(JwtAuthGuard, SubscriptionGuard)
 export class FoodLogController {
   constructor(private readonly log: FoodLogService) {}
+
+  @Get('products/search')
+  @Throttle({
+    default: {
+      limit: FOOD_SEARCH_ROUTE_LIMIT,
+      ttl: FOOD_SEARCH_ROUTE_TTL_MS,
+    },
+  })
+  @ApiOperation({
+    summary:
+      'Search the caller’s foods, then the local cache, then Open Food Facts',
+  })
+  search(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: FoodSearchQueryDto,
+  ): Promise<FoodSearchResponse> {
+    return this.log.searchFoods(user.sub, query);
+  }
+
+  @Post('products')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a custom food from per-100g values' })
+  createProduct(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CreateFoodProductDto,
+  ): Promise<FoodProductResponse> {
+    return this.log.createProduct(user.sub, body);
+  }
 
   @Get('favorites')
   @ApiOperation({ summary: 'List favorite foods, newest first' })
@@ -66,6 +106,17 @@ export class FoodLogController {
     @Param() params: FoodProductParamsDto,
   ): Promise<void> {
     return this.log.unfavorite(user.sub, params.productId);
+  }
+
+  @Get('recent')
+  @ApiOperation({
+    summary: 'Distinct products from the caller’s log, newest first',
+  })
+  recent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: FoodRecentQueryDto,
+  ): Promise<FoodRecentResponse> {
+    return this.log.recent(user.sub, query);
   }
 
   @Get('log')

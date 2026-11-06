@@ -611,6 +611,7 @@ model FoodLogEntry {
   product FoodProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([userId, loggedOn])
+  @@index([userId, productId, createdAt(sort: Desc)])
   @@map("food_log_entries")
 }
 
