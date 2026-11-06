@@ -1,10 +1,16 @@
 import {
   checkoutSchema,
+  createFoodLogSchema,
+  createFoodProductSchema,
+  foodLogQuerySchema,
+  foodSearchQuerySchema,
   forgotPasswordSchema,
   grantSubscriptionSchema,
+  isCalendarDate,
   isPlausibleDateOfBirth,
   logWorkoutSchema,
   onboardingSchema,
+  patchFoodLogSchema,
   registerSchema,
   resetPasswordSchema,
   workoutCalendarQuerySchema,
@@ -405,5 +411,35 @@ describe('password reset contracts', () => {
         password: 'long-enough',
       }).success,
     ).toBe(false);
+  });
+
+  it('accepts a real log date and rejects an impossible one', () => {
+    expect(isCalendarDate('2026-11-06')).toBe(true);
+    expect(isCalendarDate('2026-02-31')).toBe(false);
+    expect(foodLogQuerySchema.safeParse({ date: '2026-02-31' }).success).toBe(
+      false,
+    );
+    expect(foodSearchQuerySchema.safeParse({}).success).toBe(false);
+    expect(foodSearchQuerySchema.safeParse({ q: 'm' }).success).toBe(false);
+    expect(foodSearchQuerySchema.safeParse({ q: 'milk' }).success).toBe(true);
+    expect(
+      createFoodProductSchema.safeParse({
+        name: 'Rice',
+        kcalPer100g: -1,
+        proteinPer100g: 0,
+        fatPer100g: 0,
+        carbsPer100g: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      createFoodLogSchema.safeParse({
+        productId: '11111111-1111-4111-8111-111111111111',
+        grams: 0,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-06',
+      }).success,
+    ).toBe(false);
+    expect(patchFoodLogSchema.safeParse({}).success).toBe(false);
+    expect(patchFoodLogSchema.safeParse({ grams: 12.5 }).success).toBe(true);
   });
 });
