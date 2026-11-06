@@ -1,5 +1,10 @@
-import { NutritionPage } from '@/components/features/nutrition/nutrition-page';
+import { Suspense } from 'react';
+import { FoodPage } from '@/components/features/food/food-page';
 
 export default function NutritionRoute() {
-  return <NutritionPage />;
+  return (
+    <Suspense fallback={null}>
+      <FoodPage />
+    </Suspense>
+  );
 }

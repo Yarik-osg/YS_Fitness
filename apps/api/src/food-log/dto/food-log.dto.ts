@@ -55,5 +55,6 @@ export class PatchFoodLogDto implements PatchFoodLogInput {
   fat?: number;
   carbs?: number;
   meal?: PatchFoodLogInput['meal'];
+  productName?: string;
   saveAsMyProduct?: boolean;
 }

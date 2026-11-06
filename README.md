@@ -165,18 +165,21 @@ On the web, `/coach/nutrition` opens on active clients, with archived clients on
 
 ## Food
 
-Client routes require a JWT and an active subscription. The browser never calls Open Food Facts. The API does, with `OFF_BASE_URL` (default `https://world.openfoodfacts.org`) and `OFF_USER_AGENT`.
+Client routes require a JWT and an active subscription. The browser never calls Open Food Facts. Barcode reads use `OFF_BASE_URL` (default `https://world.openfoodfacts.org`). Text search uses `OFF_SEARCH_URL` (default `https://search.openfoodfacts.org`). `OFF_USER_AGENT` is sent with both.
 
-- `GET /api/v1/food/products/search?q=` or `?barcode=` — the caller’s custom products first, then Open Food Facts rows. The route allows 30 searches a minute per address, and the 31st is `429`. A user may trigger 3 text searches a minute that actually leave for Open Food Facts, and the process allows 10; barcode lookups allow 100. Cache hits do not spend those. When either outbound cap is spent the answer stays local and `fromCacheOnly` is true. A stored barcode keeps the flag false. Every returned product includes `isFavorite` for the caller. A query answered in the last 24 hours is not sent again. `OFF_SEARCH_BUDGET_PER_MIN` and `FOOD_SEARCH_USER_OFF_CALLS_PER_MIN` override the two search caps. A product over 1000 kcal or 100 g of a macro per 100 g is dropped
+- `GET /api/v1/food/products/search?q=` or `?barcode=` — the caller’s custom products and Open Food Facts rows, ordered by exact name, name prefix, exact brand, name contains, then brand contains. The route allows 30 searches a minute per address, and the 31st is `429`. A user may trigger 3 text searches a minute that actually leave for Open Food Facts, and the process allows 10; barcode lookups allow 100. Cache hits do not spend those. When either outbound cap is spent, or the text search fails and this query already has local rows, the answer stays local and `fromCacheOnly` is true. A failed search with nothing saved is `502` and is not cached. A stored barcode keeps the flag false. `Coca-Cola`, `Coca Cola`, and `кока кола` share one search, and so do `Snickers` and `снікерс`. Hyphens are not part of the match. A product with no photo is kept. A product with no kcal per 100 g is dropped. Every returned product includes `isFavorite` for the caller. A query answered in the last 24 hours is not sent again. `OFF_SEARCH_BUDGET_PER_MIN` and `FOOD_SEARCH_USER_OFF_CALLS_PER_MIN` override the two search caps. A product over 1000 kcal or 100 g of a macro per 100 g is dropped
+- `GET /api/v1/food/products` — the caller’s own foods, by name, at most 100. Another user’s foods are not included
 - `POST /api/v1/food/products` — creates a `CUSTOM` product from a name and per-100g kcal, protein, fat, and carbs
 - `GET /api/v1/food/favorites`, `PUT /api/v1/food/favorites/:productId`, `DELETE /api/v1/food/favorites/:productId` — favorites are idempotent and listed newest first. Every product in that list has `isFavorite: true`. Another user’s custom product is `404`
 - `GET /api/v1/food/recent?limit=20` — distinct products from the caller’s log, newest first. `limit` is 1–50 and defaults to 20. Each item is the product’s current per-100g values plus the latest grams, meal, and calendar date. Entries whose product was deleted are skipped. `isFavorite` is that caller’s flag
-- `GET /api/v1/food/log?date=YYYY-MM-DD` — that day’s entries, totals, the active nutrition target or `null`, and `remaining` when a target exists
+- `GET /api/v1/food/log?date=YYYY-MM-DD` — that day’s entries (each with `isFavorite`), totals, the active nutrition target or `null`, and `remaining` when a target exists
 - `POST /api/v1/food/log` — `{ productId, grams, meal, loggedOn }` stores a snapshot from the per-100g values
 - `PATCH /api/v1/food/log/:id` — edits that entry only, after locking the row. Changing grams rescales its snapshot. A typed kcal, protein, fat, or carbs value is kept as sent. Numbers above the cap for those grams are `400` `FOOD_VALUES_OUT_OF_RANGE`. `saveAsMyProduct: true` copies the edited values onto a new custom product and leaves the Open Food Facts row unchanged
 - `DELETE /api/v1/food/log/:id` — the owner only. Someone else’s entry is `404`
 
 `loggedOn` is a calendar date. It is not converted to a timestamp.
+
+On the web, `/nutrition` shows that local calendar day. Search, favorites, and recent foods open from a meal. The browser does not call Open Food Facts, and it does not recompute the day totals.
 
 ## Workouts
 

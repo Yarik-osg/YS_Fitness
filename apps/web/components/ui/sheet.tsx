@@ -56,16 +56,21 @@ export function SheetContent({
           }
         }}
         className={cn(
-          'fixed inset-x-0 bottom-0 z-[60] mx-auto w-full max-w-[430px] border-t border-white/10 bg-panel px-5 pt-4 pb-9 outline-none',
+          'fixed inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-[430px] max-h-[100dvh] flex-col border-t border-white/10 bg-panel pt-4 outline-none',
           className,
         )}
         {...props}
       >
         <div
           aria-hidden="true"
-          className="mx-auto mb-5 h-1 w-10 rounded-full bg-white/20"
+          className="mx-auto mb-5 h-1 w-10 shrink-0 rounded-full bg-white/20"
         />
-        {children}
+        <div
+          data-vaul-no-drag
+          className="max-h-[calc(100dvh-4.5rem)] touch-pan-y overflow-y-auto overscroll-contain px-5 pb-[max(2.25rem,env(safe-area-inset-bottom))]"
+        >
+          {children}
+        </div>
       </Drawer.Content>
     </Drawer.Portal>
   );

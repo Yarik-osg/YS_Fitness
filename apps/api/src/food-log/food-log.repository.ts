@@ -22,6 +22,7 @@ export interface RecentFoodRow {
 
 export interface FoodLogWrite {
   productId: string | null;
+  productName?: string;
   meal: FoodMeal;
   grams: Prisma.Decimal;
   kcal: Prisma.Decimal;
