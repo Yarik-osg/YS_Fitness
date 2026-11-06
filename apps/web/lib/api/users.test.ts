@@ -42,6 +42,8 @@ describe('saveOnboarding', () => {
       nutritionCurrent: 'balanced',
       mealsPerDay: '3',
       eatingHabits: ['snacking', 'emotional'],
+      muscleDevelopment: 0,
+      bodyFatLevel: 50,
     } satisfies OnboardingInput;
 
     await saveOnboarding(payload);

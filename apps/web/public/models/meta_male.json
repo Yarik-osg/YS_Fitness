@@ -1,0 +1,22 @@
+{
+  "shapeKeys": ["muscle", "fat", "muscle_fat_corr"],
+  "corners": {
+    "A": {
+      "muscle": 0.25,
+      "weight": 0.3
+    },
+    "B": {
+      "muscle": 1.0,
+      "weight": 0.45
+    },
+    "C": {
+      "muscle": 0.25,
+      "weight": 1.0
+    },
+    "D": {
+      "muscle": 0.35,
+      "weight": 1.0
+    }
+  },
+  "heightCm": 175
+}

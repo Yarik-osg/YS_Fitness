@@ -4,6 +4,7 @@ import {
   physiqueLevelFromCurrentBody,
   weightGoalFromMainGoal,
 } from './derived-profile';
+import { muscleFromCurrentBody, SHAPE_DEFAULT } from './body-shape';
 import type { OnboardingDraft } from './onboarding-store';
 import { biologicalSexFromProgramTrack } from './program-track';
 
@@ -13,6 +14,8 @@ const STEP_BY_FIELD: Record<string, number> = {
   programTrack: 0,
   biologicalSexForCalculation: 0,
   currentBody: 1,
+  muscleDevelopment: 1,
+  bodyFatLevel: 1,
   physiqueLevel: 1,
   desiredBody: 2,
   mainGoal: 3,
@@ -55,6 +58,9 @@ function payloadCandidate(draft: OnboardingDraft, timezone: string) {
     goal: draft.goal ?? weightGoalFromMainGoal(draft.mainGoal),
     timezone,
     programTrack: draft.programTrack,
+    muscleDevelopment:
+      draft.muscleDevelopment ?? muscleFromCurrentBody(draft.currentBody),
+    bodyFatLevel: draft.bodyFatLevel ?? SHAPE_DEFAULT,
     currentBody: draft.currentBody,
     desiredBody: draft.desiredBody,
     physiqueLevel:

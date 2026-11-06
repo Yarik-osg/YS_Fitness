@@ -122,6 +122,8 @@ model OnboardingResponses {
   mealsPerDay       String             @map("meals_per_day") @db.VarChar(16)
   eatingHabits      String[]           @map("eating_habits")
   physiqueLevel     String?            @map("physique_level") @db.VarChar(2)
+  muscleDevelopment Int                @default(50) @map("muscle_development")
+  bodyFatLevel      Int                @default(50) @map("body_fat_level")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 

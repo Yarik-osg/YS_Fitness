@@ -45,17 +45,24 @@ describe('OnboardingWizard', () => {
       screen.getByRole('button', { name: /Змінити мову/i }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Продовжити/i }));
-    expect(screen.getAllByRole('button', { name: /Варіант/ })).toHaveLength(10);
-    await user.click(screen.getByRole('button', { name: /Варіант 2/i }));
+    const [muscle, fat] = screen.getAllByRole('slider');
+    expect(muscle).toBeDefined();
+    expect(fat).toBeDefined();
+    muscle?.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(useOnboardingStore.getState()).toMatchObject({
+      muscleDevelopment: 51,
+      bodyFatLevel: 50,
+    });
     await user.click(screen.getByRole('button', { name: /Обрати цю форму/i }));
     expect(screen.getAllByRole('button', { name: /Варіант/ })).toHaveLength(4);
     await user.click(screen.getByRole('button', { name: /Назад/i }));
 
-    expect(screen.getByRole('button', { name: /Варіант 2/i })).toHaveAttribute(
-      'aria-current',
-      'true',
+    expect(useOnboardingStore.getState().muscleDevelopment).toBe(51);
+    expect(screen.getAllByRole('slider')[0]).toHaveAttribute(
+      'aria-valuenow',
+      '51',
     );
-    expect(useOnboardingStore.getState().currentBody).toBe('1');
   });
 
   it('sets program track and BMR calculation sex from a female direction choice', async () => {

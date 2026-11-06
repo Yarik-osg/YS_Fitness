@@ -187,6 +187,8 @@ const DETAIL: CoachClientDetail = {
     mealsPerDay: '3',
     eatingHabits: ['none'],
     physiqueLevel: null,
+    muscleDevelopment: 40,
+    bodyFatLevel: 60,
   },
   program: {
     accent: 'UPPER',

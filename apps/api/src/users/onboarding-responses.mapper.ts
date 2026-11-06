@@ -94,6 +94,8 @@ export function toPrismaOnboardingResponses(input: OnboardingInput) {
     mealsPerDay: input.mealsPerDay,
     eatingHabits: input.eatingHabits,
     physiqueLevel: input.physiqueLevel,
+    muscleDevelopment: input.muscleDevelopment,
+    bodyFatLevel: input.bodyFatLevel,
   };
 }
 
@@ -113,7 +115,9 @@ export function sameOnboardingResponses(
     existing.mealsPerDay === next.mealsPerDay &&
     sameStringArray(existing.focusAreas, next.focusAreas) &&
     sameStringArray(existing.eatingHabits, next.eatingHabits) &&
-    existing.physiqueLevel === next.physiqueLevel
+    existing.physiqueLevel === next.physiqueLevel &&
+    existing.muscleDevelopment === next.muscleDevelopment &&
+    existing.bodyFatLevel === next.bodyFatLevel
   );
 }
 
@@ -131,6 +135,8 @@ export function toOnboardingResponsesRecord(
     | 'mealsPerDay'
     | 'eatingHabits'
     | 'physiqueLevel'
+    | 'muscleDevelopment'
+    | 'bodyFatLevel'
     | 'createdAt'
     | 'updatedAt'
   >,
@@ -147,6 +153,8 @@ export function toOnboardingResponsesRecord(
     mealsPerDay: row.mealsPerDay,
     eatingHabits: row.eatingHabits,
     physiqueLevel: row.physiqueLevel,
+    muscleDevelopment: row.muscleDevelopment,
+    bodyFatLevel: row.bodyFatLevel,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

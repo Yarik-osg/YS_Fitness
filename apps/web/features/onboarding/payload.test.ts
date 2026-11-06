@@ -46,6 +46,8 @@ describe('buildOnboardingPayload', () => {
       nutritionCurrent: 'balanced',
       mealsPerDay: '3',
       eatingHabits: ['snacking', 'emotional'],
+      muscleDevelopment: 0,
+      bodyFatLevel: 50,
     });
   });
 

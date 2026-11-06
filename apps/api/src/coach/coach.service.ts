@@ -63,6 +63,8 @@ const clientDetailSelect = {
       mealsPerDay: true,
       eatingHabits: true,
       physiqueLevel: true,
+      muscleDevelopment: true,
+      bodyFatLevel: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -464,6 +466,8 @@ function toDetail(user: ClientDetailRow, now: Date): CoachClientDetail {
         mealsPerDay: record.mealsPerDay,
         eatingHabits: record.eatingHabits,
         physiqueLevel: record.physiqueLevel,
+        muscleDevelopment: record.muscleDevelopment,
+        bodyFatLevel: record.bodyFatLevel,
       }
     : null;
   const template = user.workoutProgram?.template;

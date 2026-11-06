@@ -144,6 +144,8 @@ export interface CoachClientOnboarding {
   mealsPerDay: string;
   eatingHabits: string[];
   physiqueLevel: string | null;
+  muscleDevelopment: number;
+  bodyFatLevel: number;
 }
 
 export interface CoachClientProgram {
@@ -236,6 +238,8 @@ export interface OnboardingResponsesRecord {
   mealsPerDay: string;
   eatingHabits: string[];
   physiqueLevel: string | null;
+  muscleDevelopment: number;
+  bodyFatLevel: number;
   createdAt: string;
   updatedAt: string;
 }
