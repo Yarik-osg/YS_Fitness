@@ -3,9 +3,27 @@ import type {
   FoodLogEntryResponse,
   FoodMacroTotal,
 } from '@repo/shared-types';
-import { PER_100G_MAX_KCAL, PER_100G_MAX_MACRO } from '@repo/validation';
+import {
+  FOOD_MAX_GRAMS,
+  FOOD_MIN_GRAMS,
+  PER_100G_MAX_KCAL,
+  PER_100G_MAX_MACRO,
+} from '@repo/validation';
 
 export const FOOD_MACRO_KEYS = ['kcal', 'protein', 'fat', 'carbs'] as const;
+
+/** True when `value` has at most one decimal, within float noise. */
+export function oneDecimal(value: number): boolean {
+  if (!Number.isFinite(value)) return false;
+  const tenths = Math.round(value * 10);
+  return Math.abs(value * 10 - tenths) < 1e-6;
+}
+
+export function gramsAccepted(value: number): boolean {
+  return (
+    oneDecimal(value) && value >= FOOD_MIN_GRAMS && value <= FOOD_MAX_GRAMS
+  );
+}
 export type FoodMacroKey = (typeof FOOD_MACRO_KEYS)[number];
 
 /** Half up, matching the API's one-decimal food snapshots. */

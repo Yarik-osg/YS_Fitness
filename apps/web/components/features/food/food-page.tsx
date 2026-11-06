@@ -32,6 +32,7 @@ import {
   selectedFoodDate,
   shiftFoodDate,
 } from '@/lib/food/dates';
+import { decodeFoodText } from '@/lib/food/text';
 import {
   FOOD_MACRO_KEYS,
   mealSubtotal,
@@ -71,9 +72,6 @@ export function FoodPage() {
   return (
     <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-24 text-ink">
       <header className="border-b border-line px-5 pt-8 pb-4">
-        <p className="mb-1.5 font-label text-[8px] font-semibold tracking-[0.2em] text-teal uppercase">
-          {t('brand')}
-        </p>
         <h1 className="font-heading text-[28px] leading-none text-ink uppercase">
           {t('title')}
         </h1>
@@ -268,10 +266,13 @@ function MealSection({
           {entries.map((entry) => (
             <li key={entry.id} className="border border-line bg-panel p-3">
               <div className="flex gap-3">
-                <FoodImage src={entry.imageUrl} alt={entry.productName} />
+                <FoodImage
+                  src={entry.imageUrl}
+                  alt={decodeFoodText(entry.productName)}
+                />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-ink">
-                    {entry.productName}
+                  <p className="text-sm text-ink">
+                    {decodeFoodText(entry.productName)}
                   </p>
                   <p className="text-xs text-muted tabular-nums">
                     {t('entryLine', {
@@ -340,7 +341,7 @@ function DeleteEntrySheet({
         <SheetTitle>{t('deleteTitle')}</SheetTitle>
         <SheetDescription>
           {entry
-            ? t('deleteBody', { name: entry.productName })
+            ? t('deleteBody', { name: decodeFoodText(entry.productName) })
             : t('deleteTitle')}
         </SheetDescription>
         <div className="flex flex-col gap-2">

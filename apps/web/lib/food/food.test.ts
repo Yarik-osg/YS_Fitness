@@ -7,15 +7,29 @@ import {
   selectedFoodDate,
   shiftFoodDate,
 } from './dates';
+import { decodeFoodText } from './text';
 import {
   entryCap,
   exceedsEntryCap,
+  gramsAccepted,
   previewMacros,
   remainingTone,
   roundHalfUp,
   scalePer100g,
   targetAsTotals,
 } from './macros';
+
+describe('food text', () => {
+  it('turns stored quote entities into quotation marks', () => {
+    expect(decodeFoodText('Вівсянка &quot;Овернайт&quot;')).toBe(
+      'Вівсянка "Овернайт"',
+    );
+    expect(decodeFoodText('A &amp; B')).toBe('A & B');
+    expect(decodeFoodText('&amp;quot;')).toBe('"');
+    expect(decodeFoodText('&#1114112;')).toBe('&#1114112;');
+    expect(decodeFoodText('&#34;')).toBe('"');
+  });
+});
 
 describe('food dates', () => {
   it('keeps the local calendar day around midnight and across a DST jump', () => {
@@ -46,6 +60,9 @@ describe('food macros', () => {
     expect(roundHalfUp(1.25, 1)).toBe(1.3);
     expect(roundHalfUp(1.24, 1)).toBe(1.2);
     expect(scalePer100g(130, 80)).toBe(104);
+    expect(gramsAccepted(10.2)).toBe(true);
+    expect(gramsAccepted(10.25)).toBe(false);
+    expect(gramsAccepted(0.05)).toBe(false);
     expect(
       previewMacros(
         {
