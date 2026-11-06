@@ -178,6 +178,8 @@ Client routes require a JWT and an active subscription. The browser never calls 
 
 `loggedOn` is a calendar date. It is not converted to a timestamp.
 
+On the web, `/food` shows that local calendar day. Search, favorites, and recent foods open from a meal. The browser does not call Open Food Facts, and it does not recompute the day totals.
+
 ## Workouts
 
 - `POST /api/v1/workouts/log` — JWT + active subscription; saves the sets just performed for one program day. Each set must match an exercise and order on that day, use a set number within the prescribed sets, and appear once (also enforced by a unique index on log, order, and set number). Reps are 1–999; weight is optional, above 0 and at most 999 kg with two decimals. Unfilled sets may be left out

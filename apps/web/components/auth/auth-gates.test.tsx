@@ -276,6 +276,21 @@ describe('AuthGate', () => {
     expect(screen.queryByText('protected content')).not.toBeInTheDocument();
   });
 
+  it('sends an incomplete user away from food', async () => {
+    navigation.pathname = '/food';
+    useAuthStore.getState().setSession(tokenExpiringIn(600), {
+      ...completedUser,
+      onboardingCompletedAt: null,
+    });
+    api.getMe.mockResolvedValue(meResponse(null));
+
+    renderGate();
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/onboarding');
+    });
+  });
+
   it('sends an incomplete user away from nutrition', async () => {
     navigation.pathname = '/nutrition';
     useAuthStore.getState().setSession(tokenExpiringIn(600), {
