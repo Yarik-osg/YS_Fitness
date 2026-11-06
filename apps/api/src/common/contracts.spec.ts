@@ -1,10 +1,21 @@
+import type {
+  FoodProductResponse,
+  FoodRecentResponse,
+} from '@repo/shared-types';
 import {
   checkoutSchema,
+  createFoodLogSchema,
+  createFoodProductSchema,
+  foodLogQuerySchema,
+  foodRecentQuerySchema,
+  foodSearchQuerySchema,
   forgotPasswordSchema,
   grantSubscriptionSchema,
+  isCalendarDate,
   isPlausibleDateOfBirth,
   logWorkoutSchema,
   onboardingSchema,
+  patchFoodLogSchema,
   registerSchema,
   resetPasswordSchema,
   workoutCalendarQuerySchema,
@@ -405,5 +416,65 @@ describe('password reset contracts', () => {
         password: 'long-enough',
       }).success,
     ).toBe(false);
+  });
+
+  it('accepts a real log date and rejects an impossible one', () => {
+    expect(isCalendarDate('2026-11-06')).toBe(true);
+    expect(isCalendarDate('2026-02-31')).toBe(false);
+    expect(foodLogQuerySchema.safeParse({ date: '2026-02-31' }).success).toBe(
+      false,
+    );
+    expect(foodSearchQuerySchema.safeParse({}).success).toBe(false);
+    expect(foodSearchQuerySchema.safeParse({ q: 'm' }).success).toBe(false);
+    expect(foodSearchQuerySchema.safeParse({ q: 'milk' }).success).toBe(true);
+    expect(
+      createFoodProductSchema.safeParse({
+        name: 'Rice',
+        kcalPer100g: -1,
+        proteinPer100g: 0,
+        fatPer100g: 0,
+        carbsPer100g: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      createFoodLogSchema.safeParse({
+        productId: '11111111-1111-4111-8111-111111111111',
+        grams: 0,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-06',
+      }).success,
+    ).toBe(false);
+    expect(patchFoodLogSchema.safeParse({}).success).toBe(false);
+    expect(patchFoodLogSchema.safeParse({ grams: 12.5 }).success).toBe(true);
+    expect(foodRecentQuerySchema.parse({}).limit).toBe(20);
+    expect(foodRecentQuerySchema.parse({ limit: '20' }).limit).toBe(20);
+    expect(foodRecentQuerySchema.safeParse({ limit: '0' }).success).toBe(false);
+    expect(foodRecentQuerySchema.safeParse({ limit: '51' }).success).toBe(
+      false,
+    );
+    const product: FoodProductResponse = {
+      id: '11111111-1111-4111-8111-111111111111',
+      source: 'OFF',
+      externalId: '1234',
+      name: 'Milk',
+      brand: null,
+      imageUrl: null,
+      kcalPer100g: 50,
+      proteinPer100g: 3,
+      fatPer100g: 2,
+      carbsPer100g: 5,
+      isFavorite: false,
+    };
+    const recent: FoodRecentResponse = {
+      items: [
+        {
+          product,
+          lastGrams: 100,
+          lastMeal: 'LUNCH',
+          lastLoggedOn: '2026-11-06',
+        },
+      ],
+    };
+    expect(recent.items[0]?.product.isFavorite).toBe(false);
   });
 });

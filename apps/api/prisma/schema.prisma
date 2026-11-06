@@ -83,6 +83,9 @@ model User {
   nutritionProfile      NutritionProfile?
   nutritionCalculations NutritionCalculation[]
   nutritionTargets      NutritionTarget[]
+  foodProducts          FoodProduct[]
+  favoriteFoods         FavoriteFood[]
+  foodLogEntries        FoodLogEntry[]
 
   @@map("users")
 }
@@ -534,4 +537,89 @@ model NutritionTarget {
 
   @@index([userId, createdAt])
   @@map("nutrition_targets")
+}
+
+enum FoodProductSource {
+  OFF
+  CUSTOM
+}
+
+enum FoodMeal {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+/// Cached Open Food Facts row or a product the user typed in.
+/// An OFF row is never edited from a log. A personal copy is a new CUSTOM row.
+model FoodProduct {
+  id               String            @id @default(uuid()) @db.Uuid
+  source           FoodProductSource
+  externalId       String?           @map("external_id") @db.VarChar(32)
+  ownerId          String?           @map("owner_id") @db.Uuid
+  basedOnProductId String?           @map("based_on_product_id") @db.Uuid
+  name             String            @db.VarChar(200)
+  brand            String?           @db.VarChar(200)
+  imageUrl         String?           @map("image_url") @db.VarChar(2000)
+  kcalPer100g      Decimal           @map("kcal_per_100g") @db.Decimal(7, 2)
+  proteinPer100g   Decimal           @map("protein_per_100g") @db.Decimal(7, 2)
+  fatPer100g       Decimal           @map("fat_per_100g") @db.Decimal(7, 2)
+  carbsPer100g     Decimal           @map("carbs_per_100g") @db.Decimal(7, 2)
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  owner      User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  basedOn    FoodProduct?   @relation("FoodProductOrigin", fields: [basedOnProductId], references: [id], onDelete: SetNull)
+  copies     FoodProduct[]  @relation("FoodProductOrigin")
+  favorites  FavoriteFood[]
+  logEntries FoodLogEntry[]
+
+  @@unique([source, externalId])
+  @@index([ownerId])
+  @@map("food_products")
+}
+
+model FavoriteFood {
+  userId    String   @map("user_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product FoodProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@map("favorite_foods")
+}
+
+/// Snapshot on the entry is the history. It stays after the product changes or goes away.
+model FoodLogEntry {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  productId   String?   @map("product_id") @db.Uuid
+  loggedOn    DateTime  @map("logged_on") @db.Date
+  meal        FoodMeal
+  grams       Decimal   @db.Decimal(7, 1)
+  productName String    @map("product_name") @db.VarChar(200)
+  imageUrl    String?   @map("image_url") @db.VarChar(2000)
+  kcal        Decimal   @db.Decimal(7, 1)
+  protein     Decimal   @db.Decimal(7, 1)
+  fat         Decimal   @db.Decimal(7, 1)
+  carbs       Decimal   @db.Decimal(7, 1)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product FoodProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([userId, loggedOn])
+  @@index([userId, productId, createdAt(sort: Desc)])
+  @@map("food_log_entries")
+}
+
+/// One row per normalized text search that Open Food Facts answered.
+/// A fresh row means the next search can stay on the local cache.
+model FoodSearchQuery {
+  queryKey  String   @id @map("query_key") @db.VarChar(100)
+  fetchedAt DateTime @map("fetched_at")
+
+  @@map("food_search_queries")
 }

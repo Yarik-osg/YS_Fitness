@@ -1,0 +1,4 @@
+export const FOOD_SEARCH_ROUTE_LIMIT = 30;
+export const FOOD_SEARCH_ROUTE_TTL_MS = 60_000;
+export const OFF_BARCODE_BUDGET_PER_MIN = 100;
+export const OFF_LIMIT_WINDOW_MS = 60_000;

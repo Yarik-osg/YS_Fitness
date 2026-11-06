@@ -584,3 +584,165 @@ export const nutritionManualTargetSchema = z
 export type NutritionManualTargetInput = z.infer<
   typeof nutritionManualTargetSchema
 >;
+
+export const FOOD_PRODUCT_SOURCES = ['OFF', 'CUSTOM'] as const;
+export const FOOD_MEALS = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'] as const;
+
+export const FOOD_MIN_GRAMS = 0.1;
+export const FOOD_MAX_GRAMS = 5000;
+export const PER_100G_MAX_KCAL = 1000;
+export const PER_100G_MAX_MACRO = 100;
+export const ENTRY_MAX_KCAL = (PER_100G_MAX_KCAL * FOOD_MAX_GRAMS) / 100;
+export const ENTRY_MAX_MACRO = (PER_100G_MAX_MACRO * FOOD_MAX_GRAMS) / 100;
+
+function decimalPlacesAtMost(scale: number) {
+  return (value: number) => {
+    const scaled = value * 10 ** scale;
+    return Math.abs(scaled - Math.round(scaled)) < 1e-6;
+  };
+}
+
+const per100gKcal = z
+  .number()
+  .finite()
+  .min(0)
+  .max(PER_100G_MAX_KCAL)
+  .refine(decimalPlacesAtMost(2));
+const per100gMacro = z
+  .number()
+  .finite()
+  .min(0)
+  .max(PER_100G_MAX_MACRO)
+  .refine(decimalPlacesAtMost(2));
+const entryKcal = z
+  .number()
+  .finite()
+  .min(0)
+  .max(ENTRY_MAX_KCAL)
+  .refine(decimalPlacesAtMost(1));
+const entryMacro = z
+  .number()
+  .finite()
+  .min(0)
+  .max(ENTRY_MAX_MACRO)
+  .refine(decimalPlacesAtMost(1));
+const foodGrams = z
+  .number()
+  .finite()
+  .min(FOOD_MIN_GRAMS)
+  .max(FOOD_MAX_GRAMS)
+  .refine(decimalPlacesAtMost(1));
+
+export const foodPer100gSchema = z
+  .object({
+    kcalPer100g: per100gKcal,
+    proteinPer100g: per100gMacro,
+    fatPer100g: per100gMacro,
+    carbsPer100g: per100gMacro,
+  })
+  .strict();
+
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  if (year === undefined || month === undefined || day === undefined) {
+    return false;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+const calendarDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine(isCalendarDate);
+
+export const foodSearchQuerySchema = z
+  .object({
+    q: z.string().trim().min(2).max(100).optional(),
+    barcode: z
+      .string()
+      .trim()
+      .regex(/^\d{4,32}$/)
+      .optional(),
+  })
+  .strict()
+  .refine((value) => value.q !== undefined || value.barcode !== undefined);
+
+export type FoodSearchQuery = z.infer<typeof foodSearchQuerySchema>;
+
+export const createFoodProductSchema = foodPer100gSchema
+  .extend({
+    name: z.string().trim().min(1).max(200),
+    imageUrl: z.string().trim().url().max(2000).nullable().optional(),
+  })
+  .strict();
+
+export type CreateFoodProductInput = z.infer<typeof createFoodProductSchema>;
+
+export const foodProductParamsSchema = z
+  .object({
+    productId: z.string().uuid(),
+  })
+  .strict();
+
+export type FoodProductParams = z.infer<typeof foodProductParamsSchema>;
+
+export const foodLogQuerySchema = z
+  .object({
+    date: calendarDate,
+  })
+  .strict();
+
+export type FoodLogQuery = z.infer<typeof foodLogQuerySchema>;
+
+const recentLimit = z.preprocess(
+  (value) => (value === undefined || value === '' ? 20 : value),
+  z.coerce.number().int().min(1).max(50),
+);
+
+export const foodRecentQuerySchema = z
+  .object({
+    limit: recentLimit,
+  })
+  .strict();
+
+export type FoodRecentQuery = z.infer<typeof foodRecentQuerySchema>;
+
+export const createFoodLogSchema = z
+  .object({
+    productId: z.string().uuid(),
+    grams: foodGrams,
+    meal: z.enum(FOOD_MEALS),
+    loggedOn: calendarDate,
+  })
+  .strict();
+
+export type CreateFoodLogInput = z.infer<typeof createFoodLogSchema>;
+
+export const foodLogParamsSchema = z
+  .object({
+    id: z.string().uuid(),
+  })
+  .strict();
+
+export type FoodLogParams = z.infer<typeof foodLogParamsSchema>;
+
+export const patchFoodLogSchema = z
+  .object({
+    grams: foodGrams.optional(),
+    kcal: entryKcal.optional(),
+    protein: entryMacro.optional(),
+    fat: entryMacro.optional(),
+    carbs: entryMacro.optional(),
+    meal: z.enum(FOOD_MEALS).optional(),
+    saveAsMyProduct: z.boolean().optional(),
+  })
+  .strict()
+  .refine((value) => Object.values(value).some((item) => item !== undefined));
+
+export type PatchFoodLogInput = z.infer<typeof patchFoodLogSchema>;

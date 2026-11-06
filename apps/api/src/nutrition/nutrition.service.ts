@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type NutritionCalculation } from '@prisma/client';
 import type {
+  ActiveNutritionTarget,
   CoachNutritionResponse,
   CoachNutritionRosterResponse,
   NutritionCalculationCreatedResponse,
@@ -114,6 +115,27 @@ export class NutritionService {
       },
     });
     return { clients: users.map((user) => toRoster(user, now)) };
+  }
+
+  async getActiveTarget(userId: string): Promise<ActiveNutritionTarget | null> {
+    const target = await this.prisma.nutritionTarget.findFirst({
+      where: { userId, active: true },
+      select: {
+        source: true,
+        targetCalories: true,
+        proteinGrams: true,
+        fatGrams: true,
+        carbsGrams: true,
+      },
+    });
+    if (!target) return null;
+    return {
+      source: target.source,
+      targetCalories: target.targetCalories.toNumber(),
+      proteinGrams: target.proteinGrams.toNumber(),
+      fatGrams: target.fatGrams.toNumber(),
+      carbsGrams: target.carbsGrams.toNumber(),
+    };
   }
 
   async getForCoach(
