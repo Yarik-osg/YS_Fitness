@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./food-search": {
+      "types": "./src/food-search.ts",
+      "default": "./src/food-search.ts"
     }
   },
   "scripts": {

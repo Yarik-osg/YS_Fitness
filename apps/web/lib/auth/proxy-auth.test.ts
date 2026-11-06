@@ -195,28 +195,6 @@ describe('applyAuthRedirect', () => {
     ).toBe('/uk/onboarding');
   });
 
-  it('protects food like progress', () => {
-    expect(
-      applyAuthRedirect({
-        pathnameWithoutLocale: '/food',
-        locale: 'en',
-        fullPathname: '/en/food',
-        hint: null,
-      }),
-    ).toBe('/en/login?next=%2Fen%2Ffood');
-  });
-
-  it('keeps an incomplete session away from food', () => {
-    expect(
-      applyAuthRedirect({
-        pathnameWithoutLocale: '/food',
-        locale: 'uk',
-        fullPathname: '/uk/food',
-        hint: 'onboarding',
-      }),
-    ).toBe('/uk/onboarding');
-  });
-
   it('protects nutrition like the dashboard', () => {
     expect(
       applyAuthRedirect({

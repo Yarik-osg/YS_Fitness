@@ -13,13 +13,14 @@ import {
   deleteFoodLog,
   favoriteFood,
   getFoodDay,
+  listCustomFoods,
   listFavoriteFoods,
   listRecentFoods,
   searchFoods,
   unfavoriteFood,
   updateFoodLog,
 } from '@/lib/api/food';
-import { applyFavorite } from '@/lib/food/cache';
+import { applyFavorite, applyFavoriteId } from '@/lib/food/cache';
 
 export const foodRootKey = ['food'] as const;
 
@@ -31,6 +32,7 @@ export function foodSearchKey(query: string) {
   return ['food', 'search', query] as const;
 }
 
+export const foodCustomKey = ['food', 'custom'] as const;
 export const foodFavoritesKey = ['food', 'favorites'] as const;
 export const foodRecentKey = ['food', 'recent'] as const;
 
@@ -47,6 +49,14 @@ export function useFoodSearch(query: string) {
     queryKey: foodSearchKey(trimmed),
     queryFn: ({ signal }) => searchFoods({ q: trimmed }, signal),
     enabled: trimmed.length >= 2,
+  });
+}
+
+export function useCustomFoods(enabled: boolean) {
+  return useQuery({
+    queryKey: foodCustomKey,
+    queryFn: () => listCustomFoods(),
+    enabled,
   });
 }
 
@@ -92,6 +102,7 @@ export function useUpdateFoodLog() {
         return Promise.all([
           refresh,
           queryClient.invalidateQueries({ queryKey: ['food', 'search'] }),
+          queryClient.invalidateQueries({ queryKey: foodCustomKey }),
         ]);
       }
       return refresh;
@@ -108,29 +119,38 @@ export function useDeleteFoodLog() {
 }
 
 export function useCreateFoodProduct() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateFoodProductInput) => createFoodProduct(body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: foodCustomKey }),
   });
 }
 
 export function useToggleFavorite() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      product,
-      next,
-    }: {
-      product: FoodProductResponse;
-      next: boolean;
-    }) =>
-      next
-        ? favoriteFood(product.id).then(() => undefined)
-        : unfavoriteFood(product.id),
-    onMutate: async ({ product, next }) => {
+    mutationFn: (
+      input:
+        | { product: FoodProductResponse; next: boolean }
+        | { productId: string; next: boolean },
+    ) => {
+      const id = 'product' in input ? input.product.id : input.productId;
+      return input.next
+        ? favoriteFood(id).then(() => undefined)
+        : unfavoriteFood(id);
+    },
+    onMutate: async (input) => {
+      const next = input.next;
       await queryClient.cancelQueries({ queryKey: foodRootKey });
       const snapshots = queryClient.getQueriesData({ queryKey: foodRootKey });
       for (const [key, data] of snapshots) {
-        queryClient.setQueryData(key, applyFavorite(data, product, next));
+        const retain = Array.isArray(key) && key[1] === 'custom';
+        queryClient.setQueryData(
+          key,
+          'product' in input
+            ? applyFavorite(data, input.product, next, retain)
+            : applyFavoriteId(data, input.productId, next, retain),
+        );
       }
       return { snapshots };
     },
@@ -138,6 +158,10 @@ export function useToggleFavorite() {
       for (const [key, data] of context?.snapshots ?? []) {
         queryClient.setQueryData(key, data);
       }
+    },
+    onSuccess: (_data, input) => {
+      if ('product' in input) return;
+      return queryClient.invalidateQueries({ queryKey: foodFavoritesKey });
     },
   });
 }

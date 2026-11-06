@@ -33,6 +33,10 @@ export function createFoodProduct(body: CreateFoodProductInput) {
   });
 }
 
+export function listCustomFoods() {
+  return apiRequest<FoodProductListResponse>('/food/products');
+}
+
 export function listFavoriteFoods() {
   return apiRequest<FoodProductListResponse>('/food/favorites');
 }

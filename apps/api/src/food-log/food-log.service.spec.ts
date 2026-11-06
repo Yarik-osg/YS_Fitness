@@ -41,6 +41,7 @@ function harness(current = entry()) {
     transaction: vi.fn(async (work: (client: typeof db) => Promise<unknown>) =>
       work(db),
     ),
+    favoriteIdSet: vi.fn().mockResolvedValue(new Set()),
   };
   const catalog = {
     copyFromEntry: vi.fn().mockResolvedValue({ id: 'my-product' }),
@@ -130,5 +131,36 @@ describe('FoodLogService.update', () => {
       service.update(userId, entryId, { grams: 50 }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(entries.updateOwned).not.toHaveBeenCalled();
+  });
+});
+
+describe('FoodLogService.day', () => {
+  it('marks logged products the user already favorited', async () => {
+    const rows = [
+      entry(),
+      entry({ id: 'entry-2', productId: 'plain' }),
+      entry({ id: 'entry-3', productId: null }),
+    ];
+    const entries = {
+      listDay: vi.fn().mockResolvedValue(rows),
+      favoriteIdSet: vi.fn().mockResolvedValue(new Set(['off-product'])),
+    };
+    const service = new FoodLogService(
+      entries as never,
+      {} as never,
+      { getActiveTarget: vi.fn().mockResolvedValue(null) } as never,
+    );
+
+    const day = await service.day(userId, '2026-11-06');
+
+    expect(entries.favoriteIdSet).toHaveBeenCalledWith(userId, [
+      'off-product',
+      'plain',
+    ]);
+    expect(day.entries.map((item) => item.isFavorite)).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 });

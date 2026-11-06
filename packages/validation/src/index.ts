@@ -740,6 +740,7 @@ export const patchFoodLogSchema = z
     fat: entryMacro.optional(),
     carbs: entryMacro.optional(),
     meal: z.enum(FOOD_MEALS).optional(),
+    productName: z.string().trim().min(1).max(200).optional(),
     saveAsMyProduct: z.boolean().optional(),
   })
   .strict()

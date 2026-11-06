@@ -4,10 +4,10 @@ import { OffOutboundLimiter, SystemClock } from './off-limiter.js';
 import { OpenFoodFactsHttp, RateLimitedOffClient } from './off-client.js';
 
 const config = {
-  get(key: 'OFF_BASE_URL' | 'OFF_USER_AGENT') {
-    return key === 'OFF_USER_AGENT'
-      ? 'YSFitness/test'
-      : 'https://world.openfoodfacts.org';
+  get(key: 'OFF_BASE_URL' | 'OFF_SEARCH_URL' | 'OFF_USER_AGENT') {
+    if (key === 'OFF_USER_AGENT') return 'YSFitness/test';
+    if (key === 'OFF_SEARCH_URL') return 'https://search.openfoodfacts.org';
+    return 'https://world.openfoodfacts.org';
   },
 };
 
@@ -37,8 +37,25 @@ describe('OpenFoodFactsHttp', () => {
       'secret upstream body',
     );
     const url = String(fetchMock.mock.calls[0]?.[0]);
-    expect(url).toContain('/cgi/search.pl');
-    expect(url).toContain('search_terms=milk');
+    expect(url).toBe(
+      'https://search.openfoodfacts.org/search?q=milk&page_size=20',
+    );
+  });
+
+  it('reads hits and ignores a legacy products array', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        hits: [{ code: '5449000000996' }],
+        products: [{ code: 'ignored' }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new OpenFoodFactsHttp(config as never);
+
+    await expect(client.search('coca cola')).resolves.toEqual([
+      { code: '5449000000996' },
+    ]);
   });
 
   it('treats a missing barcode as empty and a non-ok response as unavailable', async () => {
