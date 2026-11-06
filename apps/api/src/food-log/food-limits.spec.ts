@@ -24,12 +24,13 @@ describe('food value limits', () => {
   });
 
   it('does not let half-up rounding cross the cap at any 1-decimal gram amount', () => {
-    const step = new Prisma.Decimal(FOOD_MIN_GRAMS);
-    for (
-      let grams = new Prisma.Decimal(FOOD_MIN_GRAMS);
-      grams.lte(FOOD_MAX_GRAMS);
-      grams = grams.plus(step)
-    ) {
+    // grams = n/10. The kcal cap is then PER_100G_MAX_KCAL * n / 1000, so it
+    // has at most one decimal for every n when the per-100g kcal cap is a
+    // multiple of 100. The macro cap needs a multiple of 10.
+    expect(PER_100G_MAX_KCAL % 100).toBe(0);
+    expect(PER_100G_MAX_MACRO % 10).toBe(0);
+
+    for (const grams of [FOOD_MIN_GRAMS, 0.3, 1, 1.1, FOOD_MAX_GRAMS]) {
       const kcalCap = new Prisma.Decimal(PER_100G_MAX_KCAL).mul(grams).div(100);
       const macroCap = new Prisma.Decimal(PER_100G_MAX_MACRO)
         .mul(grams)
@@ -38,7 +39,7 @@ describe('food value limits', () => {
       expect(roundHalfUp(macroCap, 1).equals(macroCap)).toBe(true);
       expect(
         entryFitsGrams({
-          grams: grams.toNumber(),
+          grams,
           kcal: kcalCap.toNumber(),
           protein: macroCap.toNumber(),
           fat: macroCap.toNumber(),
