@@ -616,3 +616,62 @@ export interface CoachNutritionRosterRow {
 export interface CoachNutritionRosterResponse {
   clients: CoachNutritionRosterRow[];
 }
+
+export type FoodProductSource = 'OFF' | 'CUSTOM';
+export type FoodMeal = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+
+export interface FoodProductResponse {
+  id: string;
+  source: FoodProductSource;
+  externalId: string | null;
+  name: string;
+  brand: string | null;
+  imageUrl: string | null;
+  kcalPer100g: number;
+  proteinPer100g: number;
+  fatPer100g: number;
+  carbsPer100g: number;
+}
+
+export interface FoodProductListResponse {
+  products: FoodProductResponse[];
+}
+
+export interface FoodLogEntryResponse {
+  id: string;
+  productId: string | null;
+  loggedOn: string;
+  meal: FoodMeal;
+  grams: number;
+  productName: string;
+  imageUrl: string | null;
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  createdAt: string;
+}
+
+export interface FoodMacroTotal {
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+}
+
+/** Active nutrition target as numbers. Nutrition's own routes still return decimal strings. */
+export interface ActiveNutritionTarget {
+  source: 'CALCULATED' | 'MANUAL';
+  targetCalories: number;
+  proteinGrams: number;
+  fatGrams: number;
+  carbsGrams: number;
+}
+
+export interface FoodDayResponse {
+  date: string;
+  entries: FoodLogEntryResponse[];
+  totals: FoodMacroTotal;
+  target: ActiveNutritionTarget | null;
+  remaining: FoodMacroTotal | null;
+}
