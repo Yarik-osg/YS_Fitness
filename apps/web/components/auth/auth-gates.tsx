@@ -151,8 +151,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         (pathname.startsWith('/dashboard') ||
           pathname.startsWith('/profile') ||
           pathname.startsWith('/progress') ||
-          pathname.startsWith('/nutrition') ||
-          pathname.startsWith('/food')) &&
+          pathname.startsWith('/nutrition')) &&
         destination.startsWith('/onboarding')
       ) {
         router.replace(destination);

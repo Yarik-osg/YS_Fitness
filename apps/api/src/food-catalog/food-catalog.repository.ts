@@ -31,6 +31,14 @@ export class FoodCatalogRepository {
     });
   }
 
+  listCustom(userId: string): Promise<FoodProduct[]> {
+    return this.prisma.foodProduct.findMany({
+      where: { source: 'CUSTOM', ownerId: userId },
+      orderBy: { name: 'asc' },
+      take: 100,
+    });
+  }
+
   matchingOff(terms: string): Promise<FoodProduct[]> {
     return this.prisma.foodProduct.findMany({
       where: { source: 'OFF', OR: matchQuery({ q: terms }) },
@@ -154,11 +162,23 @@ export class FoodCatalogRepository {
 function matchQuery(query: { q?: string; barcode?: string }) {
   const matches: Prisma.FoodProductWhereInput[] = [];
   if (query.q) {
-    matches.push(
-      { name: { contains: query.q, mode: 'insensitive' } },
-      { brand: { contains: query.q, mode: 'insensitive' } },
-    );
+    matches.push(fieldContainsTokens('name', query.q));
+    matches.push(fieldContainsTokens('brand', query.q));
   }
   if (query.barcode) matches.push({ externalId: query.barcode });
   return matches;
+}
+
+function fieldContainsTokens(
+  field: 'name' | 'brand',
+  terms: string,
+): Prisma.FoodProductWhereInput {
+  return {
+    AND: terms
+      .split(' ')
+      .filter((token) => token.length > 0)
+      .map((token) => ({
+        [field]: { contains: token, mode: 'insensitive' as const },
+      })),
+  };
 }

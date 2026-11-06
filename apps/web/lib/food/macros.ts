@@ -36,6 +36,40 @@ export function roundHalfUp(value: number, decimals: number): number {
   return (sign * rounded) / power;
 }
 
+/** Display only. Callers must keep the raw number for any later math. */
+export function formatFoodAmount(
+  value: number,
+  locale: string,
+  decimals: 0 | 1,
+): string {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: 0,
+  }).format(roundHalfUp(value, decimals));
+}
+
+export type GoalState = 'under' | 'met' | 'over';
+
+export function goalState(
+  eaten: number,
+  target: number,
+): {
+  state: GoalState;
+  /** Bar width, 0–100. */
+  width: number;
+  overBy: number;
+} {
+  const overBy = Math.max(0, eaten - target);
+  const state: GoalState =
+    roundHalfUp(overBy, 0) > 0
+      ? 'over'
+      : roundHalfUp(Math.max(0, target - eaten), 0) === 0
+        ? 'met'
+        : 'under';
+  const width = target > 0 ? Math.min(100, (eaten / target) * 100) : 0;
+  return { state, width, overBy };
+}
+
 export function scalePer100g(per100g: number, grams: number): number {
   return roundHalfUp((per100g * grams) / 100, 1);
 }

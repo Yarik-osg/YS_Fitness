@@ -68,6 +68,11 @@ export class FoodLogService {
     return { ...created, isFavorite: false };
   }
 
+  async listCustom(userId: string): Promise<FoodProductListResponse> {
+    const products = await this.catalog.listCustom(userId);
+    return { products: await this.withFavorites(userId, products) };
+  }
+
   async listFavorites(userId: string): Promise<FoodProductListResponse> {
     const links = await this.entries.listFavorites(userId);
     const products = await this.catalog.findVisibleByIds(
@@ -157,9 +162,15 @@ export class FoodLogService {
       fat: totals.fat.toNumber(),
       carbs: totals.carbs.toNumber(),
     };
+    const flags = await this.entries.favoriteIdSet(
+      userId,
+      rows.flatMap((row) => (row.productId ? [row.productId] : [])),
+    );
     return {
       date,
-      entries: rows.map(toEntry),
+      entries: rows.map((row) =>
+        toEntry(row, row.productId ? flags.has(row.productId) : false),
+      ),
       totals: summed,
       target,
       remaining: target ? remaining(target, totals) : null,
@@ -186,7 +197,7 @@ export class FoodLogService {
       fat: entryDecimal(snapshot.fat),
       carbs: entryDecimal(snapshot.carbs),
     });
-    return toEntry(created);
+    return this.entryResponse(userId, created);
   }
 
   async update(
@@ -194,7 +205,7 @@ export class FoodLogService {
     entryId: string,
     input: PatchFoodLogInput,
   ): Promise<FoodLogEntryResponse> {
-    return this.entries.transaction(async (db) => {
+    const saved = await this.entries.transaction(async (db) => {
       const entry = await this.entries.lockOwned(userId, entryId, db);
       if (!entry) throw entryNotFound();
       const next = applyFoodLogPatch(
@@ -208,8 +219,10 @@ export class FoodLogService {
         input,
       );
       if (!entryFitsGrams(next)) throw valuesOutOfRange();
+      const productName = input.productName?.trim() || entry.productName;
       const data = {
         productId: entry.productId,
+        productName,
         meal: input.meal ?? entry.meal,
         grams: entryDecimal(next.grams),
         kcal: entryDecimal(next.kcal),
@@ -231,7 +244,7 @@ export class FoodLogService {
         const copy = await this.catalog.copyFromEntry(
           userId,
           {
-            name: entry.productName,
+            name: productName,
             imageUrl: entry.imageUrl,
             basedOnProductId: entry.productId,
             kcalPer100g: roundHalfUp(per100.data.kcalPer100g, 2),
@@ -245,13 +258,23 @@ export class FoodLogService {
       }
       const saved = await this.entries.updateOwned(userId, entryId, data, db);
       if (!saved) throw entryNotFound();
-      return toEntry(saved);
+      return saved;
     });
+    return this.entryResponse(userId, saved);
   }
 
   async remove(userId: string, entryId: string): Promise<void> {
     const count = await this.entries.deleteOwned(userId, entryId);
     if (count !== 1) throw entryNotFound();
+  }
+
+  private async entryResponse(
+    userId: string,
+    row: FoodLogEntry,
+  ): Promise<FoodLogEntryResponse> {
+    if (!row.productId) return toEntry(row, false);
+    const flags = await this.entries.favoriteIdSet(userId, [row.productId]);
+    return toEntry(row, flags.has(row.productId));
   }
 
   private async withFavorites(
@@ -290,7 +313,7 @@ function remaining(
   };
 }
 
-function toEntry(row: FoodLogEntry): FoodLogEntryResponse {
+function toEntry(row: FoodLogEntry, isFavorite: boolean): FoodLogEntryResponse {
   return {
     id: row.id,
     productId: row.productId,
@@ -304,6 +327,7 @@ function toEntry(row: FoodLogEntry): FoodLogEntryResponse {
     fat: row.fat.toNumber(),
     carbs: row.carbs.toNumber(),
     createdAt: row.createdAt.toISOString(),
+    isFavorite,
   };
 }
 

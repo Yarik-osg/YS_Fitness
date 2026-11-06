@@ -11,6 +11,8 @@ import { decodeFoodText } from './text';
 import {
   entryCap,
   exceedsEntryCap,
+  formatFoodAmount,
+  goalState,
   gramsAccepted,
   previewMacros,
   remainingTone,
@@ -18,6 +20,84 @@ import {
   scalePer100g,
   targetAsTotals,
 } from './macros';
+import { rankFoodProducts, sortByMacro } from './rank';
+
+describe('food display', () => {
+  it('rounds only the displayed number', () => {
+    const raw = 1818.6;
+    expect(formatFoodAmount(raw, 'en', 0)).toBe('1,819');
+    expect(raw).toBe(1818.6);
+    expect(formatFoodAmount(235.4, 'en', 0)).toBe('235');
+    expect(scalePer100g(130, 80)).toBe(104);
+  });
+
+  it('marks under, met, and over without letting the bar pass 100', () => {
+    expect(goalState(150, 180).state).toBe('under');
+    expect(goalState(180, 180).state).toBe('met');
+    const over = goalState(235, 180);
+    expect(over.state).toBe('over');
+    expect(over.overBy).toBe(55);
+    expect(over.width).toBe(100);
+    expect(goalState(360, 180).width).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('food search order', () => {
+  it('keeps every result and prefers the exact name', () => {
+    const products = [
+      product('Rice chips'),
+      product('Brown rice'),
+      product('рис'),
+      product('Rice'),
+    ];
+    expect(
+      rankFoodProducts(products, ' rice ').map((item) => item.name),
+    ).toEqual(['Rice', 'Rice chips', 'Brown rice', 'рис']);
+    expect(rankFoodProducts(products, 'рис').map((item) => item.name)[0]).toBe(
+      'рис',
+    );
+  });
+
+  it('ranks Coca-Cola ahead of Zero and a brand-only match', () => {
+    const products = [
+      { ...product('Soft drink'), brand: 'Coca-Cola' },
+      { ...product('Coca-Cola Zero'), brand: 'Coca-Cola' },
+      { ...product('Coca-Cola'), brand: 'Coca-Cola' },
+    ];
+    expect(
+      rankFoodProducts(products, 'кока кола').map((item) => item.name),
+    ).toEqual(['Coca-Cola', 'Coca-Cola Zero', 'Soft drink']);
+  });
+
+  it('sorts custom and favorite foods by a macro, highest first', () => {
+    const oats = {
+      ...product('Oats'),
+      source: 'CUSTOM' as const,
+      proteinPer100g: 13,
+    };
+    const liked = { ...product('Milk'), isFavorite: true, proteinPer100g: 3 };
+    const other = { ...product('Chips'), proteinPer100g: 20 };
+    expect(
+      sortByMacro([other, liked, oats], 'protein').map((item) => item.name),
+    ).toEqual(['Oats', 'Milk', 'Chips']);
+  });
+});
+
+function product(name: string) {
+  return {
+    id: name,
+    source: 'OFF' as const,
+    externalId: null,
+    name,
+    brand: null,
+    imageUrl: null,
+    kcalPer100g: 1,
+    proteinPer100g: 1,
+    fatPer100g: 1,
+    carbsPer100g: 1,
+    isFavorite: false,
+  };
+}
 
 describe('food text', () => {
   it('turns stored quote entities into quotation marks', () => {

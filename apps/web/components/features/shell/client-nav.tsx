@@ -7,7 +7,6 @@ import {
   Home,
   LayoutGrid,
   User,
-  UtensilsCrossed,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
@@ -16,7 +15,6 @@ const NAV_ITEMS = [
   { id: 'home', href: '/dashboard', icon: Home },
   { id: 'training', href: '/training', icon: Dumbbell },
   { id: 'nutrition', href: '/nutrition', icon: Apple },
-  { id: 'food', href: '/food', icon: UtensilsCrossed },
   { id: 'progress', href: '/progress', icon: BarChart3 },
   { id: 'profile', href: '/profile', icon: User },
   { id: 'library', href: null, icon: LayoutGrid },
@@ -25,7 +23,7 @@ const NAV_ITEMS = [
 export function ClientNav({
   active,
 }: {
-  active: 'home' | 'training' | 'nutrition' | 'food' | 'profile' | 'progress';
+  active: 'home' | 'training' | 'nutrition' | 'profile' | 'progress';
 }) {
   const t = useTranslations('dashboard');
 

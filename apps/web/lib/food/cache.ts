@@ -1,4 +1,5 @@
 import type {
+  FoodLogEntryResponse,
   FoodProductResponse,
   FoodRecentItemResponse,
 } from '@repo/shared-types';
@@ -11,16 +12,24 @@ export function applyFavorite(
   data: unknown,
   product: FoodProductResponse,
   isFavorite: boolean,
+  retain = false,
 ): unknown {
   if (!isRecord(data)) return data;
-  if ('entries' in data && 'totals' in data) return data;
+  if (Array.isArray(data.entries) && 'totals' in data) {
+    return {
+      ...data,
+      entries: (data.entries as FoodLogEntryResponse[]).map((entry) =>
+        entry.productId === product.id ? { ...entry, isFavorite } : entry,
+      ),
+    };
+  }
 
   if (Array.isArray(data.products)) {
     const current = data.products as FoodProductResponse[];
     const products = current.map((item) =>
       item.id === product.id ? { ...item, isFavorite } : item,
     );
-    if (!('fromCacheOnly' in data)) {
+    if (!retain && !('fromCacheOnly' in data)) {
       if (!isFavorite) {
         return { products: products.filter((item) => item.id !== product.id) };
       }
@@ -42,5 +51,44 @@ export function applyFavorite(
     };
   }
 
+  return data;
+}
+
+/** Flip a logged product when the row has no catalog card to prepend. */
+export function applyFavoriteId(
+  data: unknown,
+  productId: string,
+  isFavorite: boolean,
+  retain = false,
+): unknown {
+  if (!isRecord(data)) return data;
+  if (Array.isArray(data.entries) && 'totals' in data) {
+    return {
+      ...data,
+      entries: (data.entries as FoodLogEntryResponse[]).map((entry) =>
+        entry.productId === productId ? { ...entry, isFavorite } : entry,
+      ),
+    };
+  }
+  if (Array.isArray(data.products)) {
+    const current = data.products as FoodProductResponse[];
+    const products = current.map((item) =>
+      item.id === productId ? { ...item, isFavorite } : item,
+    );
+    if (!retain && !('fromCacheOnly' in data) && !isFavorite) {
+      return { products: products.filter((item) => item.id !== productId) };
+    }
+    return { ...data, products };
+  }
+  if (Array.isArray(data.items)) {
+    const current = data.items as FoodRecentItemResponse[];
+    return {
+      items: current.map((item) =>
+        item.product.id === productId
+          ? { ...item, product: { ...item.product, isFavorite } }
+          : item,
+      ),
+    };
+  }
   return data;
 }

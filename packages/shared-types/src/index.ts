@@ -656,6 +656,8 @@ export interface FoodLogEntryResponse {
   fat: number;
   carbs: number;
   createdAt: string;
+  /** Whether this user has favorited the product behind the row. */
+  isFavorite: boolean;
 }
 
 export interface FoodMacroTotal {

@@ -48,7 +48,7 @@ export function normalizeOffProduct(raw: unknown): NormalizedOffProduct | null {
   return {
     externalId,
     name,
-    brand: text(record.brands, BRAND_LIMIT),
+    brand: brands(record.brands),
     imageUrl:
       text(record.image_front_small_url, IMAGE_LIMIT) ??
       text(record.image_url, IMAGE_LIMIT),
@@ -61,6 +61,16 @@ function code(value: unknown): string | null {
     return String(value).slice(0, 32);
   }
   return text(value, 32);
+}
+
+function brands(value: unknown): string | null {
+  if (!Array.isArray(value)) return text(value, BRAND_LIMIT);
+  const parts: string[] = [];
+  for (const item of value) {
+    const part = text(item, BRAND_LIMIT);
+    if (part) parts.push(part);
+  }
+  return text(parts.join(', '), BRAND_LIMIT);
 }
 
 function text(value: unknown, max: number): string | null {

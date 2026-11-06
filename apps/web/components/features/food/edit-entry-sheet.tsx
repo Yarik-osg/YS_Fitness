@@ -17,6 +17,7 @@ import {
   exceedsEntryCap,
   gramsAccepted,
   oneDecimal,
+  roundHalfUp,
   scaleAmount,
 } from '@/lib/food/macros';
 import { decodeFoodText } from '@/lib/food/text';
@@ -57,6 +58,8 @@ function EditEntryForm({
   const t = useTranslations('food');
   const tAuth = useTranslations('auth');
   const update = useUpdateFoodLog();
+  const [name, setName] = useState(entry.productName);
+  const [factor, setFactor] = useState('1');
   const [grams, setGrams] = useState(String(entry.grams));
   const [kcal, setKcal] = useState(String(entry.kcal));
   const [protein, setProtein] = useState(String(entry.protein));
@@ -72,6 +75,25 @@ function EditEntryForm({
     fat: entry.fat,
     carbs: entry.carbs,
   });
+
+  function applyFactor(next: string) {
+    setFactor(next);
+    const multiplier = Number(next);
+    if (!Number.isFinite(multiplier) || multiplier <= 0) return;
+    const nextGrams = roundHalfUp(entry.grams * multiplier, 1);
+    setGrams(String(nextGrams));
+    setKcal(String(scaleAmount(entry.kcal, entry.grams, nextGrams)));
+    setProtein(String(scaleAmount(entry.protein, entry.grams, nextGrams)));
+    setFat(String(scaleAmount(entry.fat, entry.grams, nextGrams)));
+    setCarbs(String(scaleAmount(entry.carbs, entry.grams, nextGrams)));
+    setBasis({
+      grams: nextGrams,
+      kcal: scaleAmount(entry.kcal, entry.grams, nextGrams),
+      protein: scaleAmount(entry.protein, entry.grams, nextGrams),
+      fat: scaleAmount(entry.fat, entry.grams, nextGrams),
+      carbs: scaleAmount(entry.carbs, entry.grams, nextGrams),
+    });
+  }
 
   function changeGrams(next: string) {
     setGrams(next);
@@ -114,6 +136,7 @@ function EditEntryForm({
     parsed.fat !== entry.fat ||
     parsed.carbs !== entry.carbs ||
     meal !== entry.meal ||
+    name.trim() !== entry.productName ||
     saveAsMyProduct;
   const serverTooLarge =
     update.error instanceof ApiClientError &&
@@ -147,6 +170,7 @@ function EditEntryForm({
       fat?: number;
       carbs?: number;
       meal?: FoodMeal;
+      productName?: string;
       saveAsMyProduct?: boolean;
     } = {};
     if (parsed.grams !== entry.grams) body.grams = parsed.grams;
@@ -155,6 +179,7 @@ function EditEntryForm({
     if (parsed.fat !== entry.fat) body.fat = parsed.fat;
     if (parsed.carbs !== entry.carbs) body.carbs = parsed.carbs;
     if (meal !== entry.meal) body.meal = meal;
+    if (name.trim() !== entry.productName) body.productName = name.trim();
     if (saveAsMyProduct) body.saveAsMyProduct = true;
     update.mutate({ id: entry.id, body }, { onSuccess: onClose });
   }
@@ -164,6 +189,18 @@ function EditEntryForm({
       <SheetTitle>{decodeFoodText(entry.productName)}</SheetTitle>
       <SheetDescription>{t('editHint')}</SheetDescription>
       <div className="flex flex-col gap-3">
+        <Field
+          id="edit-name"
+          label={t('productName')}
+          value={name}
+          onChange={setName}
+        />
+        <Field
+          id="edit-factor"
+          label={t('multiplier')}
+          value={factor}
+          onChange={applyFactor}
+        />
         <Field
           id="edit-grams"
           label={t('grams')}

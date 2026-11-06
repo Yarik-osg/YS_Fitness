@@ -6,17 +6,17 @@ import type {
   FoodMeal,
 } from '@repo/shared-types';
 import { FOOD_MEALS, isCalendarDate } from '@repo/validation';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, Plus, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AddFoodSheet } from '@/components/features/food/add-food-sheet';
 import { EditEntrySheet } from '@/components/features/food/edit-entry-sheet';
 import { FoodImage } from '@/components/features/food/food-image';
 import { ClientNav } from '@/components/features/shell/client-nav';
 import { LockedProgramScreen } from '@/components/features/subscription/locked-screen';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
@@ -24,7 +24,7 @@ import {
   SheetDescription,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Link, useRouter } from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import { localDateKey } from '@/lib/calendar';
 import {
@@ -34,12 +34,21 @@ import {
 } from '@/lib/food/dates';
 import { decodeFoodText } from '@/lib/food/text';
 import {
-  FOOD_MACRO_KEYS,
+  formatFoodAmount,
+  goalState,
   mealSubtotal,
-  remainingTone,
   targetAsTotals,
 } from '@/lib/food/macros';
-import { useDeleteFoodLog, useFoodDay } from '@/lib/hooks/use-food';
+import {
+  useDeleteFoodLog,
+  useFoodDay,
+  useToggleFavorite,
+} from '@/lib/hooks/use-food';
+import {
+  useCalculateNutrition,
+  useNutritionCalculations,
+} from '@/lib/hooks/use-nutrition';
+import { shownNutrition } from '@/lib/nutrition-display';
 
 export function FoodPage() {
   const t = useTranslations('food');
@@ -55,7 +64,7 @@ export function FoodPage() {
   const today = localDateKey(now);
 
   function setDate(next: string) {
-    router.replace(`/food?date=${next}`);
+    router.replace(`/nutrition?date=${next}`);
   }
 
   if (
@@ -63,7 +72,7 @@ export function FoodPage() {
     day.error.code === 'SUBSCRIPTION_REQUIRED'
   ) {
     return (
-      <LockedProgramScreen nav="food">
+      <LockedProgramScreen nav="nutrition">
         <FoodSkeleton />
       </LockedProgramScreen>
     );
@@ -71,46 +80,51 @@ export function FoodPage() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-[430px] bg-background pb-24 text-ink">
-      <header className="border-b border-line px-5 pt-8 pb-4">
+      <header className="border-b border-line px-5 pt-6 pb-3">
         <h1 className="font-heading text-[28px] leading-none text-ink uppercase">
           {t('title')}
         </h1>
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <IconButton
             label={t('previousDay')}
             onClick={() => setDate(shiftFoodDate(date, -1))}
           >
             <ChevronLeft size={18} />
           </IconButton>
-          <input
-            type="date"
-            aria-label={t('date')}
-            value={date}
-            onChange={(event) => {
-              if (isCalendarDate(event.target.value))
-                setDate(event.target.value);
-            }}
-            className="min-w-0 flex-1 border border-line bg-panel px-2 py-2 text-sm text-ink"
-          />
+          <div className="min-w-0 text-center">
+            <p className="font-heading text-xl text-ink">
+              {formatFoodDate(date, locale)}
+            </p>
+            {date === today ? (
+              <p className="text-xs text-teal">{t('today')}</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setDate(today)}
+                className="text-xs text-teal"
+              >
+                {t('today')}
+              </button>
+            )}
+          </div>
           <IconButton
             label={t('nextDay')}
             onClick={() => setDate(shiftFoodDate(date, 1))}
           >
             <ChevronRight size={18} />
           </IconButton>
-          <button
-            type="button"
-            onClick={() => setDate(today)}
-            className="px-2 text-sm text-teal"
-          >
-            {t('today')}
-          </button>
         </div>
-        <p className="mt-2 text-sm text-muted">
-          {formatFoodDate(date, locale)}
-        </p>
+        <input
+          type="date"
+          aria-label={t('date')}
+          value={date}
+          onChange={(event) => {
+            if (isCalendarDate(event.target.value)) setDate(event.target.value);
+          }}
+          className="mt-2 min-h-11 w-full border border-line bg-panel px-2 text-sm text-ink"
+        />
       </header>
-      <div className="flex flex-col gap-5 px-4 pt-5">
+      <div className="flex flex-col gap-4 px-4 pt-4">
         {day.isPending ? (
           <Skeleton className="h-40 w-full" />
         ) : day.isError ? (
@@ -151,7 +165,7 @@ export function FoodPage() {
       />
       <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />
       <DeleteEntrySheet entry={deleting} onClose={() => setDeleting(null)} />
-      <ClientNav active="food" />
+      <ClientNav active="nutrition" />
     </div>
   );
 }
@@ -160,73 +174,192 @@ function DayProgress({ day }: { day: FoodDayResponse }) {
   const t = useTranslations('food');
   const locale = useLocale();
   const target = day.target ? targetAsTotals(day.target) : null;
+  const calories = target ? goalState(day.totals.kcal, target.kcal) : null;
 
   return (
-    <section className="border border-line bg-panel p-4">
-      <h2 className="mb-3 font-heading text-lg uppercase">{t('eaten')}</h2>
-      <div className="flex flex-col gap-3">
-        {FOOD_MACRO_KEYS.map((key) => (
-          <MacroRow
-            key={key}
-            label={t(key)}
-            eaten={day.totals[key]}
-            target={target ? target[key] : null}
-            remaining={day.remaining ? day.remaining[key] : null}
-            locale={locale}
-          />
-        ))}
-      </div>
-      {target ? null : (
-        <p className="mt-3 text-sm text-muted">
-          {t('noTarget')}{' '}
-          <Link href="/nutrition" className="text-teal">
-            {t('openNutrition')}
-          </Link>
+    <section className="border border-line bg-panel px-4 py-4">
+      <p className="text-xs text-muted">{t('kcal')}</p>
+      <p className="mt-1 flex items-end gap-2">
+        <span className="font-heading text-5xl leading-none text-ink tabular-nums">
+          {formatFoodAmount(day.totals.kcal, locale, 0)}
+        </span>
+        {target ? (
+          <span className="pb-1 text-sm text-muted tabular-nums">
+            / {formatFoodAmount(target.kcal, locale, 0)}
+          </span>
+        ) : null}
+      </p>
+      {calories ? (
+        <Meter label={t('kcal')} progress={calories} className="mt-3 h-1.5" />
+      ) : null}
+      {calories ? (
+        <p
+          className={`mt-1 text-sm tabular-nums ${
+            calories.state === 'over' ? 'text-amber' : 'text-muted'
+          }`}
+        >
+          {calories.state === 'over'
+            ? t('overBy', {
+                amount: formatFoodAmount(calories.overBy, locale, 0),
+              })
+            : calories.state === 'met'
+              ? t('goalMet')
+              : t('left', {
+                  amount: formatFoodAmount(
+                    (target?.kcal ?? 0) - day.totals.kcal,
+                    locale,
+                    0,
+                  ),
+                })}
         </p>
+      ) : (
+        <TargetNote />
       )}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {(['protein', 'fat', 'carbs'] as const).map((key) => {
+          const progress = target
+            ? goalState(day.totals[key], target[key])
+            : null;
+          return (
+            <div key={key}>
+              <p className="text-xs text-muted">{t(key)}</p>
+              <p className="mt-1 text-sm text-ink tabular-nums">
+                {formatFoodAmount(day.totals[key], locale, 0)}
+                {target ? (
+                  <span className="text-muted">
+                    {' '}
+                    / {formatFoodAmount(target[key], locale, 0)}
+                  </span>
+                ) : null}
+              </p>
+              {progress ? (
+                <Meter
+                  label={t(key)}
+                  progress={progress}
+                  className="mt-2 h-1"
+                />
+              ) : null}
+              {progress?.state === 'over' ? (
+                <p className="mt-1 text-xs text-amber tabular-nums">
+                  {t('overBy', {
+                    amount: formatFoodAmount(progress.overBy, locale, 0),
+                  })}
+                </p>
+              ) : null}
+              {progress?.state === 'met' ? (
+                <p className="mt-1 text-xs text-muted">{t('goalMet')}</p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
 
-function MacroRow({
+function TargetNote() {
+  const t = useTranslations('food');
+  const tNutrition = useTranslations('nutrition');
+  const calculations = useNutritionCalculations();
+  const { mutate, isPending, error } = useCalculateNutrition();
+  const queryClient = useQueryClient();
+  const started = useRef(false);
+  const latest = calculations.data?.calculations[0] ?? null;
+  const shown = shownNutrition(latest, calculations.data?.target);
+  const unsupported =
+    error instanceof ApiClientError &&
+    (error.code === 'INVALID_INPUT' ||
+      error.code === 'NUTRITION_INPUT_UNSUPPORTED');
+
+  useEffect(() => {
+    if (
+      started.current ||
+      !calculations.isSuccess ||
+      calculations.isFetching ||
+      latest
+    ) {
+      return;
+    }
+    started.current = true;
+    mutate(undefined, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['food', 'day'] });
+      },
+    });
+  }, [
+    mutate,
+    calculations.isSuccess,
+    calculations.isFetching,
+    latest,
+    queryClient,
+  ]);
+
+  if (unsupported) {
+    return (
+      <p className="mt-1 text-sm text-muted">{tNutrition('unsupported')}</p>
+    );
+  }
+  if (latest?.status === 'REQUIRES_REVIEW' && !shown) {
+    return (
+      <p className="mt-1 text-sm text-muted">{tNutrition('pendingReview')}</p>
+    );
+  }
+  if (isPending || calculations.isPending) {
+    return <p className="mt-1 text-sm text-muted">{t('loading')}</p>;
+  }
+  if (calculations.isError || error) {
+    return (
+      <div className="mt-1">
+        <p role="alert" className="text-sm text-amber">
+          {tNutrition('loadError')}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            if (calculations.isError) {
+              void calculations.refetch();
+              return;
+            }
+            mutate(undefined, {
+              onSuccess: () => {
+                void queryClient.invalidateQueries({
+                  queryKey: ['food', 'day'],
+                });
+              },
+            });
+          }}
+          className="mt-2 text-sm text-teal"
+        >
+          {t('retry')}
+        </button>
+      </div>
+    );
+  }
+  return <p className="mt-1 text-sm text-muted">{t('noTarget')}</p>;
+}
+
+function Meter({
   label,
-  eaten,
-  target,
-  remaining,
-  locale,
+  progress,
+  className,
 }: {
   label: string;
-  eaten: number;
-  target: number | null;
-  remaining: number | null;
-  locale: string;
+  progress: { width: number; state: 'under' | 'met' | 'over' };
+  className?: string;
 }) {
-  const t = useTranslations('food');
-  const tone = remaining === null ? null : remainingTone(remaining);
-  const ratio = target && target > 0 ? (eaten / target) * 100 : 0;
-
   return (
-    <div>
-      <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-muted">{label}</span>
-        <span className="tabular-nums text-ink">
-          {target !== null
-            ? `${formatAmount(eaten, locale)} / ${formatAmount(target, locale)}`
-            : formatAmount(eaten, locale)}
-        </span>
-      </div>
-      {target !== null ? <Progress value={ratio} label={label} /> : null}
-      {tone ? (
-        <p
-          className={`mt-1 text-xs tabular-nums ${
-            tone.tone === 'over' ? 'text-amber' : 'text-muted'
-          }`}
-        >
-          {tone.tone === 'over'
-            ? t('overBy', { amount: formatAmount(tone.amount, locale) })
-            : t('left', { amount: formatAmount(tone.amount, locale) })}
-        </p>
-      ) : null}
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress.width)}
+      className={`w-full overflow-hidden bg-line ${className ?? ''}`}
+    >
+      <div
+        className={`h-full max-w-full ${progress.state === 'over' ? 'bg-amber' : 'bg-teal'}`}
+        style={{ width: `${progress.width}%` }}
+      />
     </div>
   );
 }
@@ -246,12 +379,24 @@ function MealSection({
 }) {
   const t = useTranslations('food');
   const locale = useLocale();
+  const favorite = useToggleFavorite();
   const subtotal = useMemo(() => mealSubtotal(entries), [entries]);
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="font-heading text-lg uppercase">{t(`meals.${meal}`)}</h2>
+      <div className="mb-2 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-lg uppercase">
+            {t(`meals.${meal}`)}
+          </h2>
+          <p className="text-xs text-muted tabular-nums">
+            {t('mealSubtotal', {
+              kcal: formatFoodAmount(subtotal.kcal, locale, 0),
+            })}
+            {' · '}
+            {t('itemCount', { count: entries.length })}
+          </p>
+        </div>
         <IconButton
           label={t('addToMeal', { meal: t(`meals.${meal}`) })}
           onClick={onAdd}
@@ -260,62 +405,84 @@ function MealSection({
         </IconButton>
       </div>
       {entries.length === 0 ? (
-        <p className="text-sm text-muted">{t('mealEmpty')}</p>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="w-full border border-dashed border-line px-3 py-4 text-left text-sm text-muted"
+        >
+          {t('mealEmpty')} {t('addFood')}
+        </button>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {entries.map((entry) => (
-            <li key={entry.id} className="border border-line bg-panel p-3">
-              <div className="flex gap-3">
-                <FoodImage
-                  src={entry.imageUrl}
-                  alt={decodeFoodText(entry.productName)}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-ink">
-                    {decodeFoodText(entry.productName)}
-                  </p>
-                  <p className="text-xs text-muted tabular-nums">
-                    {t('entryLine', {
-                      grams: formatAmount(entry.grams, locale),
-                      kcal: formatAmount(entry.kcal, locale),
-                    })}
-                  </p>
-                  <p className="text-xs text-muted tabular-nums">
-                    {t('macroLine', {
-                      protein: formatAmount(entry.protein, locale),
-                      fat: formatAmount(entry.fat, locale),
-                      carbs: formatAmount(entry.carbs, locale),
-                    })}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-2 flex gap-3">
+        <ul className="border-t border-line">
+          {entries.map((entry) => {
+            const label = decodeFoodText(entry.productName);
+            return (
+              <li
+                key={entry.id}
+                className="flex items-center gap-2 border-b border-line py-3"
+              >
                 <button
                   type="button"
                   onClick={() => onEdit(entry)}
-                  className="text-sm text-teal"
+                  aria-label={`${t('edit')} ${label}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  {t('edit')}
+                  <FoodImage src={entry.imageUrl} alt={label} />
+                  <span className="min-w-0">
+                    <span className="block text-sm text-ink">{label}</span>
+                    <span className="block text-xs text-muted tabular-nums">
+                      {t('entryLine', {
+                        grams: formatFoodAmount(entry.grams, locale, 1),
+                        kcal: formatFoodAmount(entry.kcal, locale, 0),
+                      })}
+                    </span>
+                    <span className="block text-xs text-muted tabular-nums">
+                      {t('macroShort', {
+                        protein: formatFoodAmount(entry.protein, locale, 0),
+                        fat: formatFoodAmount(entry.fat, locale, 0),
+                        carbs: formatFoodAmount(entry.carbs, locale, 0),
+                      })}
+                    </span>
+                  </span>
                 </button>
+                {entry.productId ? (
+                  <button
+                    type="button"
+                    aria-pressed={entry.isFavorite}
+                    aria-label={
+                      entry.isFavorite
+                        ? t('unfavorite', { name: label })
+                        : t('favorite', { name: label })
+                    }
+                    onClick={() => {
+                      if (!entry.productId) return;
+                      favorite.mutate({
+                        productId: entry.productId,
+                        next: !entry.isFavorite,
+                      });
+                    }}
+                    className="grid size-11 shrink-0 place-items-center text-teal"
+                  >
+                    <Heart
+                      size={18}
+                      strokeWidth={1.6}
+                      fill={entry.isFavorite ? 'currentColor' : 'none'}
+                    />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => onDelete(entry)}
-                  className="text-sm text-muted"
+                  aria-label={t('delete')}
+                  className="grid size-11 shrink-0 place-items-center text-muted"
                 >
-                  {t('delete')}
+                  <Trash2 size={18} strokeWidth={1.6} />
                 </button>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
-      {entries.length > 0 ? (
-        <p className="mt-2 text-xs text-muted tabular-nums">
-          {t('mealSubtotal', {
-            kcal: formatAmount(subtotal.kcal, locale),
-          })}
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -354,6 +521,11 @@ function DeleteEntrySheet({
           >
             {t('delete')}
           </Button>
+          {remove.isError ? (
+            <p role="alert" className="text-sm text-amber">
+              {t('couldNotDelete')}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
@@ -393,11 +565,5 @@ function FoodSkeleton() {
     <div className="px-4 pt-8">
       <Skeleton className="h-24 w-full" />
     </div>
-  );
-}
-
-function formatAmount(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(
-    value,
   );
 }

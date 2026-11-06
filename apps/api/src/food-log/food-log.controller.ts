@@ -69,6 +69,14 @@ export class FoodLogController {
     return this.log.searchFoods(user.sub, query);
   }
 
+  @Get('products')
+  @ApiOperation({ summary: 'List the caller’s own foods, by name' })
+  customProducts(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<FoodProductListResponse> {
+    return this.log.listCustom(user.sub);
+  }
+
   @Post('products')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a custom food from per-100g values' })

@@ -48,6 +48,27 @@ describe('normalizeOffProduct', () => {
     });
   });
 
+  it('keeps a product that has no photo and reads a brand list', () => {
+    expect(
+      normalizeOffProduct({
+        code: '5449000000996',
+        product_name: 'Coca-Cola',
+        brands: ['Coca-Cola', ''],
+        nutriments: {
+          'energy-kcal_100g': 42,
+          proteins_100g: 0,
+          fat_100g: 0,
+          carbohydrates_100g: 10.6,
+        },
+      }),
+    ).toMatchObject({
+      name: 'Coca-Cola',
+      brand: 'Coca-Cola',
+      imageUrl: null,
+      kcalPer100g: 42,
+    });
+  });
+
   it('drops a product without a name, a code, or kcal', () => {
     expect(
       normalizeOffProduct({ code: '1', nutriments: { 'energy-kcal_100g': 1 } }),

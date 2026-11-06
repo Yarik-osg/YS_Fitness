@@ -9,7 +9,7 @@ import {
 } from '@repo/validation';
 import { Heart } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FoodImage } from '@/components/features/food/food-image';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,18 +20,20 @@ import {
 } from '@/components/ui/sheet';
 import { ApiClientError } from '@/lib/api/client';
 import { getUserFacingError } from '@/lib/api/errors';
-import { gramsAccepted, previewMacros } from '@/lib/food/macros';
+import { gramsAccepted, previewMacros, roundHalfUp } from '@/lib/food/macros';
+import { rankFoodProducts, sortByMacro, type MacroSort } from '@/lib/food/rank';
 import { decodeFoodText } from '@/lib/food/text';
 import {
   useCreateFoodLog,
   useCreateFoodProduct,
+  useCustomFoods,
   useFavoriteFoods,
   useFoodSearch,
   useRecentFoods,
   useToggleFavorite,
 } from '@/lib/hooks/use-food';
 
-type Tab = 'search' | 'favorites' | 'recent';
+type Tab = 'search' | 'custom' | 'favorites' | 'recent';
 
 export function AddFoodSheet({
   open,
@@ -85,6 +87,7 @@ function AddFoodForm({
     product: FoodProductResponse;
     grams: string;
     meal: FoodMeal;
+    factor: string;
   } | null>(null);
 
   useEffect(() => {
@@ -97,22 +100,24 @@ function AddFoodForm({
     grams = '100',
     nextMeal: FoodMeal = meal,
   ) {
-    setPicked({ product, grams, meal: nextMeal });
+    setPicked({ product, grams, meal: nextMeal, factor: '1' });
   }
 
   return (
     <>
-      <SheetTitle>{t(`meals.${picked?.meal ?? meal}`)}</SheetTitle>
+      <SheetTitle>{t('addProduct')}</SheetTitle>
       <SheetDescription>
-        {picked ? t('quantityHint') : t('addHint')}
+        {t(`addContext.${picked?.meal ?? meal}`)}
       </SheetDescription>
       {picked ? (
         <QuantityStep
           product={picked.product}
           grams={picked.grams}
+          factor={picked.factor}
           meal={picked.meal}
           loggedOn={loggedOn}
           onGrams={(grams) => setPicked({ ...picked, grams })}
+          onFactor={(factor) => setPicked({ ...picked, factor })}
           onMeal={(next) => setPicked({ ...picked, meal: next })}
           onBack={() => setPicked(null)}
           onDone={onClose}
@@ -120,19 +125,21 @@ function AddFoodForm({
       ) : (
         <>
           <div className="mb-4 flex border border-line">
-            {(['search', 'favorites', 'recent'] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                aria-pressed={tab === item}
-                onClick={() => setTab(item)}
-                className={`flex-1 px-2 py-2 font-label text-[10px] font-bold tracking-[0.08em] uppercase ${
-                  tab === item ? 'bg-teal text-background' : 'text-muted'
-                }`}
-              >
-                {t(`tabs.${item}`)}
-              </button>
-            ))}
+            {(['search', 'custom', 'favorites', 'recent'] as const).map(
+              (item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={tab === item}
+                  onClick={() => setTab(item)}
+                  className={`flex-1 px-2 py-2 font-label text-[10px] font-bold tracking-[0.08em] uppercase ${
+                    tab === item ? 'bg-teal text-background' : 'text-muted'
+                  }`}
+                >
+                  {t(`tabs.${item}`)}
+                </button>
+              ),
+            )}
           </div>
           {tab === 'search' ? (
             <SearchTab
@@ -147,6 +154,9 @@ function AddFoodForm({
                 pick(product);
               }}
             />
+          ) : null}
+          {tab === 'custom' ? (
+            <CustomTab onPick={(product) => pick(product)} />
           ) : null}
           {tab === 'favorites' ? (
             <FavoritesTab onPick={(product) => pick(product)} />
@@ -183,8 +193,13 @@ function SearchTab({
 }) {
   const t = useTranslations('food');
   const search = useFoodSearch(debounced);
+  const typed = debounced.trim().length >= 2;
   const slow =
     search.error instanceof ApiClientError && search.error.status === 429;
+  const products = useMemo(
+    () => rankFoodProducts(search.data?.products ?? [], debounced),
+    [search.data, debounced],
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -195,15 +210,36 @@ function SearchTab({
         aria-label={t('searchPlaceholder')}
         className="border border-line bg-background px-3 py-2 text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       />
-      {slow ? (
+      {!typed ? <p className="text-sm text-muted">{t('searchHint')}</p> : null}
+      {typed && search.isPending ? (
+        <p className="text-sm text-muted">{t('loading')}</p>
+      ) : null}
+      {typed && slow ? (
         <p role="alert" className="text-sm text-amber">
           {t('slowDown')}
         </p>
       ) : null}
+      {typed && search.isError && !slow ? (
+        <div>
+          <p role="alert" className="text-sm text-amber">
+            {t('searchError')}
+          </p>
+          <button
+            type="button"
+            onClick={() => void search.refetch()}
+            className="mt-2 text-sm text-teal"
+          >
+            {t('retry')}
+          </button>
+        </div>
+      ) : null}
       {search.data?.fromCacheOnly ? (
         <p className="text-sm text-muted">{t('cacheOnly')}</p>
       ) : null}
-      <ProductList products={search.data?.products ?? []} onPick={onPick} />
+      {typed && search.isSuccess && products.length === 0 ? (
+        <p className="text-sm text-muted">{t('searchEmpty')}</p>
+      ) : null}
+      <ProductList products={products} onPick={onPick} />
       <button
         type="button"
         onClick={() => onCreating(!creating)}
@@ -216,6 +252,69 @@ function SearchTab({
   );
 }
 
+function MacroSortRow({
+  value,
+  onChange,
+}: {
+  value: MacroSort | null;
+  onChange: (sort: MacroSort | null) => void;
+}) {
+  const t = useTranslations('food');
+  const options = [
+    ['protein', t('sortProtein')],
+    ['fat', t('sortFat')],
+    ['carbs', t('sortCarbs')],
+  ] as const;
+  return (
+    <div className="flex gap-2">
+      {options.map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          aria-pressed={value === key}
+          onClick={() => onChange(value === key ? null : key)}
+          className={`min-h-11 flex-1 border border-line text-xs ${
+            value === key ? 'bg-teal text-background' : 'text-muted'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CustomTab({
+  onPick,
+}: {
+  onPick: (product: FoodProductResponse) => void;
+}) {
+  const t = useTranslations('food');
+  const custom = useCustomFoods(true);
+  if (custom.isPending)
+    return <p className="text-sm text-muted">{t('loading')}</p>;
+  if (custom.isError) {
+    return (
+      <div>
+        <p role="alert" className="text-sm text-amber">
+          {t('listError')}
+        </p>
+        <button
+          type="button"
+          onClick={() => void custom.refetch()}
+          className="mt-2 text-sm text-teal"
+        >
+          {t('retry')}
+        </button>
+      </div>
+    );
+  }
+  if (!custom.data?.products.length) {
+    return <p className="text-sm text-muted">{t('customEmpty')}</p>;
+  }
+  return <ProductList products={custom.data.products} onPick={onPick} />;
+}
+
 function FavoritesTab({
   onPick,
 }: {
@@ -223,12 +322,37 @@ function FavoritesTab({
 }) {
   const t = useTranslations('food');
   const favorites = useFavoriteFoods(true);
+  const [sort, setSort] = useState<MacroSort | null>(null);
   if (favorites.isPending)
     return <p className="text-sm text-muted">{t('loading')}</p>;
+  if (favorites.isError) {
+    return (
+      <div>
+        <p role="alert" className="text-sm text-amber">
+          {t('listError')}
+        </p>
+        <button
+          type="button"
+          onClick={() => void favorites.refetch()}
+          className="mt-2 text-sm text-teal"
+        >
+          {t('retry')}
+        </button>
+      </div>
+    );
+  }
   if (!favorites.data?.products.length) {
     return <p className="text-sm text-muted">{t('favoritesEmpty')}</p>;
   }
-  return <ProductList products={favorites.data.products} onPick={onPick} />;
+  const products = sort
+    ? sortByMacro(favorites.data.products, sort, true)
+    : favorites.data.products;
+  return (
+    <div className="flex flex-col gap-3">
+      <MacroSortRow value={sort} onChange={setSort} />
+      <ProductList products={products} onPick={onPick} />
+    </div>
+  );
 }
 
 function RecentTab({
@@ -240,6 +364,22 @@ function RecentTab({
   const recent = useRecentFoods(true);
   if (recent.isPending)
     return <p className="text-sm text-muted">{t('loading')}</p>;
+  if (recent.isError) {
+    return (
+      <div>
+        <p role="alert" className="text-sm text-amber">
+          {t('listError')}
+        </p>
+        <button
+          type="button"
+          onClick={() => void recent.refetch()}
+          className="mt-2 text-sm text-teal"
+        >
+          {t('retry')}
+        </button>
+      </div>
+    );
+  }
   if (!recent.data?.items.length) {
     return <p className="text-sm text-muted">{t('recentEmpty')}</p>;
   }
@@ -290,25 +430,20 @@ function ProductList({
     <ul className="flex flex-col gap-2">
       {products.map((product) => (
         <li key={product.id} className="border border-line">
-          <div className="flex items-center gap-2 p-2">
+          <div className="flex items-center gap-3 p-2">
             <button
               type="button"
               onClick={() => onPick(product)}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
             >
-              <FoodImage
-                src={product.imageUrl}
-                alt={decodeFoodText(product.name)}
-              />
-              <span className="min-w-0">
-                <span className="block text-sm text-ink">
+              <FoodImage src={product.imageUrl} alt="" size="card" />
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 text-sm text-ink">
                   {decodeFoodText(product.name)}
                 </span>
-                {product.brand ? (
-                  <span className="block text-xs text-muted">
-                    {decodeFoodText(product.brand)}
-                  </span>
-                ) : null}
+                <span className="block truncate text-xs text-muted">
+                  {product.brand ? decodeFoodText(product.brand) : '\u00a0'}
+                </span>
                 <span className="block text-xs text-muted tabular-nums">
                   {t('per100', { kcal: product.kcalPer100g })}
                 </span>
@@ -322,10 +457,11 @@ function ProductList({
                   ? t('unfavorite', { name: decodeFoodText(product.name) })
                   : t('favorite', { name: decodeFoodText(product.name) })
               }
-              onClick={() =>
-                toggle.mutate({ product, next: !product.isFavorite })
-              }
-              className="grid size-10 place-items-center text-teal"
+              onClick={(event) => {
+                event.stopPropagation();
+                toggle.mutate({ product, next: !product.isFavorite });
+              }}
+              className="grid size-11 shrink-0 place-items-center self-center text-teal"
             >
               <Heart
                 size={18}
@@ -377,45 +513,55 @@ function CreateProductForm({
     <div className="flex flex-col gap-2 border border-line p-3">
       <input
         aria-label={t('productName')}
+        placeholder={t('productName')}
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink"
+        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
       />
       <input
         aria-label={t('kcalPer100')}
+        placeholder={t('kcalPer100')}
         value={kcal}
         inputMode="decimal"
         onChange={(event) => setKcal(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink"
+        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
       />
       <input
         aria-label={t('proteinPer100')}
+        placeholder={t('proteinPer100')}
         value={protein}
         inputMode="decimal"
         onChange={(event) => setProtein(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink"
+        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
       />
       <input
         aria-label={t('fatPer100')}
+        placeholder={t('fatPer100')}
         value={fat}
         inputMode="decimal"
         onChange={(event) => setFat(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink"
+        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
       />
       <input
         aria-label={t('carbsPer100')}
+        placeholder={t('carbsPer100')}
         value={carbs}
         inputMode="decimal"
         onChange={(event) => setCarbs(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink"
+        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
       />
       {invalid ? (
         <p role="alert" className="text-sm text-amber">
           {t('invalidProduct')}
         </p>
       ) : null}
+      {create.isError ? (
+        <p role="alert" className="text-sm text-amber">
+          {t('couldNotCreate')}
+        </p>
+      ) : null}
       <Button disabled={create.isPending} onClick={submit}>
-        {t('create')}
+        {create.isPending ? t('loading') : t('create')}
       </Button>
     </div>
   );
@@ -424,18 +570,22 @@ function CreateProductForm({
 function QuantityStep({
   product,
   grams,
+  factor,
   meal,
   loggedOn,
   onGrams,
+  onFactor,
   onMeal,
   onBack,
   onDone,
 }: {
   product: FoodProductResponse;
   grams: string;
+  factor: string;
   meal: FoodMeal;
   loggedOn: string;
   onGrams: (value: string) => void;
+  onFactor: (value: string) => void;
   onMeal: (meal: FoodMeal) => void;
   onBack: () => void;
   onDone: () => void;
@@ -444,8 +594,13 @@ function QuantityStep({
   const tAuth = useTranslations('auth');
   const create = useCreateFoodLog();
   const parsed = Number(grams);
-  const valid = gramsAccepted(parsed);
-  const preview = valid ? previewMacros(product, parsed) : null;
+  const multiplier = Number(factor);
+  const scaled =
+    gramsAccepted(parsed) && Number.isFinite(multiplier) && multiplier > 0
+      ? roundHalfUp(parsed * multiplier, 1)
+      : Number.NaN;
+  const valid = gramsAccepted(scaled);
+  const preview = valid ? previewMacros(product, scaled) : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -459,6 +614,16 @@ function QuantityStep({
           max={FOOD_MAX_GRAMS}
           value={grams}
           onChange={(event) => onGrams(event.target.value)}
+          className="border border-line bg-background px-3 py-2 text-ink"
+        />
+      </label>
+      <label className="flex flex-col gap-1.5 text-sm text-muted">
+        {t('multiplier')}
+        <input
+          aria-label={t('multiplier')}
+          inputMode="decimal"
+          value={factor}
+          onChange={(event) => onFactor(event.target.value)}
           className="border border-line bg-background px-3 py-2 text-ink"
         />
       </label>
@@ -496,7 +661,7 @@ function QuantityStep({
         onClick={() => {
           if (!valid) return;
           create.mutate(
-            { productId: product.id, grams: parsed, meal, loggedOn },
+            { productId: product.id, grams: scaled, meal, loggedOn },
             { onSuccess: onDone },
           );
         }}
