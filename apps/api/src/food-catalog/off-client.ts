@@ -1,5 +1,6 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service.js';
+import { OffOutboundLimiter } from './off-limiter.js';
 
 const OFF_FIELDS =
   'code,product_name,product_name_uk,brands,image_front_small_url,image_url,nutriments';
@@ -7,13 +8,15 @@ const TIMEOUT_MS = 5_000;
 
 export const OFF_CLIENT = Symbol('OFF_CLIENT');
 
+export type OffLookup<T> = { status: 'ok'; value: T } | { status: 'skipped' };
+
 export interface OffClient {
-  search(terms: string): Promise<unknown[]>;
-  barcode(code: string): Promise<unknown | null>;
+  search(terms: string): Promise<OffLookup<unknown[]>>;
+  barcode(code: string): Promise<OffLookup<unknown | null>>;
 }
 
 @Injectable()
-export class OpenFoodFactsClient implements OffClient {
+export class OpenFoodFactsHttp {
   constructor(private readonly config: AppConfigService) {}
 
   async search(terms: string): Promise<unknown[]> {
@@ -65,5 +68,23 @@ export class OpenFoodFactsClient implements OffClient {
     } catch {
       throw unavailable;
     }
+  }
+}
+
+@Injectable()
+export class RateLimitedOffClient implements OffClient {
+  constructor(
+    private readonly http: OpenFoodFactsHttp,
+    private readonly limiter: OffOutboundLimiter,
+  ) {}
+
+  async search(terms: string): Promise<OffLookup<unknown[]>> {
+    if (!this.limiter.trySearch()) return { status: 'skipped' };
+    return { status: 'ok', value: await this.http.search(terms) };
+  }
+
+  async barcode(code: string): Promise<OffLookup<unknown | null>> {
+    if (!this.limiter.tryBarcode()) return { status: 'skipped' };
+    return { status: 'ok', value: await this.http.barcode(code) };
   }
 }

@@ -49,27 +49,6 @@ export class FoodLogRepository {
     });
   }
 
-  async sumDay(
-    userId: string,
-    loggedOn: Date,
-  ): Promise<{
-    kcal: Prisma.Decimal;
-    protein: Prisma.Decimal;
-    fat: Prisma.Decimal;
-    carbs: Prisma.Decimal;
-  }> {
-    const sum = await this.prisma.foodLogEntry.aggregate({
-      where: { userId, loggedOn },
-      _sum: { kcal: true, protein: true, fat: true, carbs: true },
-    });
-    return {
-      kcal: sum._sum.kcal ?? new Prisma.Decimal(0),
-      protein: sum._sum.protein ?? new Prisma.Decimal(0),
-      fat: sum._sum.fat ?? new Prisma.Decimal(0),
-      carbs: sum._sum.carbs ?? new Prisma.Decimal(0),
-    };
-  }
-
   create(data: {
     userId: string;
     productId: string;
@@ -86,8 +65,20 @@ export class FoodLogRepository {
     return this.prisma.foodLogEntry.create({ data });
   }
 
-  findOwned(userId: string, id: string): Promise<FoodLogEntry | null> {
-    return this.prisma.foodLogEntry.findFirst({ where: { id, userId } });
+  async lockOwned(
+    userId: string,
+    id: string,
+    client: Client,
+  ): Promise<FoodLogEntry | null> {
+    const locked = await client.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM food_log_entries
+      WHERE id = CAST(${id} AS uuid)
+        AND user_id = CAST(${userId} AS uuid)
+      FOR UPDATE
+    `;
+    if (locked.length !== 1) return null;
+    return client.foodLogEntry.findFirst({ where: { id, userId } });
   }
 
   async updateOwned(

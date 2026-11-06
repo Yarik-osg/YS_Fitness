@@ -1,6 +1,7 @@
 import { BadGatewayException } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OpenFoodFactsClient } from './off-client.js';
+import { OffOutboundLimiter } from './off-limiter.js';
+import { OpenFoodFactsHttp, RateLimitedOffClient } from './off-client.js';
 
 const config = {
   get(key: 'OFF_BASE_URL' | 'OFF_USER_AGENT') {
@@ -10,7 +11,7 @@ const config = {
   },
 };
 
-describe('OpenFoodFactsClient', () => {
+describe('OpenFoodFactsHttp', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -20,7 +21,7 @@ describe('OpenFoodFactsClient', () => {
       .fn()
       .mockRejectedValue(new Error('secret upstream body'));
     vi.stubGlobal('fetch', fetchMock);
-    const client = new OpenFoodFactsClient(config as never);
+    const client = new OpenFoodFactsHttp(config as never);
 
     await expect(client.search('milk')).rejects.toBeInstanceOf(
       BadGatewayException,
@@ -49,11 +50,26 @@ describe('OpenFoodFactsClient', () => {
       })
       .mockResolvedValueOnce({ ok: false, status: 503 });
     vi.stubGlobal('fetch', fetchMock);
-    const client = new OpenFoodFactsClient(config as never);
+    const client = new OpenFoodFactsHttp(config as never);
 
     await expect(client.barcode('4820')).resolves.toBeNull();
     await expect(client.barcode('4820')).rejects.toBeInstanceOf(
       BadGatewayException,
     );
+  });
+});
+
+describe('RateLimitedOffClient', () => {
+  it('does not call Open Food Facts when the search budget is spent', async () => {
+    const http = {
+      search: vi.fn(),
+      barcode: vi.fn(),
+    };
+    const limiter = new OffOutboundLimiter();
+    for (let i = 0; i < 10; i += 1) limiter.trySearch();
+    const client = new RateLimitedOffClient(http as never, limiter);
+
+    await expect(client.search('milk')).resolves.toEqual({ status: 'skipped' });
+    expect(http.search).not.toHaveBeenCalled();
   });
 });

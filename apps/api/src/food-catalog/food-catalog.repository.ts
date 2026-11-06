@@ -39,6 +39,21 @@ export class FoodCatalogRepository {
     });
   }
 
+  findSearch(queryKey: string): Promise<{ fetchedAt: Date } | null> {
+    return this.prisma.foodSearchQuery.findUnique({
+      where: { queryKey },
+      select: { fetchedAt: true },
+    });
+  }
+
+  saveSearch(queryKey: string, fetchedAt: Date): Promise<unknown> {
+    return this.prisma.foodSearchQuery.upsert({
+      where: { queryKey },
+      create: { queryKey, fetchedAt },
+      update: { fetchedAt },
+    });
+  }
+
   findOffByBarcode(barcode: string): Promise<FoodProduct | null> {
     return this.prisma.foodProduct.findFirst({
       where: { source: 'OFF', externalId: barcode },

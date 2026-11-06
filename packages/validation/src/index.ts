@@ -588,6 +588,13 @@ export type NutritionManualTargetInput = z.infer<
 export const FOOD_PRODUCT_SOURCES = ['OFF', 'CUSTOM'] as const;
 export const FOOD_MEALS = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'] as const;
 
+export const FOOD_MIN_GRAMS = 0.1;
+export const FOOD_MAX_GRAMS = 5000;
+export const PER_100G_MAX_KCAL = 1000;
+export const PER_100G_MAX_MACRO = 100;
+export const ENTRY_MAX_KCAL = (PER_100G_MAX_KCAL * FOOD_MAX_GRAMS) / 100;
+export const ENTRY_MAX_MACRO = (PER_100G_MAX_MACRO * FOOD_MAX_GRAMS) / 100;
+
 function decimalPlacesAtMost(scale: number) {
   return (value: number) => {
     const scaled = value * 10 ** scale;
@@ -595,24 +602,45 @@ function decimalPlacesAtMost(scale: number) {
   };
 }
 
-const per100g = z
+const per100gKcal = z
   .number()
   .finite()
   .min(0)
-  .max(99999.99)
+  .max(PER_100G_MAX_KCAL)
   .refine(decimalPlacesAtMost(2));
-const entryAmount = z
+const per100gMacro = z
   .number()
   .finite()
   .min(0)
-  .max(99999.9)
+  .max(PER_100G_MAX_MACRO)
+  .refine(decimalPlacesAtMost(2));
+const entryKcal = z
+  .number()
+  .finite()
+  .min(0)
+  .max(ENTRY_MAX_KCAL)
+  .refine(decimalPlacesAtMost(1));
+const entryMacro = z
+  .number()
+  .finite()
+  .min(0)
+  .max(ENTRY_MAX_MACRO)
   .refine(decimalPlacesAtMost(1));
 const foodGrams = z
   .number()
   .finite()
-  .gt(0)
-  .max(5000)
+  .min(FOOD_MIN_GRAMS)
+  .max(FOOD_MAX_GRAMS)
   .refine(decimalPlacesAtMost(1));
+
+export const foodPer100gSchema = z
+  .object({
+    kcalPer100g: per100gKcal,
+    proteinPer100g: per100gMacro,
+    fatPer100g: per100gMacro,
+    carbsPer100g: per100gMacro,
+  })
+  .strict();
 
 export function isCalendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -647,14 +675,10 @@ export const foodSearchQuerySchema = z
 
 export type FoodSearchQuery = z.infer<typeof foodSearchQuerySchema>;
 
-export const createFoodProductSchema = z
-  .object({
+export const createFoodProductSchema = foodPer100gSchema
+  .extend({
     name: z.string().trim().min(1).max(200),
     imageUrl: z.string().trim().url().max(2000).nullable().optional(),
-    kcalPer100g: per100g,
-    proteinPer100g: per100g,
-    fatPer100g: per100g,
-    carbsPer100g: per100g,
   })
   .strict();
 
@@ -698,10 +722,10 @@ export type FoodLogParams = z.infer<typeof foodLogParamsSchema>;
 export const patchFoodLogSchema = z
   .object({
     grams: foodGrams.optional(),
-    kcal: entryAmount.optional(),
-    protein: entryAmount.optional(),
-    fat: entryAmount.optional(),
-    carbs: entryAmount.optional(),
+    kcal: entryKcal.optional(),
+    protein: entryMacro.optional(),
+    fat: entryMacro.optional(),
+    carbs: entryMacro.optional(),
     meal: z.enum(FOOD_MEALS).optional(),
     saveAsMyProduct: z.boolean().optional(),
   })

@@ -1,5 +1,7 @@
 import { BadGatewayException, type INestApplication } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaClient, UserRole } from '@prisma/client';
+import { JwtService } from '@nestjs/jwt';
 import { hash } from 'argon2';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
@@ -8,7 +10,7 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
-import { OFF_CLIENT, type OffClient } from '../src/food-catalog/off-client.js';
+import { OFF_CLIENT, type OffLookup } from '../src/food-catalog/off-client.js';
 
 const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
@@ -27,13 +29,19 @@ const milk = {
 describeWithDatabase('food catalog and log (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaClient;
-  const off: OffClient = {
-    search: vi.fn(async () => [
-      milk,
-      { ...milk, product_name: 'Milk again' },
-      { code: '3333', product_name: 'Empty' },
-    ]),
-    barcode: vi.fn(async () => null),
+  const off = {
+    search: vi.fn(async (): Promise<OffLookup<unknown[]>> => ({
+      status: 'ok',
+      value: [
+        milk,
+        { ...milk, product_name: 'Milk again' },
+        { code: '3333', product_name: 'Empty' },
+      ],
+    })),
+    barcode: vi.fn(async (): Promise<OffLookup<unknown>> => ({
+      status: 'ok',
+      value: null,
+    })),
   };
 
   beforeAll(async () => {
@@ -45,6 +53,8 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(OFF_CLIENT)
       .useValue(off)
+      .overrideProvider(APP_GUARD)
+      .useValue({ canActivate: () => true })
       .compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
@@ -57,13 +67,17 @@ describeWithDatabase('food catalog and log (e2e)', () => {
 
   beforeEach(async () => {
     vi.mocked(off.search).mockReset();
-    vi.mocked(off.search).mockResolvedValue([
-      milk,
-      { ...milk, product_name: 'Milk again' },
-      { code: '3333', product_name: 'Empty' },
-    ]);
+    vi.mocked(off.search).mockResolvedValue({
+      status: 'ok',
+      value: [
+        milk,
+        { ...milk, product_name: 'Milk again' },
+        { code: '3333', product_name: 'Empty' },
+      ],
+    });
     vi.mocked(off.barcode).mockReset();
-    vi.mocked(off.barcode).mockResolvedValue(null);
+    vi.mocked(off.barcode).mockResolvedValue({ status: 'ok', value: null });
+    await prisma.foodSearchQuery.deleteMany();
     await prisma.foodLogEntry.deleteMany();
     await prisma.favoriteFood.deleteMany();
     await prisma.foodProduct.deleteMany();
@@ -93,14 +107,20 @@ describeWithDatabase('food catalog and log (e2e)', () => {
         role: UserRole.CLIENT,
       },
     });
-    const login = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email, password: 'strong-password', clientType: 'MOBILE' })
-      .expect(200);
-    return {
-      id: user.id,
-      authorization: `Bearer ${login.body.tokens.accessToken}`,
-    };
+    const session = await prisma.authSession.create({
+      data: {
+        userId: user.id,
+        expiresAt: new Date('2027-06-01T00:00:00.000Z'),
+      },
+    });
+    const accessToken = await app.get(JwtService).signAsync(
+      { sub: user.id, sessionId: session.id, role: user.role },
+      {
+        secret: 'test-access-secret-at-least-32-characters',
+        expiresIn: 900,
+      },
+    );
+    return { id: user.id, authorization: `Bearer ${accessToken}` };
   }
 
   async function subscribe(userId: string) {
@@ -147,6 +167,7 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       .set('Authorization', user.authorization)
       .expect(200);
     expect(off.search).toHaveBeenCalledTimes(1);
+    expect(first.body.fromCacheOnly).toBe(false);
     expect(first.body.products).toEqual([
       expect.objectContaining({
         source: 'OFF',
@@ -176,18 +197,30 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       .set('Authorization', user.authorization)
       .expect(200);
     expect(off.search).toHaveBeenCalledTimes(1);
+    expect(second.body.fromCacheOnly).toBe(true);
+    await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=MILK')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(off.search).toHaveBeenCalledTimes(1);
+    expect(
+      await prisma.foodSearchQuery.count({ where: { queryKey: 'milk' } }),
+    ).toBe(1);
     expect(
       second.body.products.map((product: { source: string }) => product.source),
     ).toEqual(['CUSTOM', 'OFF']);
 
     vi.mocked(off.barcode).mockResolvedValue({
-      code: '55556666',
-      product_name: 'Yogurt',
-      nutriments: {
-        'energy-kcal_100g': 60,
-        proteins_100g: 4,
-        fat_100g: 2,
-        carbohydrates_100g: 5,
+      status: 'ok',
+      value: {
+        code: '55556666',
+        product_name: 'Yogurt',
+        nutriments: {
+          'energy-kcal_100g': 60,
+          proteins_100g: 4,
+          fat_100g: 2,
+          carbohydrates_100g: 5,
+        },
       },
     });
     await request(app.getHttpServer())
@@ -212,6 +245,9 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     expect(down.status).toBe(502);
     expect(down.body.code).toBe('OFF_UNAVAILABLE');
     expect(JSON.stringify(down.body)).not.toContain('upstream');
+    expect(
+      await prisma.foodSearchQuery.count({ where: { queryKey: 'zz' } }),
+    ).toBe(0);
   });
 
   it('favorites idempotently and only for a visible product', async () => {
@@ -324,6 +360,23 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       fat: 3,
       carbs: 12,
     });
+    const summed = (
+      day.body.entries as {
+        kcal: number;
+        protein: number;
+        fat: number;
+        carbs: number;
+      }[]
+    ).reduce(
+      (sum, entry) => ({
+        kcal: sum.kcal + entry.kcal,
+        protein: sum.protein + entry.protein,
+        fat: sum.fat + entry.fat,
+        carbs: sum.carbs + entry.carbs,
+      }),
+      { kcal: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+    expect(day.body.totals).toEqual(summed);
     expect(day.body.target.source).toBe('MANUAL');
     expect(day.body.remaining).toEqual({
       kcal: 1925,
@@ -351,5 +404,205 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     expect(copy.kcalPer100g.toNumber()).toBe(80);
     expect(edited.body.productId).not.toBe(productId);
     expect(edited.body.kcal).toBe(80);
+  });
+
+  it('logs the maximum grams of a product at the per-100g caps', async () => {
+    const user = await account('food-max@example.com');
+    await subscribe(user.id);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Oil',
+        kcalPer100g: 1000,
+        proteinPer100g: 100,
+        fatPer100g: 100,
+        carbsPer100g: 100,
+      })
+      .expect(201);
+    const logged = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 5000,
+        meal: 'DINNER',
+        loggedOn: '2026-11-06',
+      })
+      .expect(201);
+    expect(logged.body).toMatchObject({
+      kcal: 50000,
+      protein: 5000,
+      fat: 5000,
+      carbs: 5000,
+    });
+  });
+
+  it('rejects a patch whose values are too large for the grams', async () => {
+    const user = await account('food-range@example.com');
+    await subscribe(user.id);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Crumb',
+        kcalPer100g: 100,
+        proteinPer100g: 1,
+        fatPer100g: 1,
+        carbsPer100g: 1,
+      })
+      .expect(201);
+    const logged = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 0.1,
+        meal: 'SNACK',
+        loggedOn: '2026-11-06',
+      })
+      .expect(201);
+    const overEntryCap = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${logged.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 99999.9, saveAsMyProduct: true });
+    expect(overEntryCap.status).toBe(400);
+    const overGramCap = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${logged.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 50000, saveAsMyProduct: true });
+    expect(overGramCap.status).toBe(400);
+    expect(overGramCap.body.code).toBe('FOOD_VALUES_OUT_OF_RANGE');
+    expect(
+      await prisma.foodProduct.count({
+        where: { source: 'CUSTOM', name: 'Crumb' },
+      }),
+    ).toBe(1);
+  });
+
+  it('keeps a grams-only scale up to 5000 g inside the cap', async () => {
+    const user = await account('food-scale@example.com');
+    await subscribe(user.id);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Dense',
+        kcalPer100g: 1000,
+        proteinPer100g: 100,
+        fatPer100g: 100,
+        carbsPer100g: 100,
+      })
+      .expect(201);
+    const logged = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 1,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-06',
+      })
+      .expect(201);
+    const scaled = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${logged.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ grams: 5000 })
+      .expect(200);
+    expect(scaled.body).toMatchObject({
+      grams: 5000,
+      kcal: 50000,
+      protein: 5000,
+      fat: 5000,
+      carbs: 5000,
+    });
+  });
+
+  it('returns the valid Open Food Facts product and drops the absurd one', async () => {
+    const user = await account('food-absurd@example.com');
+    await subscribe(user.id);
+    vi.mocked(off.search).mockResolvedValue({
+      status: 'ok',
+      value: [
+        {
+          code: '99990001',
+          product_name: 'Absurd yogurt',
+          nutriments: {
+            'energy-kcal_100g': 1e7,
+            proteins_100g: 1,
+            fat_100g: 1,
+            carbohydrates_100g: 1,
+          },
+        },
+        {
+          code: '99990002',
+          product_name: 'Plain yogurt',
+          nutriments: {
+            'energy-kcal_100g': 60,
+            proteins_100g: 4,
+            fat_100g: 2,
+            carbohydrates_100g: 5,
+          },
+        },
+      ],
+    });
+    const found = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?q=yogurt')
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(found.body.products).toEqual([
+      expect.objectContaining({ externalId: '99990002', name: 'Plain yogurt' }),
+    ]);
+    expect(
+      await prisma.foodProduct.count({ where: { externalId: '99990001' } }),
+    ).toBe(0);
+  });
+
+  it('edits one entry from two parallel personal copies without an error', async () => {
+    const user = await account('food-race@example.com');
+    await subscribe(user.id);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Race',
+        kcalPer100g: 100,
+        proteinPer100g: 10,
+        fatPer100g: 5,
+        carbsPer100g: 10,
+      })
+      .expect(201);
+    const logged = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: created.body.id,
+        grams: 100,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-06',
+      })
+      .expect(201);
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/api/v1/food/log/${logged.body.id}`)
+        .set('Authorization', user.authorization)
+        .send({ kcal: 80, saveAsMyProduct: true }),
+      request(app.getHttpServer())
+        .patch(`/api/v1/food/log/${logged.body.id}`)
+        .set('Authorization', user.authorization)
+        .send({ kcal: 90, saveAsMyProduct: true }),
+    ]);
+    expect(
+      [first.status, second.status].every((status) => status === 200),
+    ).toBe(true);
+    const row = await prisma.foodLogEntry.findUniqueOrThrow({
+      where: { id: logged.body.id },
+    });
+    expect(row.productId).toEqual(expect.any(String));
+    const product = await prisma.foodProduct.findUnique({
+      where: { id: row.productId ?? '' },
+    });
+    expect(product?.source).toBe('CUSTOM');
+    expect(product?.ownerId).toBe(user.id);
   });
 });

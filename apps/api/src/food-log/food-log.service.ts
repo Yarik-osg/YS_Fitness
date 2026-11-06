@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { FoodLogEntry } from '@prisma/client';
 import type {
@@ -9,7 +13,12 @@ import type {
   FoodProductListResponse,
   FoodProductResponse,
 } from '@repo/shared-types';
-import type { CreateFoodLogInput, PatchFoodLogInput } from '@repo/validation';
+import {
+  foodPer100gSchema,
+  type CreateFoodLogInput,
+  type PatchFoodLogInput,
+} from '@repo/validation';
+import { roundHalfUp } from '../common/round-half-up.js';
 import { FoodCatalogService } from '../food-catalog/food-catalog.service.js';
 import { toFoodProduct } from '../food-catalog/food-product.js';
 import { NutritionService } from '../nutrition/nutrition.service.js';
@@ -18,6 +27,7 @@ import {
   applyFoodLogPatch,
   calendarDateToUtc,
   entryDecimal,
+  entryFitsGrams,
   formatCalendarDate,
   per100gFromSnapshot,
   snapshotFromPer100g,
@@ -61,12 +71,22 @@ export class FoodLogService {
   }
 
   async day(userId: string, date: string): Promise<FoodDayResponse> {
-    const loggedOn = calendarDateToUtc(date);
-    const [rows, totals, target] = await Promise.all([
-      this.entries.listDay(userId, loggedOn),
-      this.entries.sumDay(userId, loggedOn),
-      this.nutrition.getActiveTarget(userId),
-    ]);
+    const rows = await this.entries.listDay(userId, calendarDateToUtc(date));
+    const totals = rows.reduce(
+      (sum, row) => ({
+        kcal: sum.kcal.plus(row.kcal),
+        protein: sum.protein.plus(row.protein),
+        fat: sum.fat.plus(row.fat),
+        carbs: sum.carbs.plus(row.carbs),
+      }),
+      {
+        kcal: new Prisma.Decimal(0),
+        protein: new Prisma.Decimal(0),
+        fat: new Prisma.Decimal(0),
+        carbs: new Prisma.Decimal(0),
+      },
+    );
+    const target = await this.nutrition.getActiveTarget(userId);
     const summed = {
       kcal: totals.kcal.toNumber(),
       protein: totals.protein.toNumber(),
@@ -110,52 +130,56 @@ export class FoodLogService {
     entryId: string,
     input: PatchFoodLogInput,
   ): Promise<FoodLogEntryResponse> {
-    const entry = await this.entries.findOwned(userId, entryId);
-    if (!entry) throw entryNotFound();
-    const next = applyFoodLogPatch(
-      {
-        grams: entry.grams.toNumber(),
-        kcal: entry.kcal.toNumber(),
-        protein: entry.protein.toNumber(),
-        fat: entry.fat.toNumber(),
-        carbs: entry.carbs.toNumber(),
-      },
-      input,
-    );
-    const data = {
-      productId: entry.productId,
-      meal: input.meal ?? entry.meal,
-      grams: entryDecimal(next.grams),
-      kcal: entryDecimal(next.kcal),
-      protein: entryDecimal(next.protein),
-      fat: entryDecimal(next.fat),
-      carbs: entryDecimal(next.carbs),
-    };
-    if (!input.saveAsMyProduct) {
-      const saved = await this.entries.updateOwned(userId, entryId, data);
-      if (!saved) throw entryNotFound();
-      return toEntry(saved);
-    }
     return this.entries.transaction(async (db) => {
-      const copy = await this.catalog.copyFromEntry(
-        userId,
+      const entry = await this.entries.lockOwned(userId, entryId, db);
+      if (!entry) throw entryNotFound();
+      const next = applyFoodLogPatch(
         {
-          name: entry.productName,
-          imageUrl: entry.imageUrl,
-          basedOnProductId: entry.productId,
-          kcalPer100g: per100gFromSnapshot(next.kcal, next.grams),
-          proteinPer100g: per100gFromSnapshot(next.protein, next.grams),
-          fatPer100g: per100gFromSnapshot(next.fat, next.grams),
-          carbsPer100g: per100gFromSnapshot(next.carbs, next.grams),
+          grams: entry.grams.toNumber(),
+          kcal: entry.kcal.toNumber(),
+          protein: entry.protein.toNumber(),
+          fat: entry.fat.toNumber(),
+          carbs: entry.carbs.toNumber(),
         },
-        db,
+        input,
       );
-      const saved = await this.entries.updateOwned(
-        userId,
-        entryId,
-        { ...data, productId: copy.id },
-        db,
-      );
+      if (!entryFitsGrams(next)) throw valuesOutOfRange();
+      const data = {
+        productId: entry.productId,
+        meal: input.meal ?? entry.meal,
+        grams: entryDecimal(next.grams),
+        kcal: entryDecimal(next.kcal),
+        protein: entryDecimal(next.protein),
+        fat: entryDecimal(next.fat),
+        carbs: entryDecimal(next.carbs),
+      };
+      if (input.saveAsMyProduct) {
+        const per100 = foodPer100gSchema.safeParse({
+          kcalPer100g: per100gFromSnapshot(next.kcal, next.grams).toNumber(),
+          proteinPer100g: per100gFromSnapshot(
+            next.protein,
+            next.grams,
+          ).toNumber(),
+          fatPer100g: per100gFromSnapshot(next.fat, next.grams).toNumber(),
+          carbsPer100g: per100gFromSnapshot(next.carbs, next.grams).toNumber(),
+        });
+        if (!per100.success) throw valuesOutOfRange();
+        const copy = await this.catalog.copyFromEntry(
+          userId,
+          {
+            name: entry.productName,
+            imageUrl: entry.imageUrl,
+            basedOnProductId: entry.productId,
+            kcalPer100g: roundHalfUp(per100.data.kcalPer100g, 2),
+            proteinPer100g: roundHalfUp(per100.data.proteinPer100g, 2),
+            fatPer100g: roundHalfUp(per100.data.fatPer100g, 2),
+            carbsPer100g: roundHalfUp(per100.data.carbsPer100g, 2),
+          },
+          db,
+        );
+        data.productId = copy.id;
+      }
+      const saved = await this.entries.updateOwned(userId, entryId, data, db);
       if (!saved) throw entryNotFound();
       return toEntry(saved);
     });
@@ -216,5 +240,12 @@ function entryNotFound(): NotFoundException {
   return new NotFoundException({
     code: 'FOOD_ENTRY_NOT_FOUND',
     message: 'Food entry not found',
+  });
+}
+
+function valuesOutOfRange(): BadRequestException {
+  return new BadRequestException({
+    code: 'FOOD_VALUES_OUT_OF_RANGE',
+    message: 'Food values are too large for this amount',
   });
 }

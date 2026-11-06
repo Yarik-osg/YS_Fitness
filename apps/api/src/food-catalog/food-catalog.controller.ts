@@ -9,9 +9,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type {
-  FoodProductListResponse,
   FoodProductResponse,
+  FoodSearchResponse,
 } from '@repo/shared-types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedUser } from '../common/authenticated-user.js';
@@ -31,6 +32,7 @@ export class FoodCatalogController {
   constructor(private readonly catalog: FoodCatalogService) {}
 
   @Get('products/search')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'Search the caller’s foods, then the local cache, then Open Food Facts',
@@ -38,7 +40,7 @@ export class FoodCatalogController {
   search(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: FoodSearchQueryDto,
-  ): Promise<FoodProductListResponse> {
+  ): Promise<FoodSearchResponse> {
     return this.catalog.search(user.sub, query);
   }
 

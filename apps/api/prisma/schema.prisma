@@ -613,3 +613,12 @@ model FoodLogEntry {
   @@index([userId, loggedOn])
   @@map("food_log_entries")
 }
+
+/// One row per normalized text search that Open Food Facts answered.
+/// A fresh row means the next search can stay on the local cache.
+model FoodSearchQuery {
+  queryKey  String   @id @map("query_key") @db.VarChar(100)
+  fetchedAt DateTime @map("fetched_at")
+
+  @@map("food_search_queries")
+}

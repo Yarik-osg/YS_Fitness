@@ -1,3 +1,6 @@
+import { foodPer100gSchema } from '@repo/validation';
+import { roundHalfUp } from '../common/round-half-up.js';
+
 const NAME_LIMIT = 200;
 const BRAND_LIMIT = 200;
 const IMAGE_LIMIT = 2000;
@@ -21,14 +24,26 @@ export function normalizeOffProduct(raw: unknown): NormalizedOffProduct | null {
     text(record.product_name, NAME_LIMIT);
   const externalId = code(record.code);
   const kcal = nutrient(record.nutriments, 'energy-kcal_100g');
-  if (!name || !externalId || kcal === 'missing' || kcal === 'invalid')
+  if (!name || !externalId || kcal === 'missing' || kcal === 'invalid') {
     return null;
+  }
 
   const protein = nutrient(record.nutriments, 'proteins_100g');
   const fat = nutrient(record.nutriments, 'fat_100g');
   const carbs = nutrient(record.nutriments, 'carbohydrates_100g');
-  if (protein === 'invalid' || fat === 'invalid' || carbs === 'invalid')
+  if (protein === 'invalid' || fat === 'invalid' || carbs === 'invalid') {
     return null;
+  }
+
+  const candidate = {
+    kcalPer100g: roundHalfUp(kcal, 2).toNumber(),
+    proteinPer100g:
+      protein === 'missing' ? 0 : roundHalfUp(protein, 2).toNumber(),
+    fatPer100g: fat === 'missing' ? 0 : roundHalfUp(fat, 2).toNumber(),
+    carbsPer100g: carbs === 'missing' ? 0 : roundHalfUp(carbs, 2).toNumber(),
+  };
+  const parsed = foodPer100gSchema.safeParse(candidate);
+  if (!parsed.success) return null;
 
   return {
     externalId,
@@ -37,10 +52,7 @@ export function normalizeOffProduct(raw: unknown): NormalizedOffProduct | null {
     imageUrl:
       text(record.image_front_small_url, IMAGE_LIMIT) ??
       text(record.image_url, IMAGE_LIMIT),
-    kcalPer100g: round2(kcal),
-    proteinPer100g: protein === 'missing' ? 0 : round2(protein),
-    fatPer100g: fat === 'missing' ? 0 : round2(fat),
-    carbsPer100g: carbs === 'missing' ? 0 : round2(carbs),
+    ...parsed.data,
   };
 }
 
@@ -68,8 +80,4 @@ function nutrient(
   const number = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(number) || number < 0) return 'invalid';
   return number;
-}
-
-function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

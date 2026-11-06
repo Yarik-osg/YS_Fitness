@@ -71,6 +71,33 @@ describe('normalizeOffProduct', () => {
     ).toBeNull();
   });
 
+  it('drops a product whose kcal or macros are above the shared caps', () => {
+    expect(
+      normalizeOffProduct({
+        code: '1',
+        product_name: 'Absurd',
+        nutriments: {
+          'energy-kcal_100g': 1e7,
+          proteins_100g: 1,
+          fat_100g: 1,
+          carbohydrates_100g: 1,
+        },
+      }),
+    ).toBeNull();
+    expect(
+      normalizeOffProduct({
+        code: '2',
+        product_name: 'Dense',
+        nutriments: {
+          'energy-kcal_100g': 100,
+          proteins_100g: 101,
+          fat_100g: 1,
+          carbohydrates_100g: 1,
+        },
+      }),
+    ).toBeNull();
+  });
+
   it('drops a product with a negative or non-numeric nutrient', () => {
     expect(
       normalizeOffProduct({

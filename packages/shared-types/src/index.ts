@@ -637,6 +637,11 @@ export interface FoodProductListResponse {
   products: FoodProductResponse[];
 }
 
+export interface FoodSearchResponse {
+  products: FoodProductResponse[];
+  fromCacheOnly: boolean;
+}
+
 export interface FoodLogEntryResponse {
   id: string;
   productId: string | null;

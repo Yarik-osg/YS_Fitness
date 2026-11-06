@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { PER_100G_MAX_KCAL, PER_100G_MAX_MACRO } from '@repo/validation';
+import { roundHalfUp } from '../common/round-half-up.js';
 
 export interface FoodSnapshot {
   grams: number;
@@ -7,8 +9,6 @@ export interface FoodSnapshot {
   fat: number;
   carbs: number;
 }
-
-const HALF_UP = Prisma.Decimal.ROUND_HALF_UP;
 
 export function snapshotFromPer100g(
   per100g: {
@@ -44,26 +44,37 @@ export function applyFoodLogPatch(
   };
 }
 
+// 1000 kcal and 100 g of each macro per 100 g, with grams at 1 decimal,
+// land on a 1-decimal entry cap. Half-up rounding of a value already
+// within that cap cannot cross it.
+export function entryFitsGrams(snapshot: FoodSnapshot): boolean {
+  const grams = new Prisma.Decimal(snapshot.grams);
+  const kcalCap = new Prisma.Decimal(PER_100G_MAX_KCAL).mul(grams).div(100);
+  const macroCap = new Prisma.Decimal(PER_100G_MAX_MACRO).mul(grams).div(100);
+  return (
+    roundHalfUp(snapshot.kcal, 1).lte(kcalCap) &&
+    roundHalfUp(snapshot.protein, 1).lte(macroCap) &&
+    roundHalfUp(snapshot.fat, 1).lte(macroCap) &&
+    roundHalfUp(snapshot.carbs, 1).lte(macroCap)
+  );
+}
+
 export function per100gFromSnapshot(
   amount: number,
   grams: number,
 ): Prisma.Decimal {
-  return new Prisma.Decimal(amount)
-    .div(grams)
-    .mul(100)
-    .toDecimalPlaces(2, HALF_UP);
+  return roundHalfUp(new Prisma.Decimal(amount).div(grams).mul(100), 2);
 }
 
 export function entryDecimal(value: number): Prisma.Decimal {
-  return new Prisma.Decimal(value).toDecimalPlaces(1, HALF_UP);
+  return roundHalfUp(value, 1);
 }
 
 function scalePer100g(per100g: number, grams: number): number {
-  return new Prisma.Decimal(per100g)
-    .mul(grams)
-    .div(100)
-    .toDecimalPlaces(1, HALF_UP)
-    .toNumber();
+  return roundHalfUp(
+    new Prisma.Decimal(per100g).mul(grams).div(100),
+    1,
+  ).toNumber();
 }
 
 function scaleAmount(
@@ -71,11 +82,10 @@ function scaleAmount(
   fromGrams: number,
   toGrams: number,
 ): number {
-  return new Prisma.Decimal(amount)
-    .mul(toGrams)
-    .div(fromGrams)
-    .toDecimalPlaces(1, HALF_UP)
-    .toNumber();
+  return roundHalfUp(
+    new Prisma.Decimal(amount).mul(toGrams).div(fromGrams),
+    1,
+  ).toNumber();
 }
 
 export function calendarDateToUtc(value: string): Date {
