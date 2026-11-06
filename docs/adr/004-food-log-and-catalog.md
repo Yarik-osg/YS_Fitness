@@ -26,7 +26,7 @@ Changing kcal, protein, fat, carbs, grams, or meal updates that entry only. The 
 
 The shared caps are physical, not the column widths: 0.1 to 5000 g, at most 1000 kcal and 100 g of protein, fat, or carbs per 100 g. An entry can therefore hold at most 50000 kcal and 5000 g of each macro. A patch whose numbers exceed `cap per 100 g × grams / 100` is `400` `FOOD_VALUES_OUT_OF_RANGE`. Those caps land on a 1-decimal number for every 1-decimal gram amount, so half-up rounding cannot push a valid entry over the cap. Open Food Facts rows that fail the same per-100g schema are dropped. One failed cache write does not fail the search.
 
-Search calls are limited three ways. The route allows 10 searches a minute per caller address. The process allows 10 Open Food Facts searches and 100 barcode lookups a minute; when that budget is spent the API returns the local rows and `fromCacheOnly: true` instead of an error. A normalized text query that Open Food Facts answered in the last 24 hours is not sent again. A barcode that is already cached is not sent again. A failed call does not record the query. More than one API instance needs this budget in Redis; the in-process bucket only covers one process.
+Search calls are limited in two different places. The route allows 30 searches a minute per address, including answers served from cache, so a burst cannot overwhelm the API. Leaving Open Food Facts is a separate gate. Each user may trigger 3 text searches a minute (`FOOD_SEARCH_USER_OFF_CALLS_PER_MIN`). The process may make 10 (`OFF_SEARCH_BUDGET_PER_MIN`). Barcode lookups stay on their own budget of 100 a minute. The user check runs first and the process bucket second, and a refusal from either one does not spend the other. The gate runs only after the local lookup and the 24-hour query cache, so a cached search spends nothing. A refused call returns the local rows with `fromCacheOnly: true` and does not answer `429`. A query Open Food Facts answered in the last 24 hours is not sent again, and that full answer keeps `fromCacheOnly` false. A barcode already stored is not sent again. A failed call does not record the query. It does spend the user and process tokens, because Open Food Facts already counted the request. The buckets are in memory behind `OffOutboundLimiter`, so a second API instance needs Redis before the limits are shared. Idle user keys are dropped after a quiet minute.
 
 Every `/food` route requires a JWT and an active subscription.
 
@@ -40,7 +40,7 @@ Every `/food` route requires a JWT and an active subscription.
 
 ### Negative
 
-- The outbound budget is per process. A second API instance gets its own 10 searches a minute until the bucket moves to Redis.
+- The outbound budgets are per process. A second API instance gets its own 10 searches a minute until `OffOutboundLimiter` moves to Redis.
 - The active target is read as stored. Opening the food log does not refresh a calculation.
 - Per-100g values derived from a small gram amount are rounded to 2 decimals, and the entry snapshot is rounded to 1 decimal.
 

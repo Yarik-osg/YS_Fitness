@@ -36,6 +36,14 @@ export const envSchema = z.object({
     .string()
     .min(1)
     .default('YSFitness/1.0 (contact@localhost)'),
+  // Process-wide Open Food Facts search calls per minute.
+  OFF_SEARCH_BUDGET_PER_MIN: z.coerce.number().int().positive().default(10),
+  // Per-user Open Food Facts search calls per minute. Cache hits do not count.
+  FOOD_SEARCH_USER_OFF_CALLS_PER_MIN: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(3),
 });
 
 export type AppEnvironment = z.infer<typeof envSchema>;

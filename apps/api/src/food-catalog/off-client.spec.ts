@@ -1,6 +1,6 @@
 import { BadGatewayException } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OffOutboundLimiter } from './off-limiter.js';
+import { OffOutboundLimiter, SystemClock } from './off-limiter.js';
 import { OpenFoodFactsHttp, RateLimitedOffClient } from './off-client.js';
 
 const config = {
@@ -60,16 +60,43 @@ describe('OpenFoodFactsHttp', () => {
 });
 
 describe('RateLimitedOffClient', () => {
-  it('does not call Open Food Facts when the search budget is spent', async () => {
+  it('does not call Open Food Facts when the user allowance is spent', async () => {
+    const http = { search: vi.fn(), barcode: vi.fn() };
+    const limiter = new OffOutboundLimiter(new SystemClock(), {
+      searchPerMin: 10,
+      userPerMin: 3,
+      barcodePerMin: 100,
+    });
+    const client = new RateLimitedOffClient(http as never, limiter);
+    http.search.mockResolvedValue([]);
+
+    await client.search('user', 'one');
+    await client.search('user', 'two');
+    await client.search('user', 'three');
+    await expect(client.search('user', 'four')).resolves.toEqual({
+      status: 'skipped',
+    });
+    expect(http.search).toHaveBeenCalledTimes(3);
+    limiter.onModuleDestroy();
+  });
+
+  it('keeps the spent allowance when Open Food Facts fails', async () => {
     const http = {
-      search: vi.fn(),
+      search: vi.fn().mockRejectedValue(new Error('down')),
       barcode: vi.fn(),
     };
-    const limiter = new OffOutboundLimiter();
-    for (let i = 0; i < 10; i += 1) limiter.trySearch();
+    const limiter = new OffOutboundLimiter(new SystemClock(), {
+      searchPerMin: 10,
+      userPerMin: 1,
+      barcodePerMin: 100,
+    });
     const client = new RateLimitedOffClient(http as never, limiter);
 
-    await expect(client.search('milk')).resolves.toEqual({ status: 'skipped' });
-    expect(http.search).not.toHaveBeenCalled();
+    await expect(client.search('user', 'milk')).rejects.toThrow('down');
+    await expect(client.search('user', 'milk')).resolves.toEqual({
+      status: 'skipped',
+    });
+    expect(http.search).toHaveBeenCalledTimes(1);
+    limiter.onModuleDestroy();
   });
 });

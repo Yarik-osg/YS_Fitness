@@ -11,7 +11,7 @@ export const OFF_CLIENT = Symbol('OFF_CLIENT');
 export type OffLookup<T> = { status: 'ok'; value: T } | { status: 'skipped' };
 
 export interface OffClient {
-  search(terms: string): Promise<OffLookup<unknown[]>>;
+  search(userId: string, terms: string): Promise<OffLookup<unknown[]>>;
   barcode(code: string): Promise<OffLookup<unknown | null>>;
 }
 
@@ -78,8 +78,8 @@ export class RateLimitedOffClient implements OffClient {
     private readonly limiter: OffOutboundLimiter,
   ) {}
 
-  async search(terms: string): Promise<OffLookup<unknown[]>> {
-    if (!this.limiter.trySearch()) return { status: 'skipped' };
+  async search(userId: string, terms: string): Promise<OffLookup<unknown[]>> {
+    if (this.limiter.trySearch(userId) !== 'ok') return { status: 'skipped' };
     return { status: 'ok', value: await this.http.search(terms) };
   }
 

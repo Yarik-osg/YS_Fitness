@@ -197,7 +197,7 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       .set('Authorization', user.authorization)
       .expect(200);
     expect(off.search).toHaveBeenCalledTimes(1);
-    expect(second.body.fromCacheOnly).toBe(true);
+    expect(second.body.fromCacheOnly).toBe(false);
     await request(app.getHttpServer())
       .get('/api/v1/food/products/search?q=MILK')
       .set('Authorization', user.authorization)

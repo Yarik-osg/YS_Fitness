@@ -22,6 +22,10 @@ import {
   CreateFoodProductDto,
   FoodSearchQueryDto,
 } from './dto/food-catalog.dto.js';
+import {
+  FOOD_SEARCH_ROUTE_LIMIT,
+  FOOD_SEARCH_ROUTE_TTL_MS,
+} from './food-search-limits.js';
 import { FoodCatalogService } from './food-catalog.service.js';
 
 @ApiTags('food')
@@ -32,7 +36,12 @@ export class FoodCatalogController {
   constructor(private readonly catalog: FoodCatalogService) {}
 
   @Get('products/search')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({
+    default: {
+      limit: FOOD_SEARCH_ROUTE_LIMIT,
+      ttl: FOOD_SEARCH_ROUTE_TTL_MS,
+    },
+  })
   @ApiOperation({
     summary:
       'Search the caller’s foods, then the local cache, then Open Food Facts',

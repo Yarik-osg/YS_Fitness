@@ -41,7 +41,7 @@ export class FoodCatalogService {
     });
     const off = query.barcode
       ? await this.barcodeProducts(query.barcode)
-      : await this.textProducts(requireTerms(terms));
+      : await this.textProducts(userId, requireTerms(terms));
     return {
       products: [...customs, ...off.products].map(toFoodProduct),
       fromCacheOnly: off.fromCacheOnly,
@@ -93,6 +93,7 @@ export class FoodCatalogService {
   }
 
   private async textProducts(
+    userId: string,
     terms: string,
   ): Promise<{ products: FoodProduct[]; fromCacheOnly: boolean }> {
     const cached = await this.products.matchingOff(terms);
@@ -101,9 +102,9 @@ export class FoodCatalogService {
       previous &&
       Date.now() - previous.fetchedAt.getTime() < SEARCH_CACHE_MS
     ) {
-      return { products: cached, fromCacheOnly: true };
+      return { products: cached, fromCacheOnly: false };
     }
-    const lookup = await this.off.search(terms);
+    const lookup = await this.off.search(userId, terms);
     if (lookup.status === 'skipped') {
       return { products: cached, fromCacheOnly: true };
     }
