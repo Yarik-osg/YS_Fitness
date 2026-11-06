@@ -20,16 +20,12 @@ export class OpenFoodFactsHttp {
   constructor(private readonly config: AppConfigService) {}
 
   async search(terms: string): Promise<unknown[]> {
-    const url = new URL('/cgi/search.pl', this.config.get('OFF_BASE_URL'));
-    url.searchParams.set('search_terms', terms);
-    url.searchParams.set('search_simple', '1');
-    url.searchParams.set('action', 'process');
-    url.searchParams.set('json', '1');
+    const url = new URL('/search', this.config.get('OFF_SEARCH_URL'));
+    url.searchParams.set('q', terms);
     url.searchParams.set('page_size', '20');
-    url.searchParams.set('fields', OFF_FIELDS);
     const body = await this.getJson(url);
-    if (!body || typeof body !== 'object' || !('products' in body)) return [];
-    return Array.isArray(body.products) ? body.products : [];
+    if (!body || typeof body !== 'object' || !('hits' in body)) return [];
+    return Array.isArray(body.hits) ? body.hits : [];
   }
 
   async barcode(code: string): Promise<unknown | null> {

@@ -2,6 +2,56 @@ import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { FoodCatalogRepository } from './food-catalog.repository.js';
 
+describe('FoodCatalogRepository.listCustom', () => {
+  it('lists only the caller’s own foods, by name', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = new FoodCatalogRepository({
+      foodProduct: { findMany },
+    } as never);
+
+    await repository.listCustom('user-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { source: 'CUSTOM', ownerId: 'user-1' },
+      orderBy: { name: 'asc' },
+      take: 100,
+    });
+  });
+});
+
+describe('FoodCatalogRepository.matchingOff', () => {
+  it('matches each word so Coca-Cola is found as coca cola, including the brand', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = new FoodCatalogRepository({
+      foodProduct: { findMany },
+    } as never);
+
+    await repository.matchingOff('coca cola');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        source: 'OFF',
+        OR: [
+          {
+            AND: [
+              { name: { contains: 'coca', mode: 'insensitive' } },
+              { name: { contains: 'cola', mode: 'insensitive' } },
+            ],
+          },
+          {
+            AND: [
+              { brand: { contains: 'coca', mode: 'insensitive' } },
+              { brand: { contains: 'cola', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: 20,
+    });
+  });
+});
+
 describe('FoodCatalogRepository.copyFromEntry', () => {
   it('inserts a custom copy and leaves the original product alone', async () => {
     const db = {

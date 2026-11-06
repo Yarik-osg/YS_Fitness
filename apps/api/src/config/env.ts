@@ -30,8 +30,10 @@ export const envSchema = z.object({
   PROGRESS_PHOTO_DIR: z.string().min(1).optional(),
   SEED_TRAINER_EMAIL: z.string().email().optional(),
   SEED_TRAINER_PASSWORD: z.string().min(8).optional(),
-  // Open Food Facts. The web app never calls this host.
+  // Open Food Facts. The web app never calls these hosts.
+  // Barcode reads use the product API. Text search uses the search service.
   OFF_BASE_URL: z.string().url().default('https://world.openfoodfacts.org'),
+  OFF_SEARCH_URL: z.string().url().default('https://search.openfoodfacts.org'),
   OFF_USER_AGENT: z
     .string()
     .min(1)

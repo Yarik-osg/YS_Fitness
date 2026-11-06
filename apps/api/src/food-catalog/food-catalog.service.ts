@@ -8,7 +8,7 @@ import type { FoodProduct } from '@prisma/client';
 import type { CatalogFoodProduct } from './food-product.js';
 import type { CreateFoodProductInput, FoodSearchQuery } from '@repo/validation';
 import { FoodCatalogRepository } from './food-catalog.repository.js';
-import { foodSearchKey } from './food-search-key.js';
+import { foodSearchTerms, rankBySearch } from './food-search-key.js';
 import { toFoodProduct } from './food-product.js';
 import { OFF_CLIENT, type OffClient } from './off-client.js';
 import {
@@ -31,7 +31,7 @@ export class FoodCatalogService {
     userId: string,
     query: FoodSearchQuery,
   ): Promise<{ products: CatalogFoodProduct[]; fromCacheOnly: boolean }> {
-    const terms = query.q ? foodSearchKey(query.q) : undefined;
+    const terms = query.q ? foodSearchTerms(query.q) : undefined;
     const customs = await this.products.matchingCustom(userId, {
       q: terms,
       barcode: query.barcode,
@@ -40,9 +40,17 @@ export class FoodCatalogService {
       ? await this.barcodeProducts(query.barcode)
       : await this.textProducts(userId, requireTerms(terms));
     return {
-      products: [...customs, ...off.products].map(toFoodProduct),
+      products: rankBySearch(
+        [...customs, ...off.products].map(toFoodProduct),
+        terms ?? '',
+      ),
       fromCacheOnly: off.fromCacheOnly,
     };
+  }
+
+  async listCustom(userId: string): Promise<CatalogFoodProduct[]> {
+    const rows = await this.products.listCustom(userId);
+    return rows.map(toFoodProduct);
   }
 
   async create(
@@ -101,14 +109,22 @@ export class FoodCatalogService {
     ) {
       return { products: cached, fromCacheOnly: false };
     }
-    const lookup = await this.off.search(userId, terms);
+    let lookup: Awaited<ReturnType<OffClient['search']>>;
+    try {
+      lookup = await this.off.search(userId, terms);
+    } catch (error) {
+      if (cached.length === 0) throw error;
+      return { products: cached, fromCacheOnly: true };
+    }
     if (lookup.status === 'skipped') {
       return { products: cached, fromCacheOnly: true };
     }
     const byCode = new Map<string, NormalizedOffProduct>();
     for (const raw of lookup.value) {
       const normalized = normalizeOffProduct(raw);
-      if (normalized) byCode.set(normalized.externalId, normalized);
+      if (normalized && !byCode.has(normalized.externalId)) {
+        byCode.set(normalized.externalId, normalized);
+      }
     }
     const stored: FoodProduct[] = [];
     for (const product of byCode.values()) {
