@@ -158,7 +158,7 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     expect(denied.body.code).toBe('SUBSCRIPTION_REQUIRED');
   });
 
-  it('caches an Open Food Facts search, drops incomplete rows, and lists custom foods first', async () => {
+  it('caches an Open Food Facts search, drops incomplete rows, and ranks an exact name first', async () => {
     const user = await account('food-search@example.com');
     await subscribe(user.id);
 
@@ -172,7 +172,7 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       expect.objectContaining({
         source: 'OFF',
         externalId: '11112222',
-        name: 'Milk again',
+        name: 'Milk',
         kcalPer100g: 50,
       }),
     ]);
@@ -207,8 +207,8 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       await prisma.foodSearchQuery.count({ where: { queryKey: 'milk' } }),
     ).toBe(1);
     expect(
-      second.body.products.map((product: { source: string }) => product.source),
-    ).toEqual(['CUSTOM', 'OFF']);
+      second.body.products.map((product: { name: string }) => product.name),
+    ).toEqual(['Milk', 'Milk pudding']);
 
     vi.mocked(off.barcode).mockResolvedValue({
       status: 'ok',
