@@ -30,6 +30,12 @@ export const envSchema = z.object({
   PROGRESS_PHOTO_DIR: z.string().min(1).optional(),
   SEED_TRAINER_EMAIL: z.string().email().optional(),
   SEED_TRAINER_PASSWORD: z.string().min(8).optional(),
+  // Open Food Facts. The web app never calls this host.
+  OFF_BASE_URL: z.string().url().default('https://world.openfoodfacts.org'),
+  OFF_USER_AGENT: z
+    .string()
+    .min(1)
+    .default('YSFitness/1.0 (contact@localhost)'),
 });
 
 export type AppEnvironment = z.infer<typeof envSchema>;
