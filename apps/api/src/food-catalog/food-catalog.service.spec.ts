@@ -24,6 +24,7 @@ function harness() {
     matchingCustom: vi.fn().mockResolvedValue([]),
     matchingOff: vi.fn().mockResolvedValue([product]),
     findSearch: vi.fn().mockResolvedValue({ fetchedAt: new Date() }),
+    findOffByBarcode: vi.fn().mockResolvedValue(null),
     saveSearch: vi.fn(),
   };
   const off = { search: vi.fn(), barcode: vi.fn() };
@@ -41,6 +42,19 @@ describe('FoodCatalogService.search cache', () => {
       expect(result.products).toHaveLength(1);
     }
     expect(off.search).not.toHaveBeenCalled();
+  });
+
+  it('serves a stored barcode as a complete answer', async () => {
+    const { service, products, off } = harness();
+    products.findOffByBarcode.mockResolvedValue(product);
+
+    const result = await service.search('user', { barcode: '1111' });
+
+    expect(result.fromCacheOnly).toBe(false);
+    expect(result.products).toEqual([
+      expect.objectContaining({ externalId: '1111', name: 'Cached milk' }),
+    ]);
+    expect(off.barcode).not.toHaveBeenCalled();
   });
 
   it('does not record a query when Open Food Facts fails', async () => {

@@ -81,7 +81,7 @@ export class FoodCatalogService {
     barcode: string,
   ): Promise<{ products: FoodProduct[]; fromCacheOnly: boolean }> {
     const cached = await this.products.findOffByBarcode(barcode);
-    if (cached) return { products: [cached], fromCacheOnly: true };
+    if (cached) return { products: [cached], fromCacheOnly: false };
     const lookup = await this.off.barcode(barcode);
     if (lookup.status === 'skipped')
       return { products: [], fromCacheOnly: true };
