@@ -163,6 +163,20 @@ Coach routes require `ADMIN`:
 
 On the web, `/coach/nutrition` opens on active clients, with archived clients on a separate list. A row shows the active calories and macros, marked calculated or entered by hand, plus sex, age, height, weight, activity, and goal. Weekly frequency stays on the API response and is not a column. The client file shows the active target. The trainer can apply the stored calculation or enter four numbers. The apply action is hidden when that calculation is already the active calculated target.
 
+## Food
+
+Client routes require a JWT and an active subscription. The browser never calls Open Food Facts. The API does, with `OFF_BASE_URL` (default `https://world.openfoodfacts.org`) and `OFF_USER_AGENT`.
+
+- `GET /api/v1/food/products/search?q=` or `?barcode=` — the caller’s custom products first, then cached Open Food Facts rows. A text search of at least 2 characters that misses the cache fetches and stores up to 20 products. A known barcode is not fetched again
+- `POST /api/v1/food/products` — creates a `CUSTOM` product from a name and per-100g kcal, protein, fat, and carbs
+- `GET /api/v1/food/favorites`, `PUT /api/v1/food/favorites/:productId`, `DELETE /api/v1/food/favorites/:productId` — favorites are idempotent. Another user’s custom product is `404`
+- `GET /api/v1/food/log?date=YYYY-MM-DD` — that day’s entries, totals, the active nutrition target or `null`, and `remaining` when a target exists
+- `POST /api/v1/food/log` — `{ productId, grams, meal, loggedOn }` stores a snapshot from the per-100g values
+- `PATCH /api/v1/food/log/:id` — edits that entry only. Changing grams rescales its snapshot. A typed kcal, protein, fat, or carbs value is kept as sent. `saveAsMyProduct: true` copies the edited values onto a new custom product and leaves the Open Food Facts row unchanged
+- `DELETE /api/v1/food/log/:id` — the owner only. Someone else’s entry is `404`
+
+`loggedOn` is a calendar date. It is not converted to a timestamp.
+
 ## Workouts
 
 - `POST /api/v1/workouts/log` — JWT + active subscription; saves the sets just performed for one program day. Each set must match an exercise and order on that day, use a set number within the prescribed sets, and appear once (also enforced by a unique index on log, order, and set number). Reps are 1–999; weight is optional, above 0 and at most 999 kg with two decimals. Unfilled sets may be left out
