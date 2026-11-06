@@ -12,7 +12,14 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { ApiClientError } from '@/lib/api/client';
-import { exceedsEntryCap, scaleAmount } from '@/lib/food/macros';
+import { getUserFacingError } from '@/lib/api/errors';
+import {
+  exceedsEntryCap,
+  gramsAccepted,
+  oneDecimal,
+  scaleAmount,
+} from '@/lib/food/macros';
+import { decodeFoodText } from '@/lib/food/text';
 import { useUpdateFoodLog } from '@/lib/hooks/use-food';
 
 export function EditEntrySheet({
@@ -48,6 +55,7 @@ function EditEntryForm({
   onClose: () => void;
 }) {
   const t = useTranslations('food');
+  const tAuth = useTranslations('auth');
   const update = useUpdateFoodLog();
   const [grams, setGrams] = useState(String(entry.grams));
   const [kcal, setKcal] = useState(String(entry.kcal));
@@ -56,7 +64,7 @@ function EditEntryForm({
   const [carbs, setCarbs] = useState(String(entry.carbs));
   const [meal, setMeal] = useState<FoodMeal>(entry.meal);
   const [saveAsMyProduct, setSaveAsMyProduct] = useState(false);
-  const [clientError, setClientError] = useState(false);
+  const [clientError, setClientError] = useState<'amount' | 'cap' | null>(null);
   const [basis, setBasis] = useState({
     grams: entry.grams,
     kcal: entry.kcal,
@@ -112,16 +120,13 @@ function EditEntryForm({
     update.error.code === 'FOOD_VALUES_OUT_OF_RANGE';
 
   function save() {
-    setClientError(false);
+    setClientError(null);
+    const macros = [parsed.kcal, parsed.protein, parsed.fat, parsed.carbs];
     if (
-      !Number.isFinite(parsed.grams) ||
-      parsed.grams < FOOD_MIN_GRAMS ||
-      parsed.grams > FOOD_MAX_GRAMS ||
-      [parsed.kcal, parsed.protein, parsed.fat, parsed.carbs].some(
-        (value) => !Number.isFinite(value) || value < 0,
-      )
+      !gramsAccepted(parsed.grams) ||
+      macros.some((value) => !oneDecimal(value) || value < 0)
     ) {
-      setClientError(true);
+      setClientError('amount');
       return;
     }
     if (
@@ -132,7 +137,7 @@ function EditEntryForm({
         carbs: parsed.carbs,
       })
     ) {
-      setClientError(true);
+      setClientError('cap');
       return;
     }
     const body: {
@@ -156,7 +161,7 @@ function EditEntryForm({
 
   return (
     <>
-      <SheetTitle>{entry.productName}</SheetTitle>
+      <SheetTitle>{decodeFoodText(entry.productName)}</SheetTitle>
       <SheetDescription>{t('editHint')}</SheetDescription>
       <div className="flex flex-col gap-3">
         <Field
@@ -214,9 +219,19 @@ function EditEntryForm({
           />
           {t('saveAsMine')}
         </label>
-        {clientError || serverTooLarge ? (
+        {clientError === 'amount' ? (
+          <p role="alert" className="text-sm text-amber">
+            {t('invalidAmount')}
+          </p>
+        ) : null}
+        {clientError === 'cap' || serverTooLarge ? (
           <p role="alert" className="text-sm text-amber">
             {t('tooLarge')}
+          </p>
+        ) : null}
+        {update.isError && !serverTooLarge ? (
+          <p role="alert" className="text-sm text-amber">
+            {getUserFacingError(update.error, tAuth)}
           </p>
         ) : null}
         <Button disabled={!changed || update.isPending} onClick={save}>

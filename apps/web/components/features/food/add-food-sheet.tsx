@@ -9,7 +9,7 @@ import {
 } from '@repo/validation';
 import { Heart } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { FoodImage } from '@/components/features/food/food-image';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +19,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { ApiClientError } from '@/lib/api/client';
-import { previewMacros } from '@/lib/food/macros';
+import { getUserFacingError } from '@/lib/api/errors';
+import { gramsAccepted, previewMacros } from '@/lib/food/macros';
+import { decodeFoodText } from '@/lib/food/text';
 import {
   useCreateFoodLog,
   useCreateFoodProduct,
@@ -49,7 +51,7 @@ export function AddFoodSheet({
         if (!next) onClose();
       }}
     >
-      <SheetContent className="max-h-[85vh] overflow-y-auto">
+      <SheetContent>
         {open ? (
           <AddFoodForm
             key={`${meal}-${loggedOn}`}
@@ -242,15 +244,21 @@ function RecentTab({
     return <p className="text-sm text-muted">{t('recentEmpty')}</p>;
   }
   return (
-    <ul className="flex flex-col gap-2">
-      {recent.data.items.map((item) => (
-        <li key={item.product.id} className="border border-line">
-          <ProductList
-            products={[item.product]}
-            onPick={() =>
-              onPick(item.product, String(item.lastGrams), item.lastMeal)
-            }
-          />
+    <ProductList
+      products={recent.data.items.map((item) => item.product)}
+      onPick={(product) => {
+        const item = recent.data?.items.find(
+          (row) => row.product.id === product.id,
+        );
+        if (!item) return;
+        onPick(item.product, String(item.lastGrams), item.lastMeal);
+      }}
+      footer={(product) => {
+        const item = recent.data?.items.find(
+          (row) => row.product.id === product.id,
+        );
+        if (!item) return null;
+        return (
           <button
             type="button"
             onClick={() =>
@@ -260,18 +268,20 @@ function RecentTab({
           >
             {t('addAgain')}
           </button>
-        </li>
-      ))}
-    </ul>
+        );
+      }}
+    />
   );
 }
 
 function ProductList({
   products,
   onPick,
+  footer,
 }: {
   products: FoodProductResponse[];
   onPick: (product: FoodProductResponse) => void;
+  footer?: (product: FoodProductResponse) => ReactNode;
 }) {
   const t = useTranslations('food');
   const toggle = useToggleFavorite();
@@ -279,49 +289,52 @@ function ProductList({
   return (
     <ul className="flex flex-col gap-2">
       {products.map((product) => (
-        <li
-          key={product.id}
-          className="flex items-center gap-2 border border-line p-2"
-        >
-          <button
-            type="button"
-            onClick={() => onPick(product)}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          >
-            <FoodImage src={product.imageUrl} alt={product.name} />
-            <span className="min-w-0">
-              <span className="block truncate text-sm text-ink">
-                {product.name}
-              </span>
-              {product.brand ? (
-                <span className="block truncate text-xs text-muted">
-                  {product.brand}
+        <li key={product.id} className="border border-line">
+          <div className="flex items-center gap-2 p-2">
+            <button
+              type="button"
+              onClick={() => onPick(product)}
+              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            >
+              <FoodImage
+                src={product.imageUrl}
+                alt={decodeFoodText(product.name)}
+              />
+              <span className="min-w-0">
+                <span className="block text-sm text-ink">
+                  {decodeFoodText(product.name)}
                 </span>
-              ) : null}
-              <span className="block text-xs text-muted tabular-nums">
-                {t('per100', { kcal: product.kcalPer100g })}
+                {product.brand ? (
+                  <span className="block text-xs text-muted">
+                    {decodeFoodText(product.brand)}
+                  </span>
+                ) : null}
+                <span className="block text-xs text-muted tabular-nums">
+                  {t('per100', { kcal: product.kcalPer100g })}
+                </span>
               </span>
-            </span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={product.isFavorite}
-            aria-label={
-              product.isFavorite
-                ? t('unfavorite', { name: product.name })
-                : t('favorite', { name: product.name })
-            }
-            onClick={() =>
-              toggle.mutate({ product, next: !product.isFavorite })
-            }
-            className="grid size-10 place-items-center text-teal"
-          >
-            <Heart
-              size={18}
-              strokeWidth={1.6}
-              fill={product.isFavorite ? 'currentColor' : 'none'}
-            />
-          </button>
+            </button>
+            <button
+              type="button"
+              aria-pressed={product.isFavorite}
+              aria-label={
+                product.isFavorite
+                  ? t('unfavorite', { name: decodeFoodText(product.name) })
+                  : t('favorite', { name: decodeFoodText(product.name) })
+              }
+              onClick={() =>
+                toggle.mutate({ product, next: !product.isFavorite })
+              }
+              className="grid size-10 place-items-center text-teal"
+            >
+              <Heart
+                size={18}
+                strokeWidth={1.6}
+                fill={product.isFavorite ? 'currentColor' : 'none'}
+              />
+            </button>
+          </div>
+          {footer?.(product)}
         </li>
       ))}
     </ul>
@@ -428,17 +441,15 @@ function QuantityStep({
   onDone: () => void;
 }) {
   const t = useTranslations('food');
+  const tAuth = useTranslations('auth');
   const create = useCreateFoodLog();
   const parsed = Number(grams);
-  const valid =
-    Number.isFinite(parsed) &&
-    parsed >= FOOD_MIN_GRAMS &&
-    parsed <= FOOD_MAX_GRAMS;
+  const valid = gramsAccepted(parsed);
   const preview = valid ? previewMacros(product, parsed) : null;
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-ink">{product.name}</p>
+      <p className="text-sm text-ink">{decodeFoodText(product.name)}</p>
       <label className="flex flex-col gap-1.5 text-sm text-muted">
         {t('grams')}
         <input
@@ -492,6 +503,11 @@ function QuantityStep({
       >
         {t('add')}
       </Button>
+      {create.isError ? (
+        <p role="alert" className="text-sm text-amber">
+          {getUserFacingError(create.error, tAuth)}
+        </p>
+      ) : null}
       <button type="button" onClick={onBack} className="text-sm text-muted">
         {t('back')}
       </button>

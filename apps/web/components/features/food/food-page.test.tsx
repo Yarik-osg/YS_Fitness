@@ -141,6 +141,41 @@ describe('FoodPage', () => {
     });
   });
 
+  it('keeps two-decimal grams off the request and shows a failed save', async () => {
+    const user = userEvent.setup();
+    foodApi.getFoodDay.mockResolvedValue(emptyDay);
+    foodApi.searchFoods.mockResolvedValue({
+      products: [milk],
+      fromCacheOnly: false,
+    });
+    foodApi.createFoodLog.mockRejectedValue(
+      new ApiClientError(400, 'VALIDATION_ERROR', 'Grams are invalid'),
+    );
+    renderPage();
+    await user.click(
+      await screen.findByRole('button', { name: 'Add to Breakfast' }),
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search foods' }),
+      'milk',
+    );
+    await user.click(await screen.findByRole('button', { name: /^Milk/ }));
+    const grams = screen.getByRole('textbox', { name: 'Grams' });
+    await user.clear(grams);
+    await user.type(grams, '10.25');
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(
+      screen.getByText('Enter grams from 0.1 to 5000, with one decimal.'),
+    ).toBeInTheDocument();
+    await user.clear(grams);
+    await user.type(grams, '100');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Grams are invalid',
+    );
+    expect(foodApi.createFoodLog).toHaveBeenCalledTimes(1);
+  });
+
   it('rolls a favorite back when the request fails', async () => {
     const user = userEvent.setup();
     foodApi.getFoodDay.mockResolvedValue(emptyDay);
