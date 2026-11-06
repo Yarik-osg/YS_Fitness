@@ -78,6 +78,8 @@ const RESPONSES = {
     mealsPerDay: '3',
     eatingHabits: ['snacking'],
     physiqueLevel: '4',
+    muscleDevelopment: 0,
+    bodyFatLevel: 50,
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
   },

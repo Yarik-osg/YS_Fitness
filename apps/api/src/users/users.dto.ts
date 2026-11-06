@@ -38,6 +38,8 @@ export class OnboardingDto implements OnboardingInput {
   mealsPerDay!: OnboardingInput['mealsPerDay'];
   eatingHabits!: OnboardingInput['eatingHabits'];
   physiqueLevel!: OnboardingInput['physiqueLevel'];
+  muscleDevelopment!: OnboardingInput['muscleDevelopment'];
+  bodyFatLevel!: OnboardingInput['bodyFatLevel'];
 }
 
 export class CreateMeasurementDto implements CreateMeasurementInput {

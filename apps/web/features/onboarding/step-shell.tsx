@@ -92,15 +92,15 @@ export function StepShell({
         initial={direction === 0 ? false : { opacity: 0, x: 24 * direction }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
-        className="flex flex-1 flex-col px-5 pb-8 pt-7"
+        className="flex flex-1 flex-col px-5 pt-7 pb-8"
       >
         <header className="mb-6">
-          <h1 className="font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em] text-white">
+          <h1 className="font-heading text-[32px] font-normal uppercase leading-9 tracking-[-0.02em] text-ink">
             {title}
           </h1>
           <div className="my-2.5 h-px w-15 bg-accent" />
           {description && (
-            <p className="max-w-[19rem] text-[12px] leading-[1.6] text-muted">
+            <p className="text-[12px] leading-[1.6] tracking-tight text-muted">
               {description}
             </p>
           )}
@@ -111,7 +111,7 @@ export function StepShell({
         {error && (
           <p
             role="alert"
-            className="mt-5 border-l-2 border-red-400 bg-red-400/8 px-4 py-3 text-xs text-red-300"
+            className="mt-5 border border-red-400/40 bg-red-400/8 px-4 py-3 text-xs text-red-300"
           >
             {error}
           </p>

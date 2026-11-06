@@ -22,6 +22,8 @@ export const FEMALE_ONBOARDING = {
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
   physiqueLevel: '4',
+  muscleDevelopment: 0,
+  bodyFatLevel: 50,
 } satisfies OnboardingInput;
 
 export const FEMALE_ONBOARDING_ANSWERS = {
@@ -36,4 +38,6 @@ export const FEMALE_ONBOARDING_ANSWERS = {
   mealsPerDay: FEMALE_ONBOARDING.mealsPerDay,
   eatingHabits: FEMALE_ONBOARDING.eatingHabits,
   physiqueLevel: FEMALE_ONBOARDING.physiqueLevel,
+  muscleDevelopment: FEMALE_ONBOARDING.muscleDevelopment,
+  bodyFatLevel: FEMALE_ONBOARDING.bodyFatLevel,
 };

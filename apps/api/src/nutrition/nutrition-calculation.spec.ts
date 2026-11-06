@@ -51,6 +51,21 @@ describe('calculateNutrition', () => {
     expect(result.displayCarbsGrams).toBe(139);
   });
 
+  it('ignores subjective muscle and fat appearance', () => {
+    const plain = calculateNutrition(woman);
+    const withAppearance = calculateNutrition({
+      ...woman,
+      muscleDevelopment: 100,
+      bodyFatLevel: 0,
+    } as NutritionCalculationInput);
+    expect(withAppearance.targetCalories.equals(plain.targetCalories)).toBe(
+      true,
+    );
+    expect(withAppearance.proteinGrams.equals(plain.proteinGrams)).toBe(true);
+    expect(withAppearance.fatGrams.equals(plain.fatGrams)).toBe(true);
+    expect(withAppearance.carbsGrams.equals(plain.carbsGrams)).toBe(true);
+  });
+
   it('uses +5 for a man and -161 for a woman', () => {
     const female = calculateNutrition(woman);
     const male = calculateNutrition({ ...woman, sex: 'MALE' });

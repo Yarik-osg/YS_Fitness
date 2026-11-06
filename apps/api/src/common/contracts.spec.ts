@@ -30,6 +30,8 @@ const femaleOnboarding = {
   mealsPerDay: '3',
   eatingHabits: ['snacking', 'emotional'],
   physiqueLevel: '4',
+  muscleDevelopment: 0,
+  bodyFatLevel: 50,
 } as const;
 
 const maleOnboarding = {
@@ -52,6 +54,8 @@ const maleOnboarding = {
   mealsPerDay: '4-5',
   eatingHabits: ['late_eating', 'none'],
   physiqueLevel: '6',
+  muscleDevelopment: 22,
+  bodyFatLevel: 50,
 } as const;
 
 function issuePaths(result: ReturnType<typeof onboardingSchema.safeParse>) {
@@ -98,6 +102,8 @@ describe('shared API contracts', () => {
       mealsPerDay: '3',
       eatingHabits: ['snacking', 'emotional'],
       physiqueLevel: '4',
+      muscleDevelopment: 0,
+      bodyFatLevel: 100,
     });
 
     expect(result.success).toBe(true);
@@ -124,6 +130,8 @@ describe('shared API contracts', () => {
       mealsPerDay: '4-5',
       eatingHabits: ['late_eating', 'none'],
       physiqueLevel: '6',
+      muscleDevelopment: 100,
+      bodyFatLevel: 0,
     });
 
     expect(result.success).toBe(true);
@@ -194,6 +202,27 @@ describe('shared API contracts', () => {
         }),
       ),
     ).toContainEqual(['physiqueLevel']);
+  });
+
+  it('accepts subjective shape values at 0 and 100 and rejects values outside that scale', () => {
+    expect(
+      onboardingSchema.safeParse({
+        ...femaleOnboarding,
+        muscleDevelopment: 0,
+        bodyFatLevel: 100,
+      }).success,
+    ).toBe(true);
+    for (const patch of [
+      { muscleDevelopment: -1 },
+      { muscleDevelopment: 101 },
+      { bodyFatLevel: -1 },
+      { bodyFatLevel: 101 },
+      { muscleDevelopment: 1.5 },
+    ]) {
+      expect(
+        onboardingSchema.safeParse({ ...femaleOnboarding, ...patch }).success,
+      ).toBe(false);
+    }
   });
 
   it('rejects a name that is not letters only', () => {

@@ -244,6 +244,8 @@ const onboardingQuestionnaireSchema = z.object({
   mealsPerDay: z.enum(MEALS_PER_DAY),
   eatingHabits: z.array(z.enum(EATING_HABITS)).min(1),
   physiqueLevel: z.enum(PHYSIQUE_LEVELS),
+  muscleDevelopment: z.number().int().min(0).max(100),
+  bodyFatLevel: z.number().int().min(0).max(100),
 });
 
 function trackVocabulary(programTrack: (typeof PROGRAM_TRACKS)[number]) {

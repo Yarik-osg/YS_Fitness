@@ -475,6 +475,8 @@ describe('CoachService.getClient', () => {
           mealsPerDay: '3',
           eatingHabits: [],
           physiqueLevel: null,
+          muscleDevelopment: 40,
+          bodyFatLevel: 60,
           createdAt: new Date('2026-03-05T00:00:00.000Z'),
           updatedAt: new Date('2026-03-05T00:00:00.000Z'),
         },

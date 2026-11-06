@@ -232,3 +232,33 @@ Use `feature/`, `fix/`, `chore/`, `docs/`, or `refactor/` prefixes followed by k
 - Personalized workout-program generation beyond the existing template catalog and matching
 - WayForPay HTTP, webhooks, signatures, and hosted checkout
 - Dunning, invoices, refunds, and proration
+
+## Body mesh
+
+`build_body.py` builds one posed body per sex for React Three Fiber. It needs Blender 5.2.3 LTS and the MPFB 2.0.18 extension (`bl_ext.blender_org.mpfb`). The height slider stays at MPFB Average (0.5). After the shape keys exist, the basis is scaled to 175 cm for male and 165 cm for female. Female breasts use the new-human panel defaults (max cup, max firmness, influence 0.1), which is cup size and firmness 0.55. Male breast targets stay off (both macros 0.5). There is no hair and no clothing. The shell is not decimated: 13,380 vertices and 26,756 triangles. Arms sit 12° from the body. `LEG_SPREAD_DEG = -4` turns the thighs inward so the ankles land near 0.28 m.
+
+The exported sliders stay 0..1. They are not a linear map onto one muscle range and one weight range. Each corner is baked from its own MPFB muscle and weight macros (`CORNERS` in `build_body.py`):
+
+| Corner | Slider | Male muscle / weight | Female muscle / weight |
+| ------ | ------ | -------------------- | ---------------------- |
+| A      | 0 / 0  | 0.25 / 0.30          | 0.25 / 0.30            |
+| B      | 1 / 0  | 1.00 / 0.45          | 0.90 / 0.45            |
+| C      | 0 / 1  | 0.25 / 1.00          | 0.25 / 1.00            |
+| D      | 1 / 1  | 0.35 / 1.00          | 0.40 / 1.00            |
+
+Corner B keeps a high muscle value with a little extra weight so the athletic body is not starved. Corner D keeps weight at 1.0 and drops muscle (male 0.35, female 0.40) because higher muscle deletes the belly that weight adds. The 0.5/0.5 check bakes a real body at the average of these four macros and compares it with the shape-key mix.
+
+The GLB has three shape keys, relative to Basis, in this order: `muscle`, `fat`, `muscle_fat_corr`. A mix of muscle `m` and fat `f` is Basis + `m` * muscle + `f` * fat + `m * f` * muscle_fat_corr. The corners match a real MPFB bake. The 0.5/0.5 interior does not, because MPFB's macro stack is not bilinear; the script prints that error and still writes the file. The mesh faces Blender -Y, and the glTF export uses +Y up, so the figure faces +Z with the feet on y = 0.
+
+Compression is `gltf-transform optimize --compress meshopt` with weld and simplify turned off, so the morph targets keep the same vertices. If meshopt drops the targets, the script tries Draco and then leaves the file uncompressed.
+
+Regenerate from the repository root:
+
+```bash
+"/Applications/Blender.app/Contents/MacOS/Blender" -b -P build_body.py -- --sex male --out apps/web/public/models/body_male.glb --render
+"/Applications/Blender.app/Contents/MacOS/Blender" -b -P build_body.py -- --sex female --out apps/web/public/models/body_female.glb --render
+```
+
+Replace a mesh by overwriting `apps/web/public/models/body_male.glb` or `body_female.glb`. The onboarding viewer does not need a code change when the file keeps one mesh, feet on y = 0, facing +Z, and shape keys named `muscle`, `fat`, and `muscle_fat_corr`. `meta_male.json` and `meta_female.json` record those names and the baked corner macros; the viewer reads the names from the mesh.
+
+MPFB is GPL-3.0-or-later. The MakeHuman target files it loads are a separate set of assets; check their license before shipping the generated meshes.

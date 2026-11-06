@@ -259,6 +259,29 @@
     "physiqueSlider": {
       "label": "Overall physique"
     },
+    "shape": {
+      "muscle": {
+        "label": "Muscle development",
+        "description": "From a narrower build to more developed muscle.",
+        "low": "Less",
+        "high": "More"
+      },
+      "fat": {
+        "label": "Body fat",
+        "description": "From a leaner outline to a softer shape.",
+        "low": "Less",
+        "high": "More"
+      },
+      "band": {
+        "low": "Low",
+        "moderate": "Moderate",
+        "high": "High"
+      },
+      "view": {
+        "front": "Front",
+        "back": "Back"
+      }
+    },
     "choices": {
       "program": {
         "female": { "label": "For women", "description": "Women's program" },
@@ -395,7 +418,7 @@
       "currentBody": {
         "eyebrow": "Current shape",
         "title": "What is your <accent>shape now?</accent>",
-        "description": "Choose the photo that best matches your current shape"
+        "description": "Match the model to how you see your shape. This is not a body-composition measurement."
       },
       "desiredBody": {
         "eyebrow": "Desired shape",
@@ -1111,6 +1134,8 @@
       "timezone": "Timezone",
       "track": "Direction",
       "currentBody": "Current shape",
+      "muscleDevelopment": "Muscle development",
+      "bodyFatLevel": "Body fat",
       "desiredBody": "Desired shape",
       "mainGoal": "Main goal",
       "experience": "Experience",

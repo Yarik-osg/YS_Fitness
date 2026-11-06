@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from '@/i18n/navigation';
 import { ApiClientError } from '@/lib/api/client';
 import { exportCoachClient } from '@/lib/api/coach';
+import { shapeBand } from '@/features/onboarding/body-shape';
 import { roundHalfAwayFromZero } from '@/lib/nutrition-display';
 import {
   useApplyNutritionCalculation,
@@ -791,6 +792,7 @@ function AccessGrant({ detail }: { detail: CoachClientDetail }) {
 
 function Answers({ answers }: { answers: CoachClientOnboarding }) {
   const t = useTranslations('coach');
+  const shape = useTranslations('onboarding');
   const track = answers.programTrack;
   const mealsKey =
     track === 'female'
@@ -803,6 +805,14 @@ function Answers({ answers }: { answers: CoachClientOnboarding }) {
       <Field
         label={t('fields.track')}
         value={<ChoiceText path={`program.${track}.label`} fallback={track} />}
+      />
+      <Field
+        label={t('fields.muscleDevelopment')}
+        value={shape(`shape.band.${shapeBand(answers.muscleDevelopment)}`)}
+      />
+      <Field
+        label={t('fields.bodyFatLevel')}
+        value={shape(`shape.band.${shapeBand(answers.bodyFatLevel)}`)}
       />
       <Field
         label={t('fields.currentBody')}

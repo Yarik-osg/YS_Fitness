@@ -29,12 +29,13 @@ import {
   readSelectedPlanId,
 } from '@/lib/subscriptions/selected-plan';
 import { ActivitySlider } from './activity-slider';
-import { BodyCarousel } from './body-carousel';
+import { BodyShapeStep } from './body-shape-step';
 import {
-  bodySliderSrc,
-  currentBodyPhoto,
-  desiredBodyPhoto,
-} from './body-figure';
+  muscleFromCurrentBody,
+  SHAPE_DEFAULT,
+  shapeAnswers,
+} from './body-shape';
+import { bodySliderSrc, desiredBodyPhoto } from './body-figure';
 import { ChoiceList, MultiChoiceList, type Choice } from './choice-list';
 import { previewProgramId } from './preview-program';
 import {
@@ -51,7 +52,6 @@ import {
 } from './program-track';
 import { StepShell } from './step-shell';
 
-const CURRENT_BODY_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 const DESIRED_BODY_STEPS = [0, 1, 2, 3] as const;
 
 const TOTAL_STEPS = ONBOARDING_WIZARD_STEPS;
@@ -207,15 +207,6 @@ export function OnboardingWizard() {
 
   const step = Math.min(Math.max(draft.step, 0), TOTAL_STEPS - 1);
   const male = draft.programTrack === 'male';
-  const currentBodyChoices = useMemo(
-    () =>
-      CURRENT_BODY_STEPS.map((step) => ({
-        value: String(step),
-        label: t('variant', { index: step + 1 }),
-        image: currentBodyPhoto(male ? 'male' : 'female', step),
-      })),
-    [male, t],
-  );
   const desiredBodyChoices = useMemo(
     () =>
       DESIRED_BODY_STEPS.map((step) => ({
@@ -431,13 +422,22 @@ export function OnboardingWizard() {
   }, [draft.programTrack, phase]);
 
   useEffect(() => {
-    if (step === 1 && !draft.currentBody && currentBodyChoices[0]) {
-      useOnboardingStore.setState({ currentBody: currentBodyChoices[0].value });
-    }
+    if (step !== 1) return;
+    const muscleMissing = draft.muscleDevelopment === undefined;
+    const fatMissing = draft.bodyFatLevel === undefined;
+    const bodyMissing = !draft.currentBody;
+    if (!muscleMissing && !fatMissing && !bodyMissing) return;
+    const muscle =
+      draft.muscleDevelopment ?? muscleFromCurrentBody(draft.currentBody);
+    const fat = draft.bodyFatLevel ?? SHAPE_DEFAULT;
+    useOnboardingStore.setState(shapeAnswers(muscle, fat));
+  }, [draft, step]);
+
+  useEffect(() => {
     if (step === 6 && !draft.activityLevel) {
       useOnboardingStore.setState({ activityLevel: 'MODERATELY_ACTIVE' });
     }
-  }, [currentBodyChoices, draft, step]);
+  }, [draft.activityLevel, step]);
 
   useEffect(() => {
     if (step !== 11 || seededMetrics.current) return;
@@ -505,7 +505,10 @@ export function OnboardingWizard() {
       case 0:
         return Boolean(draft.programTrack);
       case 1:
-        return Boolean(draft.currentBody);
+        return (
+          typeof draft.muscleDevelopment === 'number' &&
+          typeof draft.bodyFatLevel === 'number'
+        );
       case 2:
         return Boolean(draft.desiredBody);
       case 3:
@@ -642,11 +645,13 @@ export function OnboardingWizard() {
           title={t.rich('steps.currentBody.title', { accent })}
           description={t('steps.currentBody.description')}
         >
-          <BodyCarousel
-            choices={currentBodyChoices}
-            value={draft.currentBody}
-            label={t('physiqueSlider.label')}
-            onChange={(currentBody) => draft.setAnswer({ currentBody })}
+          <BodyShapeStep
+            sex={male ? 'male' : 'female'}
+            muscle={draft.muscleDevelopment ?? SHAPE_DEFAULT}
+            fat={draft.bodyFatLevel ?? SHAPE_DEFAULT}
+            onChange={(muscle, fat) =>
+              draft.setAnswer(shapeAnswers(muscle, fat))
+            }
           />
         </StepShell>
       );

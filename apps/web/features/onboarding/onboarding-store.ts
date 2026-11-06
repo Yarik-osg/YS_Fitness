@@ -24,6 +24,8 @@ export interface OnboardingDraft {
   currentBody?: string;
   desiredBody?: string;
   physiqueLevel?: string;
+  muscleDevelopment?: number;
+  bodyFatLevel?: number;
   mainGoal?: string;
   experience?: string;
   trainingFrequency?: string;
@@ -81,6 +83,8 @@ const initialState: OnboardingDraft & {
   currentBody: undefined,
   desiredBody: undefined,
   physiqueLevel: undefined,
+  muscleDevelopment: undefined,
+  bodyFatLevel: undefined,
   mainGoal: undefined,
   experience: undefined,
   trainingFrequency: undefined,
@@ -115,6 +119,8 @@ export const useOnboardingStore = create<OnboardingState>()(
         currentBody: state.currentBody,
         desiredBody: state.desiredBody,
         physiqueLevel: state.physiqueLevel,
+        muscleDevelopment: state.muscleDevelopment,
+        bodyFatLevel: state.bodyFatLevel,
         mainGoal: state.mainGoal,
         experience: state.experience,
         trainingFrequency: state.trainingFrequency,
