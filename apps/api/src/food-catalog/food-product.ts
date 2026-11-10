@@ -9,6 +9,7 @@ export function toFoodProduct(row: FoodProduct): CatalogFoodProduct {
     id: row.id,
     source: row.source,
     externalId: row.externalId,
+    barcode: row.source === 'CUSTOM' ? row.barcode : row.externalId,
     name: row.name,
     brand: row.brand,
     imageUrl: row.imageUrl,

@@ -20,6 +20,7 @@ export interface OffLimitSettings {
   searchPerMin: number;
   userPerMin: number;
   barcodePerMin: number;
+  barcodeUserPerMin: number;
 }
 
 class TokenBucket {
@@ -69,6 +70,7 @@ export class OffOutboundLimiter implements OnModuleDestroy {
   private readonly search: TokenBucket;
   private readonly barcode: TokenBucket;
   private readonly users = new Map<string, TokenBucket>();
+  private readonly barcodeUsers = new Map<string, TokenBucket>();
   private readonly timer: ReturnType<typeof setInterval>;
 
   constructor(
@@ -107,8 +109,23 @@ export class OffOutboundLimiter implements OnModuleDestroy {
     return 'ok';
   }
 
-  tryBarcode(): boolean {
-    return this.barcode.take(this.clock.now());
+  tryBarcode(userId: string): OffSearchDecision {
+    const now = this.clock.now();
+    this.sweep(now);
+    const existing = this.barcodeUsers.get(userId);
+    const user =
+      existing ??
+      new TokenBucket(
+        this.clock,
+        this.limits.barcodeUserPerMin,
+        OFF_LIMIT_WINDOW_MS,
+      );
+    if (!user.available(now)) return 'user_limit';
+    if (!this.barcode.available(now)) return 'global_limit';
+    if (!existing) this.barcodeUsers.set(userId, user);
+    user.take(now);
+    this.barcode.take(now);
+    return 'ok';
   }
 
   trackedUsers(): number {
@@ -122,6 +139,9 @@ export class OffOutboundLimiter implements OnModuleDestroy {
   private sweep(now: number) {
     for (const [userId, bucket] of this.users) {
       if (bucket.idle(now)) this.users.delete(userId);
+    }
+    for (const [userId, bucket] of this.barcodeUsers) {
+      if (bucket.idle(now)) this.barcodeUsers.delete(userId);
     }
   }
 }

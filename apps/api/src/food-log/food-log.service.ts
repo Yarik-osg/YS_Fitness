@@ -18,6 +18,7 @@ import type {
 import type { FoodRecentQuery } from '@repo/validation';
 import {
   foodPer100gSchema,
+  normalizeBarcode,
   type CreateFoodLogInput,
   type CreateFoodProductInput,
   type FoodSearchQuery,
@@ -109,6 +110,7 @@ export class FoodLogService {
         id: row.productId,
         source: row.source,
         externalId: row.externalId,
+        barcode: row.source === 'CUSTOM' ? row.barcode : row.externalId,
         name: row.name,
         brand: row.brand,
         imageUrl: row.imageUrl,
@@ -241,11 +243,22 @@ export class FoodLogService {
           carbsPer100g: per100gFromSnapshot(next.carbs, next.grams).toNumber(),
         });
         if (!per100.success) throw valuesOutOfRange();
+        const source = entry.productId
+          ? await this.catalog.findVisible(userId, entry.productId)
+          : null;
+        const copiedBarcode =
+          source?.source === 'OFF' && source.externalId
+            ? normalizeBarcode(source.externalId)
+            : null;
+        const alreadyOwned = copiedBarcode
+          ? await this.catalog.findCustomByBarcode(userId, copiedBarcode)
+          : null;
         const copy = await this.catalog.copyFromEntry(
           userId,
           {
             name: productName,
             imageUrl: entry.imageUrl,
+            barcode: alreadyOwned ? null : copiedBarcode,
             basedOnProductId: entry.productId,
             kcalPer100g: roundHalfUp(per100.data.kcalPer100g, 2),
             proteinPer100g: roundHalfUp(per100.data.proteinPer100g, 2),

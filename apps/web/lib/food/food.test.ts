@@ -88,6 +88,7 @@ function product(name: string) {
     id: name,
     source: 'OFF' as const,
     externalId: null,
+    barcode: null,
     name,
     brand: null,
     imageUrl: null,

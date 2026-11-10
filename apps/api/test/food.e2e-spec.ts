@@ -1,6 +1,6 @@
 import { BadGatewayException, type INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { hash } from 'argon2';
 import cookieParser from 'cookie-parser';
@@ -10,7 +10,27 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
+import { normalizeBarcode } from '@repo/validation';
+import { FoodCatalogRepository } from '../src/food-catalog/food-catalog.repository.js';
 import { OFF_CLIENT, type OffLookup } from '../src/food-catalog/off-client.js';
+
+function validEan13(): string {
+  for (let value = 10 ** 12; value < 10 ** 12 + 200_000; value += 1) {
+    const code = String(value);
+    if (normalizeBarcode(code) === code) return code;
+  }
+  throw new Error('no valid barcode');
+}
+
+const yogurtCode = validEan13();
+
+function anotherEan13(taken: string): string {
+  for (let value = 10 ** 12; value < 10 ** 12 + 200_000; value += 1) {
+    const code = String(value);
+    if (code !== taken && normalizeBarcode(code) === code) return code;
+  }
+  throw new Error('no second barcode');
+}
 
 const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
@@ -213,7 +233,7 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     vi.mocked(off.barcode).mockResolvedValue({
       status: 'ok',
       value: {
-        code: '55556666',
+        code: yogurtCode,
         product_name: 'Yogurt',
         nutriments: {
           'energy-kcal_100g': 60,
@@ -224,11 +244,11 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       },
     });
     await request(app.getHttpServer())
-      .get('/api/v1/food/products/search?barcode=55556666')
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
       .set('Authorization', user.authorization)
       .expect(200);
     await request(app.getHttpServer())
-      .get('/api/v1/food/products/search?barcode=55556666')
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
       .set('Authorization', user.authorization)
       .expect(200);
     expect(off.barcode).toHaveBeenCalledTimes(1);
@@ -730,11 +750,13 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       ).status,
     ).toBe(400);
 
+    const riceCode = anotherEan13(yogurtCode);
     const created = await request(app.getHttpServer())
       .post('/api/v1/food/products')
       .set('Authorization', user.authorization)
       .send({
         name: 'Rice',
+        barcode: riceCode,
         kcalPer100g: 130,
         proteinPer100g: 3,
         fatPer100g: 1,
@@ -821,11 +843,13 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     const original = all.body.items[0];
     const copy = all.body.items[1];
     expect(original.product.id).toBe(created.body.id);
+    expect(original.product.barcode).toBe(riceCode);
     expect(original.product.kcalPer100g).toBe(130);
     expect(original.lastGrams).toBe(40);
     expect(original.lastMeal).toBe('BREAKFAST');
     expect(original.lastLoggedOn).toBe('2026-11-03');
     expect(copy.product.id).not.toBe(created.body.id);
+    expect(copy.product.barcode).toBeNull();
     expect(copy.product.kcalPer100g).toBe(50);
     expect(copy.lastGrams).toBe(80);
     expect(copy.lastMeal).toBe('SNACK');
@@ -835,5 +859,321 @@ describeWithDatabase('food catalog and log (e2e)', () => {
         (item: { product: { name: string } }) => item.product.name === 'Secret',
       ),
     ).toBe(false);
+  });
+
+  it('keeps a custom barcode per user and copies an Open Food Facts code once', async () => {
+    const user = await account('food-barcode@example.com');
+    const other = await account('food-barcode-other@example.com');
+    await subscribe(user.id);
+    await subscribe(other.id);
+    const code = anotherEan13(yogurtCode);
+    const invalid = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?barcode=55556666')
+      .set('Authorization', user.authorization);
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.code).toBe('INVALID_BARCODE');
+
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'My oats',
+        barcode: code,
+        kcalPer100g: 140,
+        proteinPer100g: 5,
+        fatPer100g: 3,
+        carbsPer100g: 24,
+      })
+      .expect(201);
+    expect(created.body.barcode).toBe(code);
+
+    const duplicate = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Oats again',
+        barcode: ` ${code} `,
+        kcalPer100g: 140,
+        proteinPer100g: 5,
+        fatPer100g: 3,
+        carbsPer100g: 24,
+      });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.code).toBe('BARCODE_ALREADY_USED');
+
+    const shared = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', other.authorization)
+      .send({
+        name: 'Their oats',
+        barcode: code,
+        kcalPer100g: 141,
+        proteinPer100g: 5,
+        fatPer100g: 3,
+        carbsPer100g: 24,
+      })
+      .expect(201);
+
+    vi.mocked(off.barcode).mockResolvedValue({
+      status: 'ok',
+      value: {
+        code,
+        product_name: 'Should not win',
+        nutriments: {
+          'energy-kcal_100g': 10,
+          proteins_100g: 1,
+          fat_100g: 1,
+          carbohydrates_100g: 1,
+        },
+      },
+    });
+    const mine = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${code}&q=ignored`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    const theirs = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${code}`)
+      .set('Authorization', other.authorization)
+      .expect(200);
+    expect(off.barcode).not.toHaveBeenCalled();
+    expect(
+      mine.body.products.map((product: { id: string }) => product.id),
+    ).toEqual([created.body.id]);
+    expect(
+      theirs.body.products.map((product: { id: string }) => product.id),
+    ).toEqual([shared.body.id]);
+
+    vi.mocked(off.barcode).mockResolvedValue({
+      status: 'ok',
+      value: {
+        code: yogurtCode,
+        product_name: 'Yogurt',
+        nutriments: {
+          'energy-kcal_100g': 60,
+          proteins_100g: 4,
+          fat_100g: 2,
+          carbohydrates_100g: 5,
+        },
+      },
+    });
+    const found = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(found.body.products[0].barcode).toBe(yogurtCode);
+    const logged = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: found.body.products[0].id,
+        grams: 100,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-05',
+      })
+      .expect(201);
+    const copied = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${logged.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 70, saveAsMyProduct: true })
+      .expect(200);
+    const firstCopy = await prisma.foodProduct.findUniqueOrThrow({
+      where: { id: copied.body.productId },
+    });
+    expect(firstCopy.barcode).toBe(yogurtCode);
+
+    const again = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: found.body.products[0].id,
+        grams: 100,
+        meal: 'DINNER',
+        loggedOn: '2026-11-06',
+      })
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${again.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 70, saveAsMyProduct: true })
+      .expect(200);
+    const secondCopy = await prisma.foodProduct.findUniqueOrThrow({
+      where: { id: second.body.productId },
+    });
+    expect(secondCopy.barcode).toBeNull();
+  });
+
+  it('saves two copies of one barcode at the same time', async () => {
+    const user = await account('food-barcode-race@example.com');
+    await subscribe(user.id);
+    vi.mocked(off.barcode).mockResolvedValue({
+      status: 'ok',
+      value: {
+        code: yogurtCode,
+        product_name: 'Yogurt',
+        nutriments: {
+          'energy-kcal_100g': 60,
+          proteins_100g: 4,
+          fat_100g: 2,
+          carbohydrates_100g: 5,
+        },
+      },
+    });
+    const found = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    const productId = found.body.products[0].id as string;
+    const [firstLog, secondLog] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/api/v1/food/log')
+        .set('Authorization', user.authorization)
+        .send({
+          productId,
+          grams: 100,
+          meal: 'LUNCH',
+          loggedOn: '2026-11-07',
+        }),
+      request(app.getHttpServer())
+        .post('/api/v1/food/log')
+        .set('Authorization', user.authorization)
+        .send({
+          productId,
+          grams: 80,
+          meal: 'DINNER',
+          loggedOn: '2026-11-07',
+        }),
+    ]);
+    expect(firstLog.status).toBe(201);
+    expect(secondLog.status).toBe(201);
+
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/api/v1/food/log/${firstLog.body.id}`)
+        .set('Authorization', user.authorization)
+        .send({ kcal: 70, saveAsMyProduct: true }),
+      request(app.getHttpServer())
+        .patch(`/api/v1/food/log/${secondLog.body.id}`)
+        .set('Authorization', user.authorization)
+        .send({ kcal: 90, saveAsMyProduct: true }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.body.kcal).toBe(70);
+    expect(first.body.grams).toBe(100);
+    expect(second.body.kcal).toBe(90);
+    expect(second.body.grams).toBe(80);
+
+    const copies = await prisma.foodProduct.findMany({
+      where: { id: { in: [first.body.productId, second.body.productId] } },
+    });
+    expect(copies).toHaveLength(2);
+    expect(copies.filter((copy) => copy.barcode === yogurtCode)).toHaveLength(
+      1,
+    );
+    expect(copies.filter((copy) => copy.barcode === null)).toHaveLength(1);
+  });
+
+  it('falls back inside the same transaction when two copies insert one barcode', async () => {
+    const user = await account('food-barcode-savepoint@example.com');
+    const catalog = app.get(FoodCatalogRepository);
+    const input = (name: string) => ({
+      name,
+      imageUrl: null,
+      barcode: '4006381333931',
+      basedOnProductId: null,
+      kcalPer100g: new Prisma.Decimal(10),
+      proteinPer100g: new Prisma.Decimal(1),
+      fatPer100g: new Prisma.Decimal(1),
+      carbsPer100g: new Prisma.Decimal(1),
+    });
+    const ids = await Promise.all([
+      prisma.$transaction(async (tx) => {
+        const copy = await catalog.copyFromEntry(user.id, input('A'), tx);
+        await tx.foodProduct.update({
+          where: { id: copy.id },
+          data: { brand: 'kept' },
+        });
+        return copy.id;
+      }),
+      prisma.$transaction(async (tx) => {
+        const copy = await catalog.copyFromEntry(user.id, input('B'), tx);
+        await tx.foodProduct.update({
+          where: { id: copy.id },
+          data: { brand: 'kept' },
+        });
+        return copy.id;
+      }),
+    ]);
+    const rows = await prisma.foodProduct.findMany({
+      where: { id: { in: ids } },
+    });
+    expect(rows.every((row) => row.brand === 'kept')).toBe(true);
+    expect(rows.filter((row) => row.barcode === '4006381333931')).toHaveLength(
+      1,
+    );
+    expect(rows.filter((row) => row.barcode === null)).toHaveLength(1);
+  });
+
+  it('does not hide a unique violation that is not the barcode', async () => {
+    const user = await account('food-barcode-other-unique@example.com');
+    await prisma.foodProduct.create({
+      data: {
+        source: 'CUSTOM',
+        ownerId: user.id,
+        externalId: null,
+        barcode: '4006381333931',
+        name: 'Same name',
+        kcalPer100g: 10,
+        proteinPer100g: 1,
+        fatPer100g: 1,
+        carbsPer100g: 1,
+      },
+    });
+    const catalog = app.get(FoodCatalogRepository);
+    let caught: unknown;
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          CREATE UNIQUE INDEX food_products_name_probe
+          ON food_products (owner_id, name)
+          WHERE source = 'CUSTOM'
+        `;
+        try {
+          await catalog.copyFromEntry(
+            user.id,
+            {
+              name: 'Same name',
+              imageUrl: null,
+              barcode: '0036000291452',
+              basedOnProductId: null,
+              kcalPer100g: new Prisma.Decimal(12),
+              proteinPer100g: new Prisma.Decimal(1),
+              fatPer100g: new Prisma.Decimal(1),
+              carbsPer100g: new Prisma.Decimal(1),
+            },
+            tx,
+          );
+        } catch (error) {
+          caught = error;
+        }
+        expect(
+          await tx.foodProduct.count({
+            where: { ownerId: user.id, name: 'Same name' },
+          }),
+        ).toBe(1);
+        throw new Error('rollback name probe');
+      });
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.message !== 'rollback name probe'
+      ) {
+        throw error;
+      }
+    }
+    expect(caught).toMatchObject({ code: 'P2002' });
+    expect(
+      (caught as { meta?: { target?: unknown } }).meta?.target,
+    ).not.toEqual(['owner_id', 'barcode']);
   });
 });

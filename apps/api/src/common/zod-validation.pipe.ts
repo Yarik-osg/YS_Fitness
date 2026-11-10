@@ -23,8 +23,11 @@ export class ZodValidationPipe implements PipeTransform {
       return schema.parse(value);
     } catch (error) {
       if (error instanceof ZodError) {
+        const onlyBarcode =
+          error.issues.length > 0 &&
+          error.issues.every((issue) => issue.path[0] === 'barcode');
         throw new BadRequestException({
-          code: 'VALIDATION_ERROR',
+          code: onlyBarcode ? 'INVALID_BARCODE' : 'VALIDATION_ERROR',
           message: 'Request validation failed',
           details: treeifyError(error),
         });

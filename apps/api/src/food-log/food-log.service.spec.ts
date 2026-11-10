@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { FoodLogEntry } from '@prisma/client';
+import { normalizeBarcode } from '@repo/validation';
 import { describe, expect, it, vi } from 'vitest';
 import { FoodLogService } from './food-log.service.js';
 
@@ -45,6 +46,12 @@ function harness(current = entry()) {
   };
   const catalog = {
     copyFromEntry: vi.fn().mockResolvedValue({ id: 'my-product' }),
+    findVisible: vi.fn().mockResolvedValue({
+      source: 'OFF',
+      externalId: null,
+      barcode: null,
+    }),
+    findCustomByBarcode: vi.fn().mockResolvedValue(null),
   };
   const service = new FoodLogService(
     entries as never,
@@ -132,7 +139,51 @@ describe('FoodLogService.update', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(entries.updateOwned).not.toHaveBeenCalled();
   });
+
+  it('copies an OFF barcode and leaves it blank when the user already owns it', async () => {
+    const code = firstBarcode();
+    const { service, catalog, db } = harness();
+    catalog.findVisible.mockResolvedValue({
+      source: 'OFF',
+      externalId: code,
+    });
+
+    await service.update(userId, entryId, { saveAsMyProduct: true, grams: 50 });
+    expect(catalog.copyFromEntry).toHaveBeenCalledWith(
+      userId,
+      expect.objectContaining({ barcode: code }),
+      db,
+    );
+
+    catalog.findCustomByBarcode.mockResolvedValue({ id: 'owned' });
+    await service.update(userId, entryId, { saveAsMyProduct: true, grams: 50 });
+    expect(catalog.copyFromEntry).toHaveBeenLastCalledWith(
+      userId,
+      expect.objectContaining({ barcode: null }),
+      db,
+    );
+
+    catalog.findVisible.mockResolvedValue({
+      source: 'CUSTOM',
+      externalId: null,
+      barcode: code,
+    });
+    await service.update(userId, entryId, { saveAsMyProduct: true, grams: 50 });
+    expect(catalog.copyFromEntry).toHaveBeenLastCalledWith(
+      userId,
+      expect.objectContaining({ barcode: null }),
+      db,
+    );
+  });
 });
+
+function firstBarcode(): string {
+  for (let value = 10 ** 12; value < 10 ** 12 + 200_000; value += 1) {
+    const code = String(value);
+    if (normalizeBarcode(code) === code) return code;
+  }
+  throw new Error('no barcode');
+}
 
 describe('FoodLogService.day', () => {
   it('marks logged products the user already favorited', async () => {

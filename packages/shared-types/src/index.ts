@@ -624,6 +624,8 @@ export interface FoodProductResponse {
   id: string;
   source: FoodProductSource;
   externalId: string | null;
+  /** Custom foods use their own barcode. Open Food Facts rows use externalId. */
+  barcode: string | null;
   name: string;
   brand: string | null;
   imageUrl: string | null;

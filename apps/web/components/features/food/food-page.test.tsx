@@ -59,6 +59,7 @@ const milk: FoodProductResponse = {
   id: '11111111-1111-4111-8111-111111111111',
   source: 'OFF',
   externalId: '123',
+  barcode: null,
   name: 'Milk',
   brand: 'Farm',
   imageUrl: null,

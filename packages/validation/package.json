@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./barcode": {
+      "types": "./src/barcode.ts",
+      "default": "./src/barcode.ts"
+    },
     "./food-search": {
       "types": "./src/food-search.ts",
       "default": "./src/food-search.ts"

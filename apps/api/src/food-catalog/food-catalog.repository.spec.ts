@@ -67,6 +67,7 @@ describe('FoodCatalogRepository.copyFromEntry', () => {
       {
         name: 'Milk',
         imageUrl: null,
+        barcode: null,
         basedOnProductId: 'off-product',
         kcalPer100g: new Prisma.Decimal(160),
         proteinPer100g: new Prisma.Decimal(10),
