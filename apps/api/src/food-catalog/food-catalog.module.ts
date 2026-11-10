@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service.js';
+import { FoodBarcodeIndexCheck } from './food-barcode-index.check.js';
 import { FoodCatalogRepository } from './food-catalog.repository.js';
 import { FoodCatalogService } from './food-catalog.service.js';
 import { OFF_BARCODE_BUDGET_PER_MIN } from './food-search-limits.js';
@@ -19,6 +20,7 @@ import {
   providers: [
     FoodCatalogRepository,
     FoodCatalogService,
+    FoodBarcodeIndexCheck,
     OpenFoodFactsHttp,
     SystemClock,
     { provide: CLOCK, useExisting: SystemClock },
