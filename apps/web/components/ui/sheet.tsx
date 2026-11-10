@@ -41,9 +41,10 @@ export function Sheet({
 export function SheetContent({
   className,
   children,
+  full = false,
   onCloseAutoFocus,
   ...props
-}: React.ComponentProps<typeof Drawer.Content>) {
+}: React.ComponentProps<typeof Drawer.Content> & { full?: boolean }) {
   const opener = React.useContext(OpenerContext);
   return (
     <Drawer.Portal>
@@ -56,18 +57,26 @@ export function SheetContent({
           }
         }}
         className={cn(
-          'fixed inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-[430px] max-h-[100dvh] flex-col border-t border-white/10 bg-panel pt-4 outline-none',
+          full
+            ? 'fixed inset-x-0 top-0 z-[60] mx-auto flex h-svh max-h-svh w-full max-w-[430px] flex-col bg-background outline-none'
+            : 'fixed inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-[430px] max-h-[100dvh] flex-col border-t border-white/10 bg-panel pt-4 outline-none',
           className,
         )}
         {...props}
       >
-        <div
-          aria-hidden="true"
-          className="mx-auto mb-5 h-1 w-10 shrink-0 rounded-full bg-white/20"
-        />
+        {full ? null : (
+          <div
+            aria-hidden="true"
+            className="mx-auto mb-5 h-1 w-10 shrink-0 rounded-full bg-white/20"
+          />
+        )}
         <div
           data-vaul-no-drag
-          className="max-h-[calc(100dvh-4.5rem)] touch-pan-y overflow-y-auto overscroll-contain px-5 pb-[max(2.25rem,env(safe-area-inset-bottom))]"
+          className={
+            full
+              ? 'relative min-h-0 flex-1 overflow-hidden'
+              : 'max-h-[calc(100dvh-4.5rem)] touch-pan-y overflow-y-auto overscroll-contain px-5 pb-[max(2.25rem,env(safe-area-inset-bottom))]'
+          }
         >
           {children}
         </div>

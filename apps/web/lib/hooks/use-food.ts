@@ -1,10 +1,12 @@
 'use client';
 
 import type { FoodProductResponse } from '@repo/shared-types';
-import type {
-  CreateFoodLogInput,
-  CreateFoodProductInput,
-  PatchFoodLogInput,
+import {
+  isValidBarcode,
+  normalizeBarcode,
+  type CreateFoodLogInput,
+  type CreateFoodProductInput,
+  type PatchFoodLogInput,
 } from '@repo/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -48,9 +50,24 @@ export function useFoodSearch(query: string) {
   return useQuery({
     queryKey: foodSearchKey(trimmed),
     queryFn: ({ signal }) => searchFoods({ q: trimmed }, signal),
-    enabled: trimmed.length >= 2,
+    enabled: trimmed.length >= 2 && !isValidBarcode(trimmed),
   });
 }
+
+export function foodBarcodeKey(code: string) {
+  return ['food', 'barcode', code] as const;
+}
+
+export function useFoodBarcodeLookup(code: string | null) {
+  const normalized = code ? normalizeBarcode(code) : null;
+  return useQuery({
+    queryKey: foodBarcodeKey(normalized ?? ''),
+    queryFn: ({ signal }) => searchFoods({ barcode: normalized ?? '' }, signal),
+    enabled: normalized !== null,
+  });
+}
+
+export type BarcodeLookup = ReturnType<typeof useFoodBarcodeLookup>;
 
 export function useCustomFoods(enabled: boolean) {
   return useQuery({
@@ -122,7 +139,11 @@ export function useCreateFoodProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateFoodProductInput) => createFoodProduct(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: foodCustomKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: foodCustomKey }),
+        queryClient.invalidateQueries({ queryKey: ['food', 'barcode'] }),
+      ]),
   });
 }
 

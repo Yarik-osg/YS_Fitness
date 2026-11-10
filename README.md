@@ -86,6 +86,8 @@ NEXT_PUBLIC_API_BASE_URL=/api/v1
 
 When you are done, remove the ngrok origin from `WEB_ORIGINS`, set `NEXT_PUBLIC_API_BASE_URL` back to `http://localhost:3001/api/v1`, and restart again.
 
+Barcode scanning needs that HTTPS page. Phone browsers treat `http://localhost` on the computer as someone else's insecure origin, so the camera stays off and the scanner offers a typed code or a photo instead. Desktop Chrome treats `http://localhost:3000` as secure, so a webcam works there. `pnpm install` copies the ZXing reader wasm from the pinned `zxing-wasm` package into `apps/web/public/zxing/`; the page loads that file from the same origin.
+
 `apps/web/next.config.js` allows the common ngrok host wildcards in `allowedDevOrigins` (dev only) and rewrites `/api/v1` to `API_PROXY_TARGET` (default `http://localhost:3001`). Same-origin rewrite keeps `COOKIE_SAME_SITE=lax`.
 
 If you ever use two different public hosts for web and API, set `COOKIE_SAME_SITE=none`. Then login/register/refresh return `csrfToken` in JSON; the page stores it as `ys_csrf` and sends `x-csrf-token`, because it cannot read the API cookie on the other host.

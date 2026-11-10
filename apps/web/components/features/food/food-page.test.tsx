@@ -551,7 +551,7 @@ describe('FoodPage', () => {
     );
     expect(screen.getByPlaceholderText('Product name')).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText('Calories per 100 g'),
+      screen.getByRole('textbox', { name: 'Calories per 100 g' }),
     ).toBeInTheDocument();
     await user.type(
       screen.getByRole('textbox', { name: 'Product name' }),
