@@ -34,6 +34,14 @@ Search calls are limited in two different places. The route allows 30 searches a
 
 Every `/food` route requires a JWT and an active subscription.
 
+## Barcode addendum
+
+A search barcode is trimmed to digits of length 8, 12, or 13 and must pass the GS1 mod-10 check. A 12-digit UPC-A is stored and queried as the EAN-13 with a leading 0. EAN-8 stays 8 digits. Anything else is `400` `INVALID_BARCODE` when that is the only invalid field, otherwise the usual `VALIDATION_ERROR`.
+
+When `barcode` is present it wins over `q`. The order is the caller’s `CUSTOM` row with that `barcode` column, then an `OFF` row whose `externalId` is the normalized code or the legacy 12-digit form, then a fresh `FoodSearchQuery` row keyed `barcode:<code>`. Only then does the outbound gate run. A definitive miss (Open Food Facts has no product, or the product has no name, no kcal, or values over the per-100g caps) is recorded for 24 hours and the next scan does not leave the process. A thrown lookup or a spent user or process allowance returns the local rows with `fromCacheOnly: true` and writes nothing. Cache hits spend neither allowance. The user allowance is `FOOD_BARCODE_USER_OFF_CALLS_PER_MIN` (default 20). The process allowance stays 100. Checking the user first means a process denial does not consume the user’s token, and a user denial does not consume the process token. Barcode scans use the same 30-per-minute route throttle as text search.
+
+`barcode` is its own column. `externalId` stays the Open Food Facts identity and is null on every custom row, so the `(source, externalId)` unique index still allows many custom foods with no code. One custom barcode per user is `food_products_custom_barcode_key` on `(owner_id, barcode) WHERE source = 'CUSTOM' AND barcode IS NOT NULL`. Prisma cannot model that predicate, so the index is only in the migration SQL. `prisma migrate deploy` (what CI runs) applies the file and does not drop it. `prisma db push` and a schema-only rebuild would. Do not accept a generated migration that drops the index. Two users may share a code. `saveAsMyProduct` copies an Open Food Facts `externalId` onto the new custom row when it is a valid barcode and this user does not already own that code; otherwise the copy’s barcode stays null, and a unique-index race retries without the code. A copy of a custom product gets no barcode. The response field `barcode` is the custom column, or `externalId` for an Open Food Facts row.
+
 ## Consequences
 
 ### Positive
