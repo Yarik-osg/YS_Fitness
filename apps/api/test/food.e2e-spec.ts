@@ -1,6 +1,6 @@
 import { BadGatewayException, type INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { hash } from 'argon2';
 import cookieParser from 'cookie-parser';
@@ -11,6 +11,7 @@ import {
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
 import { normalizeBarcode } from '@repo/validation';
+import { FoodCatalogRepository } from '../src/food-catalog/food-catalog.repository.js';
 import { OFF_CLIENT, type OffLookup } from '../src/food-catalog/off-client.js';
 
 function validEan13(): string {
@@ -999,5 +1000,180 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       where: { id: second.body.productId },
     });
     expect(secondCopy.barcode).toBeNull();
+  });
+
+  it('saves two copies of one barcode at the same time', async () => {
+    const user = await account('food-barcode-race@example.com');
+    await subscribe(user.id);
+    vi.mocked(off.barcode).mockResolvedValue({
+      status: 'ok',
+      value: {
+        code: yogurtCode,
+        product_name: 'Yogurt',
+        nutriments: {
+          'energy-kcal_100g': 60,
+          proteins_100g: 4,
+          fat_100g: 2,
+          carbohydrates_100g: 5,
+        },
+      },
+    });
+    const found = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    const productId = found.body.products[0].id as string;
+    const [firstLog, secondLog] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/api/v1/food/log')
+        .set('Authorization', user.authorization)
+        .send({
+          productId,
+          grams: 100,
+          meal: 'LUNCH',
+          loggedOn: '2026-11-07',
+        }),
+      request(app.getHttpServer())
+        .post('/api/v1/food/log')
+        .set('Authorization', user.authorization)
+        .send({
+          productId,
+          grams: 80,
+          meal: 'DINNER',
+          loggedOn: '2026-11-07',
+        }),
+    ]);
+    expect(firstLog.status).toBe(201);
+    expect(secondLog.status).toBe(201);
+
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/api/v1/food/log/${firstLog.body.id}`)
+        .set('Authorization', user.authorization)
+        .send({ kcal: 70, saveAsMyProduct: true }),
+      request(app.getHttpServer())
+        .patch(`/api/v1/food/log/${secondLog.body.id}`)
+        .set('Authorization', user.authorization)
+        .send({ kcal: 90, saveAsMyProduct: true }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.body.kcal).toBe(70);
+    expect(first.body.grams).toBe(100);
+    expect(second.body.kcal).toBe(90);
+    expect(second.body.grams).toBe(80);
+
+    const copies = await prisma.foodProduct.findMany({
+      where: { id: { in: [first.body.productId, second.body.productId] } },
+    });
+    expect(copies).toHaveLength(2);
+    expect(copies.filter((copy) => copy.barcode === yogurtCode)).toHaveLength(
+      1,
+    );
+    expect(copies.filter((copy) => copy.barcode === null)).toHaveLength(1);
+  });
+
+  it('falls back inside the same transaction when two copies insert one barcode', async () => {
+    const user = await account('food-barcode-savepoint@example.com');
+    const catalog = app.get(FoodCatalogRepository);
+    const input = (name: string) => ({
+      name,
+      imageUrl: null,
+      barcode: '4006381333931',
+      basedOnProductId: null,
+      kcalPer100g: new Prisma.Decimal(10),
+      proteinPer100g: new Prisma.Decimal(1),
+      fatPer100g: new Prisma.Decimal(1),
+      carbsPer100g: new Prisma.Decimal(1),
+    });
+    const ids = await Promise.all([
+      prisma.$transaction(async (tx) => {
+        const copy = await catalog.copyFromEntry(user.id, input('A'), tx);
+        await tx.foodProduct.update({
+          where: { id: copy.id },
+          data: { brand: 'kept' },
+        });
+        return copy.id;
+      }),
+      prisma.$transaction(async (tx) => {
+        const copy = await catalog.copyFromEntry(user.id, input('B'), tx);
+        await tx.foodProduct.update({
+          where: { id: copy.id },
+          data: { brand: 'kept' },
+        });
+        return copy.id;
+      }),
+    ]);
+    const rows = await prisma.foodProduct.findMany({
+      where: { id: { in: ids } },
+    });
+    expect(rows.every((row) => row.brand === 'kept')).toBe(true);
+    expect(rows.filter((row) => row.barcode === '4006381333931')).toHaveLength(
+      1,
+    );
+    expect(rows.filter((row) => row.barcode === null)).toHaveLength(1);
+  });
+
+  it('does not hide a unique violation that is not the barcode', async () => {
+    const user = await account('food-barcode-other-unique@example.com');
+    await prisma.foodProduct.create({
+      data: {
+        source: 'CUSTOM',
+        ownerId: user.id,
+        externalId: null,
+        barcode: '4006381333931',
+        name: 'Same name',
+        kcalPer100g: 10,
+        proteinPer100g: 1,
+        fatPer100g: 1,
+        carbsPer100g: 1,
+      },
+    });
+    const catalog = app.get(FoodCatalogRepository);
+    let caught: unknown;
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          CREATE UNIQUE INDEX food_products_name_probe
+          ON food_products (owner_id, name)
+          WHERE source = 'CUSTOM'
+        `;
+        try {
+          await catalog.copyFromEntry(
+            user.id,
+            {
+              name: 'Same name',
+              imageUrl: null,
+              barcode: '0036000291452',
+              basedOnProductId: null,
+              kcalPer100g: new Prisma.Decimal(12),
+              proteinPer100g: new Prisma.Decimal(1),
+              fatPer100g: new Prisma.Decimal(1),
+              carbsPer100g: new Prisma.Decimal(1),
+            },
+            tx,
+          );
+        } catch (error) {
+          caught = error;
+        }
+        expect(
+          await tx.foodProduct.count({
+            where: { ownerId: user.id, name: 'Same name' },
+          }),
+        ).toBe(1);
+        throw new Error('rollback name probe');
+      });
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.message !== 'rollback name probe'
+      ) {
+        throw error;
+      }
+    }
+    expect(caught).toMatchObject({ code: 'P2002' });
+    expect(
+      (caught as { meta?: { target?: unknown } }).meta?.target,
+    ).not.toEqual(['owner_id', 'barcode']);
   });
 });

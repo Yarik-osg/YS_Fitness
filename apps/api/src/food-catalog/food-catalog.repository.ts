@@ -163,11 +163,24 @@ export class FoodCatalogRepository {
     },
     db: Client,
   ): Promise<{ id: string }> {
+    if (!input.barcode) return this.insertCopy(userId, input, db);
+    // A unique violation aborts the Postgres transaction. The savepoint is the
+    // only statement that can undo that insert and leave the caller's update runnable.
+    await db.$executeRaw`SAVEPOINT food_copy_barcode`;
     try {
-      return await this.insertCopy(userId, input, db);
+      const created = await this.insertCopy(userId, input, db);
+      await db.$executeRaw`RELEASE SAVEPOINT food_copy_barcode`;
+      return created;
     } catch (error) {
-      if (!input.barcode || !isUniqueViolation(error)) throw error;
-      return this.insertCopy(userId, { ...input, barcode: null }, db);
+      await db.$executeRaw`ROLLBACK TO SAVEPOINT food_copy_barcode`;
+      if (!isBarcodeConflict(error)) throw error;
+      const created = await this.insertCopy(
+        userId,
+        { ...input, barcode: null },
+        db,
+      );
+      await db.$executeRaw`RELEASE SAVEPOINT food_copy_barcode`;
+      return created;
     }
   }
 
@@ -206,10 +219,20 @@ function matchQuery(terms?: string) {
   return matches;
 }
 
-function isUniqueViolation(error: unknown): boolean {
+const BARCODE_CONFLICT_FIELDS = ['barcode', 'owner_id'];
+
+function isBarcodeConflict(error: unknown): boolean {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2002' ||
+    !Array.isArray(error.meta?.target)
+  ) {
+    return false;
+  }
+  const fields = error.meta.target.map(String).sort();
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2002'
+    fields.length === BARCODE_CONFLICT_FIELDS.length &&
+    fields.every((field, index) => field === BARCODE_CONFLICT_FIELDS[index])
   );
 }
 
