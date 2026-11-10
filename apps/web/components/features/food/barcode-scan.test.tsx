@@ -284,7 +284,19 @@ describe('BarcodeScanner camera', () => {
 
 function ScannerProbe({ active }: { active: boolean }) {
   const scanner = useBarcodeScanner(active, vi.fn());
-  return <p>{scanner.phase}</p>;
+  return (
+    <>
+      <p>{scanner.phase}</p>
+      <button
+        type="button"
+        aria-pressed={scanner.torch}
+        disabled={!scanner.canTorch}
+        onClick={() => void scanner.toggleTorch()}
+      >
+        torch
+      </button>
+    </>
+  );
 }
 
 describe('useBarcodeScanner', () => {
@@ -315,6 +327,50 @@ describe('useBarcodeScanner', () => {
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
     view.unmount();
     expect(track.stop).toHaveBeenCalled();
+  });
+
+  it('turns the torch control off when the device rejects it', async () => {
+    const user = userEvent.setup();
+    const applyConstraints = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('torch unavailable'));
+    const track = {
+      stop: vi.fn(),
+      getCapabilities: () => ({ torch: true }),
+      applyConstraints,
+    };
+    vi.stubGlobal('isSecureContext', true);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [track],
+          getVideoTracks: () => [track],
+        }),
+      },
+    });
+    vi.stubGlobal(
+      'BarcodeDetector',
+      class {
+        static getSupportedFormats() {
+          return Promise.resolve(['ean_13', 'ean_8', 'upc_a']);
+        }
+
+        detect() {
+          return Promise.resolve([]);
+        }
+      },
+    );
+    renderProbe(true);
+    const button = await screen.findByRole('button', { name: 'torch' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+    await user.click(button);
+    await waitFor(() =>
+      expect(button).toHaveAttribute('aria-pressed', 'false'),
+    );
   });
 
   it('stops every track when the tab is hidden or the route changes', async () => {

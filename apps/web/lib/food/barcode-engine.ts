@@ -37,16 +37,22 @@ export async function loadPolyfillDetector(): Promise<ScanDetector> {
 export async function createScanDetector(
   loadPolyfill: () => Promise<ScanDetector> = loadPolyfillDetector,
 ): Promise<{ detector: ScanDetector; usedPolyfill: boolean }> {
-  const Native = nativeDetector();
-  if (Native?.getSupportedFormats) {
-    const supported = await Native.getSupportedFormats();
-    const ready = BARCODE_FORMATS.every((format) => supported.includes(format));
-    if (ready) {
-      return {
-        detector: new Native({ formats: [...BARCODE_FORMATS] }),
-        usedPolyfill: false,
-      };
+  try {
+    const Native = nativeDetector();
+    if (Native?.getSupportedFormats) {
+      const supported = await Native.getSupportedFormats();
+      const ready = BARCODE_FORMATS.every((format) =>
+        supported.includes(format),
+      );
+      if (ready) {
+        return {
+          detector: new Native({ formats: [...BARCODE_FORMATS] }),
+          usedPolyfill: false,
+        };
+      }
     }
+  } catch {
+    // A native detector can reject or throw and still leave the camera usable.
   }
   return { detector: await loadPolyfill(), usedPolyfill: true };
 }

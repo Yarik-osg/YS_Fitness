@@ -180,8 +180,13 @@ export function useBarcodeScanner(
     const track = streamRef.current?.getVideoTracks()[0];
     if (!track || !torchCapable(track)) return;
     const next = !torch;
-    await setTorch(track, next);
-    setTorchOn(next);
+    try {
+      await setTorch(track, next);
+      setTorchOn(next);
+    } catch {
+      setTorchOn(false);
+      if (!torchCapable(track)) setCanTorch(false);
+    }
   }
 
   const bindVideo = useCallback((node: HTMLVideoElement | null) => {

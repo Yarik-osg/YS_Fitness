@@ -40,4 +40,36 @@ describe('createScanDetector', () => {
     expect(created.detector).toBe(polyfill);
     expect(loadPolyfill).toHaveBeenCalledOnce();
   });
+
+  it('uses the polyfill when the native detector fails', async () => {
+    class Native {
+      static getSupportedFormats() {
+        return Promise.reject(new Error('formats failed'));
+      }
+    }
+    vi.stubGlobal('BarcodeDetector', Native);
+    const polyfill = { detect: vi.fn() };
+    const loadPolyfill = vi.fn(async () => polyfill);
+    const created = await createScanDetector(loadPolyfill);
+    expect(created.usedPolyfill).toBe(true);
+    expect(created.detector).toBe(polyfill);
+  });
+
+  it('uses the polyfill when the native constructor throws', async () => {
+    class Native {
+      static getSupportedFormats() {
+        return Promise.resolve(formats);
+      }
+
+      constructor() {
+        throw new Error('native broken');
+      }
+    }
+    vi.stubGlobal('BarcodeDetector', Native);
+    const polyfill = { detect: vi.fn() };
+    const loadPolyfill = vi.fn(async () => polyfill);
+    const created = await createScanDetector(loadPolyfill);
+    expect(created.usedPolyfill).toBe(true);
+    expect(created.detector).toBe(polyfill);
+  });
 });
