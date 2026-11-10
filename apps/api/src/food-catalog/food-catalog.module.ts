@@ -29,6 +29,7 @@ import {
           searchPerMin: config.get('OFF_SEARCH_BUDGET_PER_MIN'),
           userPerMin: config.get('FOOD_SEARCH_USER_OFF_CALLS_PER_MIN'),
           barcodePerMin: OFF_BARCODE_BUDGET_PER_MIN,
+          barcodeUserPerMin: config.get('FOOD_BARCODE_USER_OFF_CALLS_PER_MIN'),
         }),
       inject: [CLOCK, AppConfigService],
     },

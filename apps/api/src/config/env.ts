@@ -46,6 +46,12 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(3),
+  // Per-user Open Food Facts barcode lookups per minute. Cache hits do not count.
+  FOOD_BARCODE_USER_OFF_CALLS_PER_MIN: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(20),
 });
 
 export type AppEnvironment = z.infer<typeof envSchema>;

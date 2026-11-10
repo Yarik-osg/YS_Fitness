@@ -10,7 +10,26 @@ import {
   configureE2eEnvironment,
   readTestDatabaseUrl,
 } from '../src/config/test-environment.js';
+import { normalizeBarcode } from '@repo/validation';
 import { OFF_CLIENT, type OffLookup } from '../src/food-catalog/off-client.js';
+
+function validEan13(): string {
+  for (let value = 10 ** 12; value < 10 ** 12 + 200_000; value += 1) {
+    const code = String(value);
+    if (normalizeBarcode(code) === code) return code;
+  }
+  throw new Error('no valid barcode');
+}
+
+const yogurtCode = validEan13();
+
+function anotherEan13(taken: string): string {
+  for (let value = 10 ** 12; value < 10 ** 12 + 200_000; value += 1) {
+    const code = String(value);
+    if (code !== taken && normalizeBarcode(code) === code) return code;
+  }
+  throw new Error('no second barcode');
+}
 
 const testDatabaseUrl = readTestDatabaseUrl() ?? '';
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;
@@ -213,7 +232,7 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     vi.mocked(off.barcode).mockResolvedValue({
       status: 'ok',
       value: {
-        code: '55556666',
+        code: yogurtCode,
         product_name: 'Yogurt',
         nutriments: {
           'energy-kcal_100g': 60,
@@ -224,11 +243,11 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       },
     });
     await request(app.getHttpServer())
-      .get('/api/v1/food/products/search?barcode=55556666')
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
       .set('Authorization', user.authorization)
       .expect(200);
     await request(app.getHttpServer())
-      .get('/api/v1/food/products/search?barcode=55556666')
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
       .set('Authorization', user.authorization)
       .expect(200);
     expect(off.barcode).toHaveBeenCalledTimes(1);
@@ -730,11 +749,13 @@ describeWithDatabase('food catalog and log (e2e)', () => {
       ).status,
     ).toBe(400);
 
+    const riceCode = anotherEan13(yogurtCode);
     const created = await request(app.getHttpServer())
       .post('/api/v1/food/products')
       .set('Authorization', user.authorization)
       .send({
         name: 'Rice',
+        barcode: riceCode,
         kcalPer100g: 130,
         proteinPer100g: 3,
         fatPer100g: 1,
@@ -821,11 +842,13 @@ describeWithDatabase('food catalog and log (e2e)', () => {
     const original = all.body.items[0];
     const copy = all.body.items[1];
     expect(original.product.id).toBe(created.body.id);
+    expect(original.product.barcode).toBe(riceCode);
     expect(original.product.kcalPer100g).toBe(130);
     expect(original.lastGrams).toBe(40);
     expect(original.lastMeal).toBe('BREAKFAST');
     expect(original.lastLoggedOn).toBe('2026-11-03');
     expect(copy.product.id).not.toBe(created.body.id);
+    expect(copy.product.barcode).toBeNull();
     expect(copy.product.kcalPer100g).toBe(50);
     expect(copy.lastGrams).toBe(80);
     expect(copy.lastMeal).toBe('SNACK');
@@ -835,5 +858,146 @@ describeWithDatabase('food catalog and log (e2e)', () => {
         (item: { product: { name: string } }) => item.product.name === 'Secret',
       ),
     ).toBe(false);
+  });
+
+  it('keeps a custom barcode per user and copies an Open Food Facts code once', async () => {
+    const user = await account('food-barcode@example.com');
+    const other = await account('food-barcode-other@example.com');
+    await subscribe(user.id);
+    await subscribe(other.id);
+    const code = anotherEan13(yogurtCode);
+    const invalid = await request(app.getHttpServer())
+      .get('/api/v1/food/products/search?barcode=55556666')
+      .set('Authorization', user.authorization);
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.code).toBe('INVALID_BARCODE');
+
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'My oats',
+        barcode: code,
+        kcalPer100g: 140,
+        proteinPer100g: 5,
+        fatPer100g: 3,
+        carbsPer100g: 24,
+      })
+      .expect(201);
+    expect(created.body.barcode).toBe(code);
+
+    const duplicate = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', user.authorization)
+      .send({
+        name: 'Oats again',
+        barcode: ` ${code} `,
+        kcalPer100g: 140,
+        proteinPer100g: 5,
+        fatPer100g: 3,
+        carbsPer100g: 24,
+      });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.code).toBe('BARCODE_ALREADY_USED');
+
+    const shared = await request(app.getHttpServer())
+      .post('/api/v1/food/products')
+      .set('Authorization', other.authorization)
+      .send({
+        name: 'Their oats',
+        barcode: code,
+        kcalPer100g: 141,
+        proteinPer100g: 5,
+        fatPer100g: 3,
+        carbsPer100g: 24,
+      })
+      .expect(201);
+
+    vi.mocked(off.barcode).mockResolvedValue({
+      status: 'ok',
+      value: {
+        code,
+        product_name: 'Should not win',
+        nutriments: {
+          'energy-kcal_100g': 10,
+          proteins_100g: 1,
+          fat_100g: 1,
+          carbohydrates_100g: 1,
+        },
+      },
+    });
+    const mine = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${code}&q=ignored`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    const theirs = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${code}`)
+      .set('Authorization', other.authorization)
+      .expect(200);
+    expect(off.barcode).not.toHaveBeenCalled();
+    expect(
+      mine.body.products.map((product: { id: string }) => product.id),
+    ).toEqual([created.body.id]);
+    expect(
+      theirs.body.products.map((product: { id: string }) => product.id),
+    ).toEqual([shared.body.id]);
+
+    vi.mocked(off.barcode).mockResolvedValue({
+      status: 'ok',
+      value: {
+        code: yogurtCode,
+        product_name: 'Yogurt',
+        nutriments: {
+          'energy-kcal_100g': 60,
+          proteins_100g: 4,
+          fat_100g: 2,
+          carbohydrates_100g: 5,
+        },
+      },
+    });
+    const found = await request(app.getHttpServer())
+      .get(`/api/v1/food/products/search?barcode=${yogurtCode}`)
+      .set('Authorization', user.authorization)
+      .expect(200);
+    expect(found.body.products[0].barcode).toBe(yogurtCode);
+    const logged = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: found.body.products[0].id,
+        grams: 100,
+        meal: 'LUNCH',
+        loggedOn: '2026-11-05',
+      })
+      .expect(201);
+    const copied = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${logged.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 70, saveAsMyProduct: true })
+      .expect(200);
+    const firstCopy = await prisma.foodProduct.findUniqueOrThrow({
+      where: { id: copied.body.productId },
+    });
+    expect(firstCopy.barcode).toBe(yogurtCode);
+
+    const again = await request(app.getHttpServer())
+      .post('/api/v1/food/log')
+      .set('Authorization', user.authorization)
+      .send({
+        productId: found.body.products[0].id,
+        grams: 100,
+        meal: 'DINNER',
+        loggedOn: '2026-11-06',
+      })
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .patch(`/api/v1/food/log/${again.body.id}`)
+      .set('Authorization', user.authorization)
+      .send({ kcal: 70, saveAsMyProduct: true })
+      .expect(200);
+    const secondCopy = await prisma.foodProduct.findUniqueOrThrow({
+      where: { id: second.body.productId },
+    });
+    expect(secondCopy.barcode).toBeNull();
   });
 });

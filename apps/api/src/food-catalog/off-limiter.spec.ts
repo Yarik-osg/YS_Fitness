@@ -14,12 +14,14 @@ function limiter(
     searchPerMin: number;
     userPerMin: number;
     barcodePerMin: number;
+    barcodeUserPerMin: number;
   }>,
 ) {
   return new OffOutboundLimiter(clock, {
     searchPerMin: 10,
     userPerMin: 3,
     barcodePerMin: 100,
+    barcodeUserPerMin: 20,
     ...limits,
   });
 }
@@ -38,6 +40,7 @@ describe('OffOutboundLimiter', () => {
       searchPerMin: number;
       userPerMin: number;
       barcodePerMin: number;
+      barcodeUserPerMin: number;
     }>,
   ) {
     const created = limiter(clock, limits);
@@ -90,6 +93,36 @@ describe('OffOutboundLimiter', () => {
     }
     expect(decisions.filter((decision) => decision === 'ok')).toHaveLength(10);
     expect(decisions.slice(10)).toEqual(['global_limit', 'global_limit']);
+  });
+
+  it('stops the 21st barcode for one user and still serves someone else', () => {
+    const clock = new FakeClock();
+    const gate = create(clock, { barcodePerMin: 100, barcodeUserPerMin: 20 });
+    for (let index = 0; index < 20; index += 1) {
+      expect(gate.tryBarcode('a')).toBe('ok');
+    }
+    expect(gate.tryBarcode('a')).toBe('user_limit');
+    expect(gate.tryBarcode('other')).toBe('ok');
+  });
+
+  it('denies the 21st barcode without spending the global bucket, and the reverse', () => {
+    const clock = new FakeClock();
+    const gate = create(clock, { barcodePerMin: 2, barcodeUserPerMin: 2 });
+    expect(gate.tryBarcode('a')).toBe('ok');
+    expect(gate.tryBarcode('a')).toBe('ok');
+    expect(gate.tryBarcode('a')).toBe('user_limit');
+    expect(gate.tryBarcode('b')).toBe('global_limit');
+    expect(gate.tryBarcode('b')).toBe('global_limit');
+    clock.nowValue += 60_000;
+    expect(gate.tryBarcode('b')).toBe('ok');
+  });
+
+  it('does not let a global barcode denial spend the user allowance', () => {
+    const clock = new FakeClock();
+    const gate = create(clock, { barcodePerMin: 1, barcodeUserPerMin: 1 });
+    expect(gate.tryBarcode('a')).toBe('ok');
+    expect(gate.tryBarcode('b')).toBe('global_limit');
+    expect(gate.tryBarcode('b')).toBe('global_limit');
   });
 
   it('drops a user key after a full quiet minute', () => {

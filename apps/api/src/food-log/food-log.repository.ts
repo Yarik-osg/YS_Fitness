@@ -11,6 +11,7 @@ export interface RecentFoodRow {
   loggedOn: Date;
   source: 'OFF' | 'CUSTOM';
   externalId: string | null;
+  barcode: string | null;
   name: string;
   brand: string | null;
   imageUrl: string | null;
@@ -80,6 +81,7 @@ export class FoodLogRepository {
         picked.logged_on AS "loggedOn",
         picked.source,
         picked.external_id AS "externalId",
+        picked.barcode AS "barcode",
         picked.name,
         picked.brand,
         picked.image_url AS "imageUrl",
@@ -97,6 +99,7 @@ export class FoodLogRepository {
           e.id,
           p.source,
           p.external_id,
+          p.barcode,
           p.name,
           p.brand,
           p.image_url,

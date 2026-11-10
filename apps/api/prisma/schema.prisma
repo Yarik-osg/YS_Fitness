@@ -557,6 +557,13 @@ model FoodProduct {
   id               String            @id @default(uuid()) @db.Uuid
   source           FoodProductSource
   externalId       String?           @map("external_id") @db.VarChar(32)
+  /// Custom foods only. Open Food Facts barcodes stay in externalId.
+  /// One barcode per user is the partial unique index
+  /// food_products_custom_barcode_key (owner_id, barcode WHERE source = CUSTOM
+  /// AND barcode IS NOT NULL), hand-written in the migration because Prisma
+  /// cannot model that predicate. `prisma migrate deploy` applies it.
+  /// `prisma db push` drops it; do not accept a later migration that drops it.
+  barcode          String?           @db.VarChar(13)
   ownerId          String?           @map("owner_id") @db.Uuid
   basedOnProductId String?           @map("based_on_product_id") @db.Uuid
   name             String            @db.VarChar(200)

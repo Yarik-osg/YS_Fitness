@@ -16,19 +16,33 @@ const visibleTo = (userId: string) => ({
 export class FoodCatalogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  matchingCustom(
-    userId: string,
-    query: { q?: string; barcode?: string },
-  ): Promise<FoodProduct[]> {
+  matchingCustom(userId: string, terms?: string): Promise<FoodProduct[]> {
     return this.prisma.foodProduct.findMany({
       where: {
         source: 'CUSTOM',
         ownerId: userId,
-        OR: matchQuery(query),
+        OR: matchQuery(terms),
       },
       orderBy: { name: 'asc' },
       take: 20,
     });
+  }
+
+  findCustomByBarcode(
+    userId: string,
+    barcode: string,
+  ): Promise<FoodProduct | null> {
+    return this.prisma.foodProduct.findFirst({
+      where: { source: 'CUSTOM', ownerId: userId, barcode },
+    });
+  }
+
+  async findOffByExternalIds(ids: string[]): Promise<FoodProduct | null> {
+    if (ids.length === 0) return null;
+    const rows = await this.prisma.foodProduct.findMany({
+      where: { source: 'OFF', externalId: { in: ids } },
+    });
+    return rows.find((row) => row.externalId === ids[0]) ?? rows[0] ?? null;
   }
 
   listCustom(userId: string): Promise<FoodProduct[]> {
@@ -41,7 +55,7 @@ export class FoodCatalogRepository {
 
   matchingOff(terms: string): Promise<FoodProduct[]> {
     return this.prisma.foodProduct.findMany({
-      where: { source: 'OFF', OR: matchQuery({ q: terms }) },
+      where: { source: 'OFF', OR: matchQuery(terms) },
       orderBy: { name: 'asc' },
       take: 20,
     });
@@ -110,6 +124,7 @@ export class FoodCatalogRepository {
     input: {
       name: string;
       imageUrl: string | null;
+      barcode: string | null;
       kcalPer100g: number;
       proteinPer100g: number;
       fatPer100g: number;
@@ -134,11 +149,34 @@ export class FoodCatalogRepository {
     });
   }
 
-  copyFromEntry(
+  async copyFromEntry(
     userId: string,
     input: {
       name: string;
       imageUrl: string | null;
+      barcode: string | null;
+      basedOnProductId: string | null;
+      kcalPer100g: Prisma.Decimal;
+      proteinPer100g: Prisma.Decimal;
+      fatPer100g: Prisma.Decimal;
+      carbsPer100g: Prisma.Decimal;
+    },
+    db: Client,
+  ): Promise<{ id: string }> {
+    try {
+      return await this.insertCopy(userId, input, db);
+    } catch (error) {
+      if (!input.barcode || !isUniqueViolation(error)) throw error;
+      return this.insertCopy(userId, { ...input, barcode: null }, db);
+    }
+  }
+
+  private insertCopy(
+    userId: string,
+    input: {
+      name: string;
+      imageUrl: string | null;
+      barcode: string | null;
       basedOnProductId: string | null;
       kcalPer100g: Prisma.Decimal;
       proteinPer100g: Prisma.Decimal;
@@ -159,14 +197,20 @@ export class FoodCatalogRepository {
   }
 }
 
-function matchQuery(query: { q?: string; barcode?: string }) {
+function matchQuery(terms?: string) {
   const matches: Prisma.FoodProductWhereInput[] = [];
-  if (query.q) {
-    matches.push(fieldContainsTokens('name', query.q));
-    matches.push(fieldContainsTokens('brand', query.q));
+  if (terms) {
+    matches.push(fieldContainsTokens('name', terms));
+    matches.push(fieldContainsTokens('brand', terms));
   }
-  if (query.barcode) matches.push({ externalId: query.barcode });
   return matches;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }
 
 function fieldContainsTokens(

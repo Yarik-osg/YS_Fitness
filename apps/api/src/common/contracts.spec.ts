@@ -456,6 +456,7 @@ describe('password reset contracts', () => {
       id: '11111111-1111-4111-8111-111111111111',
       source: 'OFF',
       externalId: '1234',
+      barcode: '1234',
       name: 'Milk',
       brand: null,
       imageUrl: null,
@@ -476,5 +477,6 @@ describe('password reset contracts', () => {
       ],
     };
     expect(recent.items[0]?.product.isFavorite).toBe(false);
+    expect(recent.items[0]?.product.barcode).toBe('1234');
   });
 });

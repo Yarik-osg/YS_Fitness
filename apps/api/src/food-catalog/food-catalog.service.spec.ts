@@ -15,6 +15,7 @@ const product = {
   id: 'product-1',
   source: 'OFF',
   externalId: '1111',
+  barcode: null,
   ownerId: null,
   basedOnProductId: null,
   name: 'Cached milk',
@@ -32,7 +33,8 @@ function harness() {
     matchingCustom: vi.fn().mockResolvedValue([]),
     matchingOff: vi.fn().mockResolvedValue([product]),
     findSearch: vi.fn().mockResolvedValue({ fetchedAt: new Date() }),
-    findOffByBarcode: vi.fn().mockResolvedValue(null),
+    findCustomByBarcode: vi.fn().mockResolvedValue(null),
+    findOffByExternalIds: vi.fn().mockResolvedValue(null),
     saveSearch: vi.fn(),
     upsertOff: vi.fn(async (normalized: NormalizedOff) =>
       stored(normalized.externalId, normalized.name, normalized.brand, {
@@ -60,7 +62,7 @@ describe('FoodCatalogService.search cache', () => {
 
   it('serves a stored barcode as a complete answer', async () => {
     const { service, products, off } = harness();
-    products.findOffByBarcode.mockResolvedValue(product);
+    products.findOffByExternalIds.mockResolvedValue(product);
 
     const result = await service.search('user', { barcode: '1111' });
 
@@ -218,6 +220,7 @@ function stored(
     id,
     source: id.startsWith('custom') ? 'CUSTOM' : 'OFF',
     externalId: id.startsWith('custom') ? null : id,
+    barcode: null,
     ownerId: id.startsWith('custom') ? 'user' : null,
     basedOnProductId: null,
     name,

@@ -12,7 +12,7 @@ export type OffLookup<T> = { status: 'ok'; value: T } | { status: 'skipped' };
 
 export interface OffClient {
   search(userId: string, terms: string): Promise<OffLookup<unknown[]>>;
-  barcode(code: string): Promise<OffLookup<unknown | null>>;
+  barcode(userId: string, code: string): Promise<OffLookup<unknown | null>>;
 }
 
 @Injectable()
@@ -79,8 +79,11 @@ export class RateLimitedOffClient implements OffClient {
     return { status: 'ok', value: await this.http.search(terms) };
   }
 
-  async barcode(code: string): Promise<OffLookup<unknown | null>> {
-    if (!this.limiter.tryBarcode()) return { status: 'skipped' };
+  async barcode(
+    userId: string,
+    code: string,
+  ): Promise<OffLookup<unknown | null>> {
+    if (this.limiter.tryBarcode(userId) !== 'ok') return { status: 'skipped' };
     return { status: 'ok', value: await this.http.barcode(code) };
   }
 }

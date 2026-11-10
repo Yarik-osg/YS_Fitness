@@ -83,6 +83,7 @@ describe('RateLimitedOffClient', () => {
       searchPerMin: 10,
       userPerMin: 3,
       barcodePerMin: 100,
+      barcodeUserPerMin: 20,
     });
     const client = new RateLimitedOffClient(http as never, limiter);
     http.search.mockResolvedValue([]);
@@ -106,6 +107,7 @@ describe('RateLimitedOffClient', () => {
       searchPerMin: 10,
       userPerMin: 1,
       barcodePerMin: 100,
+      barcodeUserPerMin: 20,
     });
     const client = new RateLimitedOffClient(http as never, limiter);
 
