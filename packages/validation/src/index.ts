@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import { normalizeBarcode } from '@repo/validation/barcode';
+
+export {
+  barcodeLookupIds,
+  isValidBarcode,
+  normalizeBarcode,
+} from '@repo/validation/barcode';
 
 export const clientTypeSchema = z.enum(['WEB', 'MOBILE']);
 
@@ -661,14 +668,22 @@ const calendarDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine(isCalendarDate);
 
+export const normalizedBarcodeSchema = z
+  .string()
+  .trim()
+  .transform((value, context) => {
+    const normalized = normalizeBarcode(value);
+    if (!normalized) {
+      context.addIssue({ code: 'custom', message: 'Invalid barcode' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
 export const foodSearchQuerySchema = z
   .object({
     q: z.string().trim().min(2).max(100).optional(),
-    barcode: z
-      .string()
-      .trim()
-      .regex(/^\d{4,32}$/)
-      .optional(),
+    barcode: normalizedBarcodeSchema.optional(),
   })
   .strict()
   .refine((value) => value.q !== undefined || value.barcode !== undefined);
@@ -679,6 +694,7 @@ export const createFoodProductSchema = foodPer100gSchema
   .extend({
     name: z.string().trim().min(1).max(200),
     imageUrl: z.string().trim().url().max(2000).nullable().optional(),
+    barcode: normalizedBarcodeSchema.nullish(),
   })
   .strict();
 
