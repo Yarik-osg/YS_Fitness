@@ -16,6 +16,15 @@ function firstValid(length: 8 | 12 | 13): string {
 }
 
 describe('normalizeBarcode', () => {
+  it('accepts published GS1 examples and rejects a changed check digit', () => {
+    expect(normalizeBarcode('4006381333931')).toBe('4006381333931');
+    expect(normalizeBarcode('4006381333932')).toBeNull();
+    expect(normalizeBarcode('036000291452')).toBe('0036000291452');
+    expect(normalizeBarcode('036000291453')).toBeNull();
+    expect(normalizeBarcode('73513537')).toBe('73513537');
+    expect(normalizeBarcode('73513538')).toBeNull();
+  });
+
   const ean8 = firstValid(8);
   const upc = firstValid(12);
   const ean13 = firstValid(13);
