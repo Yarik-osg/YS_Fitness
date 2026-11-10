@@ -34,7 +34,7 @@ export class OpenFoodFactsHttp {
       this.config.get('OFF_BASE_URL'),
     );
     url.searchParams.set('fields', OFF_FIELDS);
-    const body = await this.getJson(url);
+    const body = await this.getBarcodeBody(url);
     if (!body || typeof body !== 'object') return null;
     if ('status' in body && body.status === 0) return null;
     if (!('product' in body) || body.product == null) return null;
@@ -65,6 +65,48 @@ export class OpenFoodFactsHttp {
       throw unavailable;
     }
   }
+
+  /** Barcode misses are HTTP 404 with status 0. Text search stays on getJson. */
+  private async getBarcodeBody(url: URL): Promise<unknown> {
+    const unavailable = new BadGatewayException({
+      code: 'OFF_UNAVAILABLE',
+      message: 'Food search is unavailable',
+    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': this.config.get('OFF_USER_AGENT'),
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch {
+      throw unavailable;
+    }
+    if (response.status === 404) {
+      let body: unknown;
+      try {
+        body = (await response.json()) as unknown;
+      } catch {
+        throw unavailable;
+      }
+      if (isOffNotFound(body)) return body;
+      throw unavailable;
+    }
+    if (!response.ok) throw unavailable;
+    try {
+      return (await response.json()) as unknown;
+    } catch {
+      throw unavailable;
+    }
+  }
+}
+
+function isOffNotFound(body: unknown): boolean {
+  return (
+    !!body && typeof body === 'object' && 'status' in body && body.status === 0
+  );
 }
 
 @Injectable()

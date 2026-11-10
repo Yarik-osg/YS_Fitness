@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client';
 import { normalizeBarcode } from '@repo/validation';
 import { describe, expect, it, vi } from 'vitest';
 import { FoodCatalogService, barcodeCacheKey } from './food-catalog.service.js';
+import { OpenFoodFactsHttp, RateLimitedOffClient } from './off-client.js';
+import { OffOutboundLimiter, SystemClock } from './off-limiter.js';
 
 function firstValid(length: 8 | 12 | 13): string {
   const start = 10 ** (length - 1);
@@ -157,5 +159,65 @@ describe('barcode search', () => {
 
     expect(result.fromCacheOnly).toBe(true);
     expect(off.barcode).toHaveBeenCalledWith('user-a', ean);
+  });
+
+  it('records an Open Food Facts 404 as a miss and does not spend the next allowance', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ status: 0, status_verbose: 'product not found' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const http = new OpenFoodFactsHttp({
+      get(key: string) {
+        if (key === 'OFF_USER_AGENT') return 'YSFitness/test';
+        return 'https://world.openfoodfacts.org';
+      },
+    } as never);
+    const limiter = new OffOutboundLimiter(new SystemClock(), {
+      searchPerMin: 10,
+      userPerMin: 3,
+      barcodePerMin: 100,
+      barcodeUserPerMin: 2,
+    });
+    const remembered = new Set<string>();
+    const products = {
+      findCustomByBarcode: vi.fn().mockResolvedValue(null),
+      findOffByExternalIds: vi.fn().mockResolvedValue(null),
+      findSearch: vi.fn(async (key: string) =>
+        remembered.has(key) ? { fetchedAt: new Date() } : null,
+      ),
+      saveSearch: vi.fn(async (key: string) => {
+        remembered.add(key);
+      }),
+      upsertOff: vi.fn(),
+    };
+    const service = new FoodCatalogService(
+      products as never,
+      new RateLimitedOffClient(http, limiter),
+    );
+    const code = '4006381333931';
+    try {
+      const first = await service.search('user-a', { barcode: code });
+      expect(first).toEqual({ products: [], fromCacheOnly: false });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(products.saveSearch).toHaveBeenCalledWith(
+        barcodeCacheKey(code),
+        expect.any(Date),
+      );
+
+      const second = await service.search('user-a', { barcode: code });
+      expect(second).toEqual({ products: [], fromCacheOnly: false });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const other = await service.search('user-a', {
+        barcode: '0036000291452',
+      });
+      expect(other.fromCacheOnly).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      limiter.onModuleDestroy();
+      vi.unstubAllGlobals();
+    }
   });
 });

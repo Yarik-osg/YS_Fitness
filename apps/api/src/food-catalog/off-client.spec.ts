@@ -58,6 +58,65 @@ describe('OpenFoodFactsHttp', () => {
     ]);
   });
 
+  it('reads a barcode hit, a JSON miss, and treats every other failure as unavailable', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({
+          status: 0,
+          status_verbose: 'product not found',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => {
+          throw new Error('<html>not json</html>');
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => {
+          throw new Error('empty');
+        },
+      })
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 1,
+          product: { code: '4006381333931', product_name: 'Pen' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 0 }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new OpenFoodFactsHttp(config as never);
+
+    await expect(client.barcode('2099999999998')).resolves.toBeNull();
+    await expect(client.barcode('2099999999998')).rejects.toMatchObject({
+      response: { code: 'OFF_UNAVAILABLE' },
+    });
+    await expect(client.barcode('2099999999998')).rejects.toBeInstanceOf(
+      BadGatewayException,
+    );
+    await expect(client.barcode('2099999999998')).rejects.toBeInstanceOf(
+      BadGatewayException,
+    );
+    await expect(client.barcode('4006381333931')).resolves.toEqual({
+      code: '4006381333931',
+      product_name: 'Pen',
+    });
+    await expect(client.barcode('4006381333931')).resolves.toBeNull();
+  });
+
   it('treats a missing barcode as empty and a non-ok response as unavailable', async () => {
     const fetchMock = vi
       .fn()
