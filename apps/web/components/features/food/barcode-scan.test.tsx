@@ -1,5 +1,11 @@
 import type { FoodProductResponse } from '@repo/shared-types';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/components/providers';
@@ -140,9 +146,7 @@ describe('typed barcode search', () => {
       code,
     );
     expect(await screen.findByText('Product not found.')).toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', { name: 'Create product with this barcode' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Create product' }));
     const field = screen.getByRole('textbox', { name: 'Barcode' });
     expect(field).toHaveValue(code);
     expect(field).toHaveAttribute('readonly');
@@ -205,17 +209,76 @@ describe('BarcodeScanner camera', () => {
         'The camera is blocked. Type the barcode or choose a photo.',
       ),
     ).toBeInTheDocument();
-    await user.type(
+    fireEvent.change(
       screen.getByRole('textbox', { name: 'Type the barcode' }),
-      code,
+      {
+        target: { value: code },
+      },
     );
-    await user.click(
-      screen.getByRole('button', { name: 'Look up this barcode' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Look up' }));
     expect(
       await screen.findByRole('textbox', { name: 'Grams' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Meal' })).toHaveValue('LUNCH');
+  });
+
+  it('replaces the camera with the miss', async () => {
+    const user = userEvent.setup();
+    camera(new DOMException('blocked', 'NotAllowedError'));
+    foodApi.searchFoods.mockResolvedValue({
+      products: [],
+      fromCacheOnly: false,
+    });
+    renderSheet();
+    await user.click(screen.getByRole('button', { name: 'Scan barcode' }));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Type the barcode' }),
+      {
+        target: { value: code },
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Look up' }));
+    expect(await screen.findByText('Product not found.')).toBeInTheDocument();
+    expect(document.querySelector('video')).not.toBeInTheDocument();
+  });
+
+  it('keeps the barcode field focused and hides the search form', async () => {
+    const user = userEvent.setup();
+    camera(new DOMException('blocked', 'NotAllowedError'));
+    const view = renderSheet();
+    await user.click(screen.getByRole('button', { name: 'Scan barcode' }));
+    const field = await screen.findByRole('textbox', {
+      name: 'Type the barcode',
+    });
+    field.focus();
+    view.rerender(
+      <Providers>
+        <I18nTestProvider locale="en">
+          <AddFoodSheet
+            open
+            meal="LUNCH"
+            loggedOn="2026-11-06"
+            onClose={vi.fn()}
+          />
+        </I18nTestProvider>
+      </Providers>,
+    );
+    expect(document.activeElement).toBe(field);
+    expect(
+      screen.queryByRole('textbox', { name: 'Search foods' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears the photo input so the same picture can be chosen again', async () => {
+    const user = userEvent.setup();
+    camera(new DOMException('blocked', 'NotAllowedError'));
+    renderSheet();
+    await user.click(screen.getByRole('button', { name: 'Scan barcode' }));
+    const input = await screen.findByLabelText('Scan from photo');
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'label.jpg', { type: 'image/jpeg' })] },
+    });
+    expect(input).toHaveValue('');
   });
 });
 

@@ -10,7 +10,13 @@ import {
 } from '@repo/validation';
 import { Heart, ScanBarcode } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   BarcodeLookupPanel,
   BarcodeScanner,
@@ -57,17 +63,19 @@ export function AddFoodSheet({
     <Sheet
       open={open}
       dismissible={!scanning}
+      repositionInputs={!scanning}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
     >
-      <SheetContent>
+      <SheetContent full={scanning}>
         {open ? (
           <AddFoodForm
             key={`${meal}-${loggedOn}`}
             meal={meal}
             loggedOn={loggedOn}
             onClose={onClose}
+            scanning={scanning}
             onScanningChange={setScanning}
           />
         ) : (
@@ -82,16 +90,17 @@ function AddFoodForm({
   meal,
   loggedOn,
   onClose,
+  scanning,
   onScanningChange,
 }: {
   meal: FoodMeal;
   loggedOn: string;
   onClose: () => void;
+  scanning: boolean;
   onScanningChange: (scanning: boolean) => void;
 }) {
   const t = useTranslations('food');
   const [tab, setTab] = useState<Tab>('search');
-  const [scanning, setScanning] = useState(false);
   const [lockedBarcode, setLockedBarcode] = useState<string | null>(null);
   const [addedFromScan, setAddedFromScan] = useState(false);
   const [fromScan, setFromScan] = useState(false);
@@ -117,119 +126,121 @@ function AddFoodForm({
     scanned = false,
   ) {
     setFromScan(scanned);
-    setScanning(false);
+    onScanningChange(false);
     setPicked({ product, grams, meal: nextMeal, factor: '1' });
   }
 
-  useEffect(() => {
-    onScanningChange?.(scanning);
-  }, [onScanningChange, scanning]);
+  const closeScanner = useCallback(
+    () => onScanningChange(false),
+    [onScanningChange],
+  );
 
   return (
     <>
-      <SheetTitle>{t('addProduct')}</SheetTitle>
-      <SheetDescription>
-        {t(`addContext.${picked?.meal ?? meal}`)}
-      </SheetDescription>
-      {picked ? (
-        <QuantityStep
-          product={picked.product}
-          grams={picked.grams}
-          factor={picked.factor}
-          meal={picked.meal}
-          loggedOn={loggedOn}
-          onGrams={(grams) => setPicked({ ...picked, grams })}
-          onFactor={(factor) => setPicked({ ...picked, factor })}
-          onMeal={(next) => setPicked({ ...picked, meal: next })}
-          onBack={() => setPicked(null)}
-          onDone={() => {
-            if (!fromScan) {
-              onClose();
-              return;
-            }
-            setPicked(null);
-            setAddedFromScan(true);
-          }}
-        />
-      ) : addedFromScan ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-ink">{t('scanAdded')}</p>
-          <button
-            type="button"
-            onClick={() => {
-              setAddedFromScan(false);
-              setScanning(true);
-            }}
-            className="text-left text-sm text-teal"
-          >
-            {t('scanAnother')}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-sm text-muted"
-          >
-            {t('scanDone')}
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="mb-4 flex border border-line">
-            {(['search', 'custom', 'favorites', 'recent'] as const).map(
-              (item) => (
-                <button
-                  key={item}
-                  type="button"
-                  aria-pressed={tab === item}
-                  onClick={() => setTab(item)}
-                  className={`flex-1 px-2 py-2 font-label text-[10px] font-bold tracking-[0.08em] uppercase ${
-                    tab === item ? 'bg-teal text-background' : 'text-muted'
-                  }`}
-                >
-                  {t(`tabs.${item}`)}
-                </button>
-              ),
-            )}
-          </div>
-          {tab === 'search' ? (
-            <SearchTab
-              query={query}
-              debounced={debounced}
-              creating={creating}
-              onQuery={setQuery}
-              onCreating={setCreating}
-              onPick={(product) => pick(product)}
-              onBarcode={(product) => pick(product, '100', meal, true)}
-              lockedBarcode={lockedBarcode}
-              onScan={() => setScanning(true)}
-              onCreated={(product) => {
-                setCreating(false);
-                setLockedBarcode(null);
-                pick(product, '100', meal, fromScan);
-              }}
-            />
-          ) : null}
-          {tab === 'custom' ? (
-            <CustomTab onPick={(product) => pick(product)} />
-          ) : null}
-          {tab === 'favorites' ? (
-            <FavoritesTab onPick={(product) => pick(product)} />
-          ) : null}
-          {tab === 'recent' ? (
-            <RecentTab
-              onPick={(product, grams, nextMeal) =>
-                pick(product, grams, nextMeal)
+      <SheetTitle className={scanning ? 'sr-only' : undefined}>
+        {t('addProduct')}
+      </SheetTitle>
+      <div
+        inert={scanning ? true : undefined}
+        aria-hidden={scanning || undefined}
+      >
+        <SheetDescription>
+          {t(`addContext.${picked?.meal ?? meal}`)}
+        </SheetDescription>
+        {picked ? (
+          <QuantityStep
+            product={picked.product}
+            grams={picked.grams}
+            factor={picked.factor}
+            meal={picked.meal}
+            loggedOn={loggedOn}
+            onGrams={(grams) => setPicked({ ...picked, grams })}
+            onFactor={(factor) => setPicked({ ...picked, factor })}
+            onMeal={(next) => setPicked({ ...picked, meal: next })}
+            onBack={() => setPicked(null)}
+            onDone={() => {
+              if (!fromScan) {
+                onClose();
+                return;
               }
-            />
-          ) : null}
-        </>
-      )}
+              setPicked(null);
+              setAddedFromScan(true);
+            }}
+          />
+        ) : addedFromScan ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-ink">{t('scanAdded')}</p>
+            <Button
+              variant="outline"
+              className="w-full whitespace-nowrap"
+              onClick={() => {
+                setAddedFromScan(false);
+                onScanningChange(true);
+              }}
+            >
+              {t('scanAnother')}
+            </Button>
+            <Button onClick={onClose}>{t('scanDone')}</Button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex border border-line">
+              {(['search', 'custom', 'favorites', 'recent'] as const).map(
+                (item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    aria-pressed={tab === item}
+                    onClick={() => setTab(item)}
+                    className={`flex-1 px-2 py-2 font-label text-[10px] font-bold tracking-[0.08em] uppercase ${
+                      tab === item ? 'bg-teal text-background' : 'text-muted'
+                    }`}
+                  >
+                    {t(`tabs.${item}`)}
+                  </button>
+                ),
+              )}
+            </div>
+            {tab === 'search' ? (
+              <SearchTab
+                query={query}
+                debounced={debounced}
+                creating={creating}
+                onQuery={setQuery}
+                onCreating={setCreating}
+                onPick={(product) => pick(product)}
+                onBarcode={(product) => pick(product, '100', meal, true)}
+                lockedBarcode={lockedBarcode}
+                onScan={() => onScanningChange(true)}
+                onCreated={(product) => {
+                  setCreating(false);
+                  setLockedBarcode(null);
+                  pick(product, '100', meal, fromScan);
+                }}
+              />
+            ) : null}
+            {tab === 'custom' ? (
+              <CustomTab onPick={(product) => pick(product)} />
+            ) : null}
+            {tab === 'favorites' ? (
+              <FavoritesTab onPick={(product) => pick(product)} />
+            ) : null}
+            {tab === 'recent' ? (
+              <RecentTab
+                onPick={(product, grams, nextMeal) =>
+                  pick(product, grams, nextMeal)
+                }
+              />
+            ) : null}
+          </>
+        )}
+      </div>
       {scanning ? (
         <BarcodeScanner
-          onClose={() => setScanning(false)}
+          onClose={closeScanner}
           onProduct={(product) => pick(product, '100', meal, true)}
           onCreate={(barcode) => {
-            setScanning(false);
+            onScanningChange(false);
             setFromScan(true);
             setTab('search');
             setLockedBarcode(barcode);
@@ -237,7 +248,7 @@ function AddFoodForm({
             setQuery('');
           }}
           onSearchByName={() => {
-            setScanning(false);
+            onScanningChange(false);
             setTab('search');
             setQuery('');
             setCreating(false);
@@ -642,40 +653,32 @@ function CreateProductForm({
         value={code}
         readOnly={barcodeLocked}
         onChange={(event) => setCode(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted read-only:text-muted"
+        className="border border-line bg-background px-3 py-2 text-base text-ink placeholder:text-muted read-only:text-muted"
       />
-      <input
-        aria-label={t('kcalPer100')}
-        placeholder={t('kcalPer100')}
-        value={kcal}
-        inputMode="decimal"
-        onChange={(event) => setKcal(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
-      />
-      <input
-        aria-label={t('proteinPer100')}
-        placeholder={t('proteinPer100')}
-        value={protein}
-        inputMode="decimal"
-        onChange={(event) => setProtein(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
-      />
-      <input
-        aria-label={t('fatPer100')}
-        placeholder={t('fatPer100')}
-        value={fat}
-        inputMode="decimal"
-        onChange={(event) => setFat(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
-      />
-      <input
-        aria-label={t('carbsPer100')}
-        placeholder={t('carbsPer100')}
-        value={carbs}
-        inputMode="decimal"
-        onChange={(event) => setCarbs(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
-      />
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            ['kcal', 'kcalPer100', kcal, setKcal],
+            ['protein', 'proteinPer100', protein, setProtein],
+            ['fat', 'fatPer100', fat, setFat],
+            ['carbs', 'carbsPer100', carbs, setCarbs],
+          ] as const
+        ).map(([short, full, value, setValue]) => (
+          <label
+            key={full}
+            className="flex min-w-0 flex-col gap-1 text-sm text-muted"
+          >
+            {t(short)}
+            <input
+              aria-label={t(full)}
+              value={value}
+              inputMode="decimal"
+              onChange={(event) => setValue(event.target.value)}
+              className="min-w-0 border border-line bg-background px-3 py-2 text-base text-ink placeholder:text-muted"
+            />
+          </label>
+        ))}
+      </div>
       {invalid ? (
         <p role="alert" className="text-sm text-amber">
           {t('invalidProduct')}
@@ -731,28 +734,30 @@ function QuantityStep({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink">{decodeFoodText(product.name)}</p>
-      <label className="flex flex-col gap-1.5 text-sm text-muted">
-        {t('grams')}
-        <input
-          aria-label={t('grams')}
-          inputMode="decimal"
-          min={FOOD_MIN_GRAMS}
-          max={FOOD_MAX_GRAMS}
-          value={grams}
-          onChange={(event) => onGrams(event.target.value)}
-          className="border border-line bg-background px-3 py-2 text-ink"
-        />
-      </label>
-      <label className="flex flex-col gap-1.5 text-sm text-muted">
-        {t('multiplier')}
-        <input
-          aria-label={t('multiplier')}
-          inputMode="decimal"
-          value={factor}
-          onChange={(event) => onFactor(event.target.value)}
-          className="border border-line bg-background px-3 py-2 text-ink"
-        />
-      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">
+          {t('grams')}
+          <input
+            aria-label={t('grams')}
+            inputMode="decimal"
+            min={FOOD_MIN_GRAMS}
+            max={FOOD_MAX_GRAMS}
+            value={grams}
+            onChange={(event) => onGrams(event.target.value)}
+            className="border border-line bg-background px-3 py-2 text-base text-ink"
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1.5 text-sm text-muted">
+          {t('multiplier')}
+          <input
+            aria-label={t('multiplier')}
+            inputMode="decimal"
+            value={factor}
+            onChange={(event) => onFactor(event.target.value)}
+            className="border border-line bg-background px-3 py-2 text-base text-ink"
+          />
+        </label>
+      </div>
       <label className="flex flex-col gap-1.5 text-sm text-muted">
         {t('meal')}
         <select

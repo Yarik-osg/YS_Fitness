@@ -4,7 +4,9 @@ import type { FoodProductResponse } from '@repo/shared-types';
 import { normalizeBarcode } from '@repo/validation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState } from 'react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ApiClientError } from '@/lib/api/client';
+import { cn } from '@/lib/utils';
 import { isScanFormat } from '@/lib/food/barcode';
 import { createScanDetector } from '@/lib/food/barcode-engine';
 import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
@@ -48,13 +50,12 @@ export function BarcodeLookupPanel({
         <p role="alert" className="text-sm text-amber">
           {slow ? t('slowDown') : t('scanLookupFailed')}
         </p>
-        <button
-          type="button"
+        <Button
+          className="mt-2 w-full whitespace-nowrap"
           onClick={() => void lookup.refetch()}
-          className="mt-2 text-sm text-teal"
         >
           {t('retry')}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -83,40 +84,38 @@ export function BarcodeLookupPanel({
     return (
       <div className="flex flex-col gap-2">
         <p className="text-sm text-ink">{t('scanCatalogDown')}</p>
-        <button
-          type="button"
+        <Button
+          className="w-full whitespace-nowrap"
           onClick={() => void lookup.refetch()}
-          className="text-left text-sm text-teal"
         >
           {t('retry')}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full whitespace-nowrap"
           onClick={() => onCreate(code)}
-          className="text-left text-sm text-teal"
         >
           {t('scanCreate')}
-        </button>
+        </Button>
       </div>
     );
   }
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-ink">{t('scanNotFound')}</p>
-      <button
-        type="button"
+      <Button
+        className="w-full whitespace-nowrap"
         onClick={() => onCreate(code)}
-        className="text-left text-sm text-teal"
       >
         {t('scanCreate')}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="outline"
+        className="w-full whitespace-nowrap"
         onClick={onSearchByName}
-        className="text-left text-sm text-teal"
       >
         {t('scanByName')}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -150,7 +149,7 @@ export function BarcodeScanner({
       [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
         (item) => !item.hasAttribute('disabled'),
       );
-    items()[0]?.focus();
+    if (!root.contains(document.activeElement)) items()[0]?.focus();
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -229,69 +228,98 @@ export function BarcodeScanner({
                   ? t('scanAlign')
                   : '';
 
+  const scanning = accepted === null && phase === 'scanning';
+
   return (
     <div
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-[80] flex flex-col bg-background text-ink"
+      className="absolute inset-0 z-10 flex flex-col bg-background pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+3.25rem))] text-ink"
     >
-      <div className="flex items-center justify-between gap-3 px-5 py-4">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">
         <h2
           id={titleId}
-          className="font-label text-xs font-bold tracking-[0.14em] uppercase"
+          className="min-w-0 truncate font-label text-xs font-bold tracking-[0.14em] uppercase"
         >
           {t('scanTitle')}
         </h2>
-        <button type="button" onClick={onClose} className="text-sm text-teal">
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 whitespace-nowrap"
+          onClick={onClose}
+        >
           {t('scanClose')}
-        </button>
+        </Button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-8">
-        <p aria-live="polite" className="text-sm text-muted">
-          {status}
-        </p>
-        {accepted === null && phase === 'scanning' ? (
-          <div className="relative mx-auto aspect-[3/4] w-full max-w-sm overflow-hidden border border-line">
-            <video
-              ref={bindVideo}
-              muted
-              playsInline
-              className="h-full w-full object-cover"
-            />
-            <div className="pointer-events-none absolute inset-8 border border-white">
+      {scanning ? (
+        <div className="relative h-52 shrink-0 bg-background">
+          <video
+            ref={bindVideo}
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8">
+            <div className="h-36 w-full max-w-sm border-2 border-ink">
               <span className="sr-only">{t('scanFrame')}</span>
             </div>
           </div>
-        ) : null}
+          <p
+            aria-live="polite"
+            className="absolute inset-x-0 bottom-3 px-5 text-center text-sm text-ink"
+          >
+            {status}
+          </p>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+          {status ? (
+            <p aria-live="polite" className="text-sm text-muted">
+              {status}
+            </p>
+          ) : null}
+          {accepted ? (
+            <BarcodeLookupPanel
+              lookup={lookup}
+              code={accepted}
+              onProduct={onProduct}
+              onCreate={onCreate}
+              onSearchByName={onSearchByName}
+            />
+          ) : null}
+          {accepted && !lookup.isPending ? (
+            <Button
+              variant="outline"
+              className="w-full whitespace-nowrap"
+              onClick={() => setAccepted(null)}
+            >
+              {t('scanAnother')}
+            </Button>
+          ) : null}
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pt-4">
         {phase === 'paused' ? (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            className="w-full whitespace-nowrap"
             onClick={restart}
-            className="text-left text-sm text-teal"
           >
             {t('scanStart')}
-          </button>
+          </Button>
         ) : null}
         {canTorch ? (
-          <button
-            type="button"
+          <Button
+            variant="outline"
             aria-pressed={torch}
+            className="w-full whitespace-nowrap"
             onClick={() => void toggleTorch()}
-            className="text-left text-sm text-teal"
           >
             {torch ? t('scanTorchOff') : t('scanTorchOn')}
-          </button>
-        ) : null}
-        {accepted ? (
-          <BarcodeLookupPanel
-            lookup={lookup}
-            code={accepted}
-            onProduct={onProduct}
-            onCreate={onCreate}
-            onSearchByName={onSearchByName}
-          />
+          </Button>
         ) : null}
         <label className="flex flex-col gap-1.5 text-sm text-muted">
           {t('scanManual')}
@@ -303,7 +331,7 @@ export function BarcodeScanner({
               setManual(event.target.value);
               setManualInvalid(false);
             }}
-            className="border border-line bg-background px-3 py-2 text-ink"
+            className="border border-line bg-background px-3 py-2 text-base text-ink"
           />
         </label>
         {manualInvalid ? (
@@ -311,21 +339,27 @@ export function BarcodeScanner({
             {t('scanInvalid')}
           </p>
         ) : null}
-        <button
-          type="button"
-          onClick={submitManual}
-          className="text-left text-sm text-teal"
-        >
+        <Button className="w-full whitespace-nowrap" onClick={submitManual}>
           {t('scanUseTyped')}
-        </button>
-        <label className="text-sm text-teal">
+        </Button>
+        <label
+          className={cn(
+            buttonVariants({ variant: 'outline' }),
+            'w-full whitespace-nowrap focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent',
+          )}
+        >
           {t('scanPhoto')}
           <input
             type="file"
             accept="image/*"
             capture="environment"
             className="sr-only"
-            onChange={(event) => void onPhoto(event.target.files?.[0])}
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              input.value = '';
+              void onPhoto(file);
+            }}
           />
         </label>
         {photoInvalid ? (

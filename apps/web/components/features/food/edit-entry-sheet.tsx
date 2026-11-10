@@ -195,44 +195,46 @@ function EditEntryForm({
           value={name}
           onChange={setName}
         />
-        <Field
-          id="edit-factor"
-          label={t('multiplier')}
-          value={factor}
-          onChange={applyFactor}
-        />
-        <Field
-          id="edit-grams"
-          label={t('grams')}
-          value={grams}
-          min={FOOD_MIN_GRAMS}
-          max={FOOD_MAX_GRAMS}
-          onChange={changeGrams}
-        />
-        <Field
-          id="edit-kcal"
-          label={t('kcal')}
-          value={kcal}
-          onChange={(value) => editMacro('kcal', value)}
-        />
-        <Field
-          id="edit-protein"
-          label={t('protein')}
-          value={protein}
-          onChange={(value) => editMacro('protein', value)}
-        />
-        <Field
-          id="edit-fat"
-          label={t('fat')}
-          value={fat}
-          onChange={(value) => editMacro('fat', value)}
-        />
-        <Field
-          id="edit-carbs"
-          label={t('carbs')}
-          value={carbs}
-          onChange={(value) => editMacro('carbs', value)}
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <Field
+            id="edit-factor"
+            label={t('multiplier')}
+            value={factor}
+            onChange={applyFactor}
+          />
+          <Field
+            id="edit-grams"
+            label={t('grams')}
+            value={grams}
+            min={FOOD_MIN_GRAMS}
+            max={FOOD_MAX_GRAMS}
+            onChange={changeGrams}
+          />
+          <Field
+            id="edit-kcal"
+            label={t('kcal')}
+            value={kcal}
+            onChange={(value) => editMacro('kcal', value)}
+          />
+          <Field
+            id="edit-protein"
+            label={t('protein')}
+            value={protein}
+            onChange={(value) => editMacro('protein', value)}
+          />
+          <Field
+            id="edit-fat"
+            label={t('fat')}
+            value={fat}
+            onChange={(value) => editMacro('fat', value)}
+          />
+          <Field
+            id="edit-carbs"
+            label={t('carbs')}
+            value={carbs}
+            onChange={(value) => editMacro('carbs', value)}
+          />
+        </div>
         <label className="flex flex-col gap-1.5 text-sm text-muted">
           {t('meal')}
           <select
@@ -295,7 +297,10 @@ function Field({
   onChange: (value: string) => void;
 }) {
   return (
-    <label htmlFor={id} className="flex flex-col gap-1.5 text-sm text-muted">
+    <label
+      htmlFor={id}
+      className="flex min-w-0 flex-col gap-1.5 text-sm text-muted"
+    >
       {label}
       <input
         id={id}
@@ -304,7 +309,7 @@ function Field({
         max={max}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="border border-line bg-background px-3 py-2 text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="border border-line bg-background px-3 py-2 text-base text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       />
     </label>
   );
