@@ -6,10 +6,15 @@ import {
   FOOD_MAX_GRAMS,
   FOOD_MEALS,
   FOOD_MIN_GRAMS,
+  normalizeBarcode,
 } from '@repo/validation';
-import { Heart } from 'lucide-react';
+import { Heart, ScanBarcode } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  BarcodeLookupPanel,
+  BarcodeScanner,
+} from '@/components/features/food/barcode-scanner';
 import { FoodImage } from '@/components/features/food/food-image';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +33,7 @@ import {
   useCreateFoodProduct,
   useCustomFoods,
   useFavoriteFoods,
+  useFoodBarcodeLookup,
   useFoodSearch,
   useRecentFoods,
   useToggleFavorite,
@@ -46,9 +52,11 @@ export function AddFoodSheet({
   loggedOn: string;
   onClose: () => void;
 }) {
+  const [scanning, setScanning] = useState(false);
   return (
     <Sheet
       open={open}
+      dismissible={!scanning}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
@@ -60,6 +68,7 @@ export function AddFoodSheet({
             meal={meal}
             loggedOn={loggedOn}
             onClose={onClose}
+            onScanningChange={setScanning}
           />
         ) : (
           <SheetTitle className="sr-only">Add</SheetTitle>
@@ -73,13 +82,19 @@ function AddFoodForm({
   meal,
   loggedOn,
   onClose,
+  onScanningChange,
 }: {
   meal: FoodMeal;
   loggedOn: string;
   onClose: () => void;
+  onScanningChange: (scanning: boolean) => void;
 }) {
   const t = useTranslations('food');
   const [tab, setTab] = useState<Tab>('search');
+  const [scanning, setScanning] = useState(false);
+  const [lockedBarcode, setLockedBarcode] = useState<string | null>(null);
+  const [addedFromScan, setAddedFromScan] = useState(false);
+  const [fromScan, setFromScan] = useState(false);
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [creating, setCreating] = useState(false);
@@ -99,9 +114,16 @@ function AddFoodForm({
     product: FoodProductResponse,
     grams = '100',
     nextMeal: FoodMeal = meal,
+    scanned = false,
   ) {
+    setFromScan(scanned);
+    setScanning(false);
     setPicked({ product, grams, meal: nextMeal, factor: '1' });
   }
+
+  useEffect(() => {
+    onScanningChange?.(scanning);
+  }, [onScanningChange, scanning]);
 
   return (
     <>
@@ -120,8 +142,36 @@ function AddFoodForm({
           onFactor={(factor) => setPicked({ ...picked, factor })}
           onMeal={(next) => setPicked({ ...picked, meal: next })}
           onBack={() => setPicked(null)}
-          onDone={onClose}
+          onDone={() => {
+            if (!fromScan) {
+              onClose();
+              return;
+            }
+            setPicked(null);
+            setAddedFromScan(true);
+          }}
         />
+      ) : addedFromScan ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-ink">{t('scanAdded')}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setAddedFromScan(false);
+              setScanning(true);
+            }}
+            className="text-left text-sm text-teal"
+          >
+            {t('scanAnother')}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-muted"
+          >
+            {t('scanDone')}
+          </button>
+        </div>
       ) : (
         <>
           <div className="mb-4 flex border border-line">
@@ -149,9 +199,13 @@ function AddFoodForm({
               onQuery={setQuery}
               onCreating={setCreating}
               onPick={(product) => pick(product)}
+              onBarcode={(product) => pick(product, '100', meal, true)}
+              lockedBarcode={lockedBarcode}
+              onScan={() => setScanning(true)}
               onCreated={(product) => {
                 setCreating(false);
-                pick(product);
+                setLockedBarcode(null);
+                pick(product, '100', meal, fromScan);
               }}
             />
           ) : null}
@@ -170,6 +224,26 @@ function AddFoodForm({
           ) : null}
         </>
       )}
+      {scanning ? (
+        <BarcodeScanner
+          onClose={() => setScanning(false)}
+          onProduct={(product) => pick(product, '100', meal, true)}
+          onCreate={(barcode) => {
+            setScanning(false);
+            setFromScan(true);
+            setTab('search');
+            setLockedBarcode(barcode);
+            setCreating(true);
+            setQuery('');
+          }}
+          onSearchByName={() => {
+            setScanning(false);
+            setTab('search');
+            setQuery('');
+            setCreating(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -178,38 +252,57 @@ function SearchTab({
   query,
   debounced,
   creating,
+  lockedBarcode,
   onQuery,
   onCreating,
+  onScan,
   onPick,
+  onBarcode,
   onCreated,
 }: {
   query: string;
   debounced: string;
   creating: boolean;
+  lockedBarcode: string | null;
   onQuery: (value: string) => void;
   onCreating: (value: boolean) => void;
+  onScan: () => void;
   onPick: (product: FoodProductResponse) => void;
+  onBarcode: (product: FoodProductResponse) => void;
   onCreated: (product: FoodProductResponse) => void;
 }) {
   const t = useTranslations('food');
+  const code = normalizeBarcode(debounced);
   const search = useFoodSearch(debounced);
-  const typed = debounced.trim().length >= 2;
+  const barcodeLookup = useFoodBarcodeLookup(code);
+  const typed = debounced.trim().length >= 2 && !code;
   const slow =
     search.error instanceof ApiClientError && search.error.status === 429;
   const products = useMemo(
-    () => rankFoodProducts(search.data?.products ?? [], debounced),
-    [search.data, debounced],
+    () =>
+      code ? [] : rankFoodProducts(search.data?.products ?? [], debounced),
+    [code, search.data, debounced],
   );
 
   return (
     <div className="flex flex-col gap-3">
-      <input
-        value={query}
-        onChange={(event) => onQuery(event.target.value)}
-        placeholder={t('searchPlaceholder')}
-        aria-label={t('searchPlaceholder')}
-        className="border border-line bg-background px-3 py-2 text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      />
+      <div className="flex gap-2">
+        <input
+          value={query}
+          onChange={(event) => onQuery(event.target.value)}
+          placeholder={t('searchPlaceholder')}
+          aria-label={t('searchPlaceholder')}
+          className="min-w-0 flex-1 border border-line bg-background px-3 py-2 text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        />
+        <button
+          type="button"
+          aria-label={t('scanOpen')}
+          onClick={onScan}
+          className="grid size-11 shrink-0 place-items-center border border-line text-teal"
+        >
+          <ScanBarcode size={18} strokeWidth={1.6} aria-hidden="true" />
+        </button>
+      </div>
       {!typed ? <p className="text-sm text-muted">{t('searchHint')}</p> : null}
       {typed && search.isPending ? (
         <p className="text-sm text-muted">{t('loading')}</p>
@@ -233,7 +326,16 @@ function SearchTab({
           </button>
         </div>
       ) : null}
-      {search.data?.fromCacheOnly ? (
+      {code && !creating ? (
+        <BarcodeLookupPanel
+          lookup={barcodeLookup}
+          code={code}
+          onProduct={onBarcode}
+          onCreate={() => onCreating(true)}
+          onSearchByName={() => onQuery('')}
+        />
+      ) : null}
+      {!code && search.data?.fromCacheOnly ? (
         <p className="text-sm text-muted">{t('cacheOnly')}</p>
       ) : null}
       {typed && search.isSuccess && products.length === 0 ? (
@@ -247,7 +349,13 @@ function SearchTab({
       >
         {t('createOwn')}
       </button>
-      {creating ? <CreateProductForm onCreated={onCreated} /> : null}
+      {creating ? (
+        <CreateProductForm
+          barcode={code ?? lockedBarcode ?? ''}
+          barcodeLocked={Boolean(code ?? lockedBarcode)}
+          onCreated={onCreated}
+        />
+      ) : null}
     </div>
   );
 }
@@ -478,22 +586,31 @@ function ProductList({
 }
 
 function CreateProductForm({
+  barcode = '',
+  barcodeLocked = false,
   onCreated,
 }: {
+  barcode?: string;
+  barcodeLocked?: boolean;
   onCreated: (product: FoodProductResponse) => void;
 }) {
   const t = useTranslations('food');
   const create = useCreateFoodProduct();
   const [name, setName] = useState('');
+  const [code, setCode] = useState(barcode);
   const [kcal, setKcal] = useState('');
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
   const [carbs, setCarbs] = useState('');
   const [invalid, setInvalid] = useState(false);
+  const duplicate =
+    create.error instanceof ApiClientError &&
+    create.error.code === 'BARCODE_ALREADY_USED';
 
   function submit() {
     const parsed = createFoodProductSchema.safeParse({
       name,
+      barcode: code.trim() ? code : null,
       kcalPer100g: Number(kcal),
       proteinPer100g: Number(protein),
       fatPer100g: Number(fat),
@@ -517,6 +634,15 @@ function CreateProductForm({
         value={name}
         onChange={(event) => setName(event.target.value)}
         className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted"
+      />
+      <input
+        aria-label={t('barcode')}
+        placeholder={t('barcode')}
+        inputMode="numeric"
+        value={code}
+        readOnly={barcodeLocked}
+        onChange={(event) => setCode(event.target.value)}
+        className="border border-line bg-background px-3 py-2 text-ink placeholder:text-muted read-only:text-muted"
       />
       <input
         aria-label={t('kcalPer100')}
@@ -557,7 +683,7 @@ function CreateProductForm({
       ) : null}
       {create.isError ? (
         <p role="alert" className="text-sm text-amber">
-          {t('couldNotCreate')}
+          {duplicate ? t('barcodeUsed') : t('couldNotCreate')}
         </p>
       ) : null}
       <Button disabled={create.isPending} onClick={submit}>
